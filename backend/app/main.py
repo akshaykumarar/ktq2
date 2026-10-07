@@ -12,6 +12,8 @@ from fastapi.staticfiles import StaticFiles
 from backend.app.config.settings import load_config
 from backend.app.agents.factory import AgentFactory
 from backend.app.api.chat import router as chat_router
+from backend.app.api.rfi import router as rfi_router
+from backend.app.db.health import check_database_connection
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -51,6 +53,7 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(chat_router)
+app.include_router(rfi_router)
 
 
 @app.get("/api/health", tags=["system"])
@@ -62,6 +65,13 @@ async def health_check() -> dict:
         "status": "ok",
         "agents": ["master"] + specialists,
     }
+
+
+@app.get("/api/db/health", tags=["system"])
+async def database_health_check() -> dict:
+    """Check configured Postgres connectivity and schema availability."""
+    config = getattr(app.state, "config", None) or load_config()
+    return check_database_connection(config.secrets)
 
 
 # Mount existing chatbot UI frontend if available

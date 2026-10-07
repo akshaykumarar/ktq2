@@ -30,8 +30,25 @@ class AppSecrets(BaseSettings):
     ANTHROPIC_API_KEY: str | None = None
     GOOGLE_API_KEY: str | None = None
     OLLAMA_BASE_URL: str = "http://localhost:11434"
+    POSTGRES_MODE: str | None = None
+    DATABASE_URL: str | None = None
+    DB_HOST: str | None = None
+    DB_PORT: int = 5432
+    DB_NAME: str | None = None
+    DB_USER: str | None = None
+    DB_PASSWORD: str | None = None
+    DB_SSL_MODE: str = "require"
+    DB_CHANNEL_BINDING: str | None = None
+    DB_SCHEMA: str = "ktq"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    @property
+    def db_configured(self) -> bool:
+        """Whether all required database connection fields are present."""
+        if self.DATABASE_URL:
+            return True
+        return all([self.DB_HOST, self.DB_NAME, self.DB_USER, self.DB_PASSWORD])
 
 
 class AppConfig(BaseModel):
