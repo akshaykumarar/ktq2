@@ -1,0 +1,11 @@
+{
+  "chatbotStore": {
+    "url": "https://hook.eu1.make.com/ah791mkhp7r10xwsoljltui2jaymc5xr",
+    "apiKey": "aerchain3",
+    "authHeader": "x-make-apikey",
+    "path": "",
+    "mode": "webhook",
+    "authPrefix": "",
+    "contentType": "application/json"
+  }
+}

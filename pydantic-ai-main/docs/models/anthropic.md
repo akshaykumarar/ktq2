@@ -1,0 +1,728 @@
+---
+description: "Use Anthropic Claude models with Pydantic AI, with prompt caching, task budgets and compaction, directly or via Bedrock, Vertex AI or Microsoft Foundry."
+---
+
+# Anthropic
+
+## Install
+
+To use `AnthropicModel`, install either `pydantic-ai` or `pydantic-ai-slim` with the `anthropic` optional group:
+
+```bash
+pip/uv-add "pydantic-ai-slim[anthropic]"
+```
+
+## Configuration
+
+To use [Anthropic](https://anthropic.com) through their API, go to [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) to generate an API key.
+
+`AnthropicModelName` contains a list of available Anthropic models.
+
+## Environment variable
+
+Once you have the API key, you can set it as an environment variable:
+
+```bash
+export ANTHROPIC_API_KEY='your-api-key'
+```
+
+You can then use `AnthropicModel` by name:
+
+```python
+from pydantic_ai import Agent
+
+agent = Agent('anthropic:claude-sonnet-4-6')
+...
+```
+
+Or initialise the model directly with just the model name:
+
+```python
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModel
+
+model = AnthropicModel('claude-sonnet-4-5')
+agent = Agent(model)
+...
+```
+
+!!! note "Claude Opus 4.7 / 4.8 / 5 / 5.5 migration"
+    Anthropic's [Claude Opus migration guide](https://platform.claude.com/docs/en/about-claude/models/migration-guide) recommends removing `temperature`, `top_p`, and `top_k` from Opus 4.7, 4.8, 5, and 5.5 requests. Pydantic AI drops those keys automatically for `claude-opus-4-7`, `claude-opus-4-8`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `claude-fable-5` and `claude-mythos-5`, including `extra_body` overrides.
+
+    The same guide also recommends re-evaluating `max_tokens` and any token-count assumptions when migrating from Opus 4.6, since Opus 4.7 introduced updated tokenization (carried into 4.8). If you rely on `count_tokens()` or `count_tokens_before_request`, verify your thresholds against the new model.
+
+## `provider` argument
+
+You can provide a custom `Provider` via the `provider` argument:
+
+```python
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
+
+model = AnthropicModel(
+    'claude-sonnet-4-5', provider=AnthropicProvider(api_key='your-api-key')
+)
+agent = Agent(model)
+...
+```
+
+## Custom HTTP Client
+
+You can customize the `AnthropicProvider` with a custom `httpx2.AsyncClient`:
+
+```python
+from httpx2 import AsyncClient
+
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
+
+custom_http_client = AsyncClient(timeout=30)
+model = AnthropicModel(
+    'claude-sonnet-4-5',
+    provider=AnthropicProvider(api_key='your-api-key', http_client=custom_http_client),
+)
+agent = Agent(model)
+...
+```
+
+A legacy `httpx.AsyncClient` is not accepted: `anthropic` 1.0 is built on `httpx2` and rejects one at
+client construction.
+
+The `AsyncAnthropic` client that the provider builds also retries failed requests on its own — `max_retries=2` by default, so a request can reach the network up to three times before your code sees an error. Pass `max_retries=0` when you construct the client yourself (for example as `anthropic_client=`) to keep the retry policy in your transport alone. See [Provider SDK retries](../retries.md#provider-sdk-retries) for when this layer fires.
+
+## Model settings
+
+You can customize model behavior using [`AnthropicModelSettings`][pydantic_ai.models.anthropic.AnthropicModelSettings]:
+
+```python
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModel, AnthropicModelSettings
+
+model = AnthropicModel('claude-sonnet-4-5')
+settings = AnthropicModelSettings(
+    temperature=0.2,
+    top_k=40,
+    service_tier='auto',
+)
+agent = Agent(model, model_settings=settings)
+...
+```
+
+Anthropic requires [`max_tokens`][pydantic_ai.settings.ModelSettings.max_tokens], which thinking counts toward. When you don't set it, Pydantic AI sends the model's maximum output, like 64,000 on Claude Sonnet 4.5 or 128,000 on Claude Opus 5, and streams the request behind the scenes, since a response that long can take more than 10 minutes. A [`timeout`][pydantic_ai.settings.ModelSettings.timeout] then limits the wait between streamed chunks rather than the whole response. A model whose maximum isn't known gets 16384, and models older than Claude Sonnet 4.5 get 4096, since they reject a request whose input plus `max_tokens` exceeds the context window. Models are recognized by name, so set `max_tokens` yourself if you reach one through a Bedrock ARN or a custom deployment name.
+
+### Service tier
+
+Anthropic supports controlling the [service tier](https://platform.claude.com/docs/en/api/service-tiers) to manage latency and throughput.
+You can use the unified [`service_tier`][pydantic_ai.settings.ModelSettings.service_tier] field or the provider-specific [`anthropic_service_tier`][pydantic_ai.models.anthropic.AnthropicModelSettings.anthropic_service_tier] field. `anthropic_service_tier` takes precedence over the unified field when both are set, and accepts Anthropic's native values (`'auto'` or `'standard_only'`).
+
+The unified field maps as follows for Anthropic:
+
+- `'auto'`: passed through as `'auto'` (Anthropic's native value — uses priority capacity when available).
+- `'default'`: maps to `'standard_only'` (forces the standard tier, opting out of priority capacity).
+- `'flex'` and `'priority'` are not part of Anthropic's tier model and are silently ignored.
+
+## Cloud Platform Integrations
+
+You can use Anthropic models through cloud platforms by passing a custom client to [`AnthropicProvider`][pydantic_ai.providers.anthropic.AnthropicProvider].
+
+### AWS Bedrock
+
+To use Claude models via [AWS Bedrock](https://aws.amazon.com/bedrock/claude/), follow the [Anthropic documentation](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock) on how to set up a Bedrock client and then pass it to `AnthropicProvider`. Both the newer `AsyncAnthropicBedrockMantle` client (recommended by Anthropic, using the Messages API) and the legacy `AsyncAnthropicBedrock` client (using the `InvokeModel` API with ARN-versioned model IDs) are supported:
+
+```python {test="skip" typecheck="skip - anthropic's __all__ omits this client, so pyright reports it as not exported"}
+from anthropic import AsyncAnthropicBedrockMantle
+
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
+
+bedrock_client = AsyncAnthropicBedrockMantle()  # Uses AWS credentials from environment
+provider = AnthropicProvider(anthropic_client=bedrock_client)
+model = AnthropicModel('anthropic.claude-haiku-4-5', provider=provider)
+agent = Agent(model)
+...
+```
+
+!!! note "Bedrock vs BedrockConverseModel"
+    This approach uses Anthropic's SDK with AWS Bedrock credentials. For an alternative using AWS SDK (boto3) directly, see [`BedrockConverseModel`](bedrock.md).
+
+!!! note "Tool search on the legacy `AsyncAnthropicBedrock` client"
+    The legacy `InvokeModel` API doesn't support the `bm25` [tool search](../tools-advanced.md#tool-search) variant, so [`ToolSearch`][pydantic_ai.capabilities.ToolSearch] defaults to `'regex'` on the `AsyncAnthropicBedrock` client (instead of `'bm25'`), and passing `ToolSearch(strategy='bm25')` raises a `UserError`.
+
+!!! note "Token counting on the legacy `AsyncAnthropicBedrock` client"
+    The Anthropic SDK blocks its high-level token-counting method on Bedrock, so `count_tokens()` (and `count_tokens_before_request`) instead call Bedrock's own `/model/{model}/count-tokens` endpoint. That endpoint only accepts **base** foundation-model IDs (e.g. `anthropic.claude-sonnet-4-20250514-v1:0`); cross-region inference profile IDs (`us.`/`eu.`/`global.` prefixes) and end-of-life model versions are rejected by Bedrock.
+
+### Google Cloud
+
+To use Claude models via [Google Cloud Vertex AI](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-claude), follow the [Anthropic documentation](https://docs.anthropic.com/en/api/claude-on-vertex-ai) on how to set up an `AsyncAnthropicVertex` client and then pass it to `AnthropicProvider`:
+
+```python {test="skip" typecheck="skip - anthropic's __all__ omits this client, so pyright reports it as not exported"}
+from anthropic import AsyncAnthropicVertex
+
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
+
+vertex_client = AsyncAnthropicVertex(region='us-east5', project_id='your-project-id')
+provider = AnthropicProvider(anthropic_client=vertex_client)
+model = AnthropicModel('claude-sonnet-4-5', provider=provider)
+agent = Agent(model)
+...
+```
+
+### Microsoft Foundry
+
+To use Claude models via [Microsoft Foundry](https://ai.azure.com/), follow the [Anthropic documentation](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry) on how to set up an `AsyncAnthropicFoundry` client and then pass it to `AnthropicProvider`:
+
+```python {test="skip"}
+from anthropic import AsyncAnthropicFoundry
+
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
+
+foundry_client = AsyncAnthropicFoundry(
+    api_key='your-foundry-api-key',  # Or set ANTHROPIC_FOUNDRY_API_KEY
+    resource='your-resource-name',
+)
+provider = AnthropicProvider(anthropic_client=foundry_client)
+model = AnthropicModel('claude-sonnet-4-5', provider=provider)
+agent = Agent(model)
+...
+```
+
+See [Anthropic's Microsoft Foundry documentation](https://platform.claude.com/docs/en/build-with-claude/claude-in-microsoft-foundry) for setup instructions including Entra ID authentication.
+
+## Task Budgets (Beta)
+
+Anthropic's [task budgets](https://platform.claude.com/docs/en/build-with-claude/task-budgets) let you give Claude an advisory token budget for a full agentic loop — including thinking, tool calls, tool results, and output — so the model can pace itself and finish gracefully as the budget is consumed. Configure them with [`AnthropicModelSettings.anthropic_task_budget`][pydantic_ai.models.anthropic.AnthropicModelSettings.anthropic_task_budget], which takes an [`AnthropicTaskBudget`][pydantic_ai.models.anthropic.AnthropicTaskBudget] payload and maps to `output_config.task_budget`.
+
+Pydantic AI automatically enables Anthropic's required `task-budgets-2026-03-13` beta when this setting is present. Support is currently limited to native Anthropic `claude-fable-5`, `claude-fable-5-1`, `claude-mythos-5`, `claude-mythos-5-1`, `claude-opus-4-7`, `claude-opus-4-8`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, and `claude-sonnet-5-5` requests, not Bedrock, Vertex, or Microsoft Foundry Anthropic model IDs.
+
+```python {title="anthropic_task_budget.py"}
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModel, AnthropicModelSettings
+
+model = AnthropicModel('claude-opus-4-8')
+settings = AnthropicModelSettings(
+    anthropic_task_budget={'type': 'tokens', 'total': 20_000},
+)
+agent = Agent(model, model_settings=settings)
+...
+```
+
+Task budgets compose with [`anthropic_effort`][pydantic_ai.models.anthropic.AnthropicModelSettings.anthropic_effort]: effort tunes per-step reasoning depth, while task budgets cap total work across the loop. Both fields end up under the same `output_config` object.
+
+!!! note
+    Task budgets are advisory, not a hard cap; pair them with [`max_tokens`][pydantic_ai.settings.ModelSettings.max_tokens] for an enforced ceiling.
+
+### Carrying budgets across compaction
+
+If you use [`AnthropicCompaction`][pydantic_ai.models.anthropic.AnthropicCompaction] for server-side compaction, you can skip this section: the server tracks the countdown itself, so leave `remaining` unset and let `total` self-regulate.
+
+The `remaining` field on `task_budget` is for *client-side* compaction patterns where you summarize earlier turns yourself between requests, so the server has no memory of how much budget was spent before the rewrite. Pydantic AI does not track `remaining` for you — accumulate token usage across requests yourself (e.g. from [`RunUsage`][pydantic_ai.usage.RunUsage] on each run) and pass the updated value on the next request so the countdown continues from where you left off rather than resetting to `total`. Setting `remaining` also invalidates any prompt-cache prefix that contains the budget, so if you want to preserve caching, set `total` once and let the server self-regulate against the running countdown.
+
+!!! warning
+    `task_budget.remaining` is mutually exclusive with [`AnthropicCompaction`][pydantic_ai.models.anthropic.AnthropicCompaction]: Anthropic rejects requests that combine the two because server-side compaction tracks the budget itself. Pydantic AI raises a [`UserError`][pydantic_ai.exceptions.UserError] before sending the request when this combination is configured. Choose one: `remaining` for client-side budget tracking, or [`AnthropicCompaction`][pydantic_ai.models.anthropic.AnthropicCompaction] for server-side compaction.
+
+## Prompt Caching
+
+Anthropic supports [prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) to reduce costs by caching parts of your prompts. Pydantic AI supports automatic caching, per-block message caching, and explicit cache breakpoints:
+
+### Automatic Caching
+
+The simplest way to enable prompt caching is with [`AnthropicModelSettings.anthropic_cache`][pydantic_ai.models.anthropic.AnthropicModelSettings.anthropic_cache]. This uses Anthropic's [automatic caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching#automatic-caching), passing a top-level `cache_control` parameter so the server automatically applies a cache breakpoint to the last cacheable block in each request:
+
+```python {test="skip"}
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModelSettings
+
+agent = Agent(
+    'anthropic:claude-sonnet-4-6',
+    instructions='You are a helpful assistant.',
+    model_settings=AnthropicModelSettings(
+        anthropic_cache=True,
+    ),
+)
+
+result1 = agent.run_sync('What is the capital of France?')
+
+result2 = agent.run_sync(
+    'What is the capital of Germany?', message_history=result1.all_messages()
+)
+print(f'Cache write: {result1.usage.cache_write_tokens}')
+print(f'Cache read: {result2.usage.cache_read_tokens}')
+print(f'Cache hit ratio: {result2.usage.cache_hit_ratio}')
+```
+
+This is ideal for multi-turn conversations where the cache breakpoint should move forward as the conversation grows. You can also specify a custom TTL with `anthropic_cache='1h'`.
+
+!!! note "Bedrock and Vertex"
+    Bedrock and Vertex [do not yet support automatic caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching#automatic-caching). On these platforms, `anthropic_cache` falls back to per-block caching on the last user message, providing the same benefit for multi-turn conversations.
+
+### Per-block Message Caching
+
+As an alternative to `anthropic_cache`, [`AnthropicModelSettings.anthropic_cache_messages`][pydantic_ai.models.anthropic.AnthropicModelSettings.anthropic_cache_messages] adds per-block `cache_control` to the last content block of the final message instead of using Anthropic's top-level automatic caching parameter. Use this with Anthropic-compatible gateways and proxies (such as MiniMax, OpenRouter, or LiteLLM) that accept the Anthropic message format but don't support top-level automatic caching:
+
+```python {test="skip"}
+from anthropic import AsyncAnthropic
+
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModel, AnthropicModelSettings
+from pydantic_ai.providers.anthropic import AnthropicProvider
+
+client = AsyncAnthropic(
+    api_key='your-api-key',
+    base_url='https://your-anthropic-compatible-gateway.example.com',
+)
+
+model = AnthropicModel(
+    'claude-sonnet-4-6',
+    provider=AnthropicProvider(anthropic_client=client),
+)
+agent = Agent(
+    model,
+    model_settings=AnthropicModelSettings(
+        anthropic_cache_messages=True,
+    ),
+)
+
+result = agent.run_sync('What is the capital of France?')
+print(result.output)
+```
+
+You can also specify a custom TTL with `anthropic_cache_messages='1h'`. `anthropic_cache_messages` cannot be combined with `anthropic_cache`.
+
+### Explicit Cache Breakpoints
+
+In addition to automatic caching, Pydantic AI provides several ways to place cache breakpoints on specific content:
+
+1. **Cache User Messages with [`CachePoint`][pydantic_ai.messages.CachePoint]**: Insert a `CachePoint` marker in your user messages to cache everything before it
+2. **Cache the Final Message Block**: Set [`AnthropicModelSettings.anthropic_cache_messages`][pydantic_ai.models.anthropic.AnthropicModelSettings.anthropic_cache_messages] to `True` (uses 5m TTL by default) or specify `'5m'` / `'1h'` directly
+3. **Cache System Instructions**: Set [`AnthropicModelSettings.anthropic_cache_instructions`][pydantic_ai.models.anthropic.AnthropicModelSettings.anthropic_cache_instructions] to `True` (uses 5m TTL by default) or specify `'5m'` / `'1h'` directly
+4. **Cache Tool Definitions**: Set [`AnthropicModelSettings.anthropic_cache_tool_definitions`][pydantic_ai.models.anthropic.AnthropicModelSettings.anthropic_cache_tool_definitions] to `True` (uses 5m TTL by default) or specify `'5m'` / `'1h'` directly
+
+#### Example: Comprehensive Caching Strategy
+
+Combine automatic caching with explicit breakpoints for maximum savings. Automatic caching handles the conversation, while explicit breakpoints pin system instructions and tool definitions:
+
+```python {test="skip"}
+from pydantic_ai import Agent, RunContext
+from pydantic_ai.models.anthropic import AnthropicModelSettings
+
+agent = Agent(
+    'anthropic:claude-sonnet-4-6',
+    instructions='Detailed instructions...',
+    model_settings=AnthropicModelSettings(
+        anthropic_cache=True,                   # Server auto-caches last block
+        anthropic_cache_instructions=True,      # Explicitly cache system instructions
+        anthropic_cache_tool_definitions='1h',  # Explicitly cache tool definitions with 1h TTL
+    ),
+)
+
+@agent.tool
+def search_docs(ctx: RunContext, query: str) -> str:
+    """Search documentation."""
+    return f'Results for {query}'
+
+
+result = agent.run_sync('Search for Python best practices')
+print(result.output)
+```
+
+### Smart Instruction Caching
+
+When you use `anthropic_cache_instructions` with both static and dynamic [instructions](../agent.md#instructions), Pydantic AI automatically places the cache boundary at the optimal point. Static instructions (from `Agent(instructions=...)`) are sorted before dynamic instructions (from `@agent.instructions` functions or [toolsets](../toolsets.md)), and the cache point is placed after the last static instruction part.
+
+This means your stable, static instructions are cached efficiently, while dynamic instructions (which may change between requests) remain outside the cache boundary and don't cause cache invalidation.
+
+```python {test="skip"}
+from datetime import date
+
+from pydantic_ai import Agent, RunContext
+from pydantic_ai.models.anthropic import AnthropicModelSettings
+
+agent = Agent(
+    'anthropic:claude-sonnet-4-6',
+    deps_type=str,
+    instructions='You are a helpful customer service agent. Follow company policy.',  # (1)!
+    model_settings=AnthropicModelSettings(
+        anthropic_cache_instructions=True,  # (2)!
+    ),
+)
+
+
+@agent.instructions
+def dynamic_context(ctx: RunContext[str]) -> str:  # (3)!
+    return f"Customer name: {ctx.deps}. Today's date: {date.today()}."
+
+
+result = agent.run_sync('What is your return policy?', deps='Alice')
+print(result.output)
+```
+
+1. Static instructions are cached across requests.
+2. Enables smart cache placement at the static/dynamic boundary.
+3. Dynamic instructions change per-request and are not cached.
+
+### Fine-Grained Control with CachePoint
+
+Use manual `CachePoint` markers to control cache locations precisely:
+
+```python {test="skip"}
+from pydantic_ai import Agent, CachePoint
+
+agent = Agent(
+    'anthropic:claude-sonnet-4-6',
+    instructions='Instructions...',
+)
+
+# Manually control cache points for specific content blocks
+result = agent.run_sync([
+    'Long context from documentation...',
+    CachePoint(),  # Cache everything up to this point
+    'First question'
+])
+print(result.output)
+```
+
+### Accessing Cache Usage Statistics
+
+Access cache usage statistics via `result.usage`:
+
+```python {test="skip"}
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModelSettings
+
+agent = Agent(
+    'anthropic:claude-sonnet-4-6',
+    instructions='Instructions...',
+    model_settings=AnthropicModelSettings(
+        anthropic_cache=True,
+    ),
+)
+
+result = agent.run_sync('Your question')
+usage = result.usage
+print(f'Cache write tokens: {usage.cache_write_tokens}')
+print(f'Cache read tokens: {usage.cache_read_tokens}')
+```
+
+`cache_write_tokens` counts all cache writes. When some of them used a one-hour TTL, which Anthropic bills at a higher rate than five-minute writes, their count is also in `usage.details['ephemeral_1h_input_tokens']`, or in `usage.details['compaction_ephemeral_1h_input_tokens']` for writes made during [message compaction](#message-compaction), and the cost is calculated at the one-hour rate for those tokens.
+
+### Cache Diagnostics
+
+When a request misses the cache unexpectedly, Anthropic's [cache diagnostics](https://platform.claude.com/docs/en/build-with-claude/cache-diagnostics) can tell you why. Set [`AnthropicModelSettings.anthropic_cache_diagnostics`][pydantic_ai.models.anthropic.AnthropicModelSettings.anthropic_cache_diagnostics] to `True`, and each request names the most recent Anthropic response in the message history as the one to compare against. When the prompt prefix diverged, the response's [`provider_details`][pydantic_ai.messages.ModelResponse.provider_details] has a `'cache_diagnostics'` key with Anthropic's result, such as `{'cache_miss_reason': {'type': 'tools_changed', 'cache_missed_input_tokens': 3713}}`:
+
+```python {test="skip"}
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModelSettings
+
+agent = Agent(
+    'anthropic:claude-sonnet-4-6',
+    instructions='Instructions...',
+    model_settings=AnthropicModelSettings(anthropic_cache=True, anthropic_cache_diagnostics=True),
+)
+
+result1 = agent.run_sync('Your question')
+result2 = agent.run_sync('Follow-up question', message_history=result1.all_messages())
+diagnostics = (result2.response.provider_details or {}).get('cache_diagnostics')
+if diagnostics and (reason := diagnostics['cache_miss_reason']):
+    print(f"Cache miss: {reason['type']}, {reason.get('cache_missed_input_tokens')} tokens")
+```
+
+The `type` is one of `model_changed`, `system_changed`, `tools_changed`, `messages_changed`, `previous_message_not_found` or `unavailable`. The key is absent when Anthropic found no divergence, and holds `{'cache_miss_reason': None}` when the comparison hadn't finished yet.
+
+Diagnostics are free and don't affect caching, but they're off by default: Anthropic keeps a short-lived fingerprint of each request that asks for them (hashes and token counts, not prompt content), and rejects them for HIPAA-enabled organizations. They're only available on the Claude API, so the setting is ignored on Bedrock, Vertex AI and Microsoft Foundry.
+
+### Cache Point Limits
+
+Anthropic enforces a maximum of 4 cache points per request. Pydantic AI automatically manages this limit to ensure your requests always comply without errors.
+
+#### How Cache Points Are Allocated
+
+Cache points can come from several sources:
+
+1. **Automatic caching**: Via `anthropic_cache` (the server applies 1 cache point to the last cacheable block)
+2. **Final message block**: Via `anthropic_cache_messages` setting (adds cache point to last message content block)
+3. **System Prompt**: Via `anthropic_cache_instructions` setting (adds cache point to last system prompt block)
+4. **Tool Definitions**: Via `anthropic_cache_tool_definitions` setting (adds cache point to last tool definition)
+5. **Messages**: Via `CachePoint` markers (adds cache points to message content)
+
+Each setting uses **at most 1 cache point**, but you can combine them — except `anthropic_cache` and `anthropic_cache_messages`, which are mutually exclusive. If the total exceeds 4, Pydantic AI automatically trims excess cache points from older messages.
+
+#### Example: Combining Automatic and Explicit Caching
+
+Define an agent with automatic caching plus explicit breakpoints:
+
+```python {test="skip"}
+from pydantic_ai import Agent, CachePoint
+from pydantic_ai.models.anthropic import AnthropicModelSettings
+
+agent = Agent(
+    'anthropic:claude-sonnet-4-6',
+    instructions='Detailed instructions...',
+    model_settings=AnthropicModelSettings(
+        anthropic_cache=True,                   # 1 cache point (server-applied)
+        anthropic_cache_instructions=True,      # 1 cache point
+        anthropic_cache_tool_definitions=True,  # 1 cache point
+    ),
+)
+
+@agent.tool_plain
+def my_tool() -> str:
+    return 'result'
+
+
+# 3 of 4 slots used (1 automatic + 1 instructions + 1 tools)
+# Room for 1 more explicit CachePoint marker
+result = agent.run_sync([
+    'Context', CachePoint(),  # 4th cache point - OK
+    'Question'
+])
+print(result.output)
+usage = result.usage
+print(f'Cache write tokens: {usage.cache_write_tokens}')
+print(f'Cache read tokens: {usage.cache_read_tokens}')
+```
+
+#### Automatic Cache Point Limiting
+
+When explicit cache points from all sources (settings + `CachePoint` markers) exceed the available budget, Pydantic AI automatically removes excess cache points from **older message content** (keeping the most recent ones).
+
+Define an agent with 2 explicit cache points from settings:
+
+```python {test="skip"}
+from pydantic_ai import Agent, CachePoint
+from pydantic_ai.models.anthropic import AnthropicModelSettings
+
+agent = Agent(
+    'anthropic:claude-sonnet-4-6',
+    instructions='Instructions...',
+    model_settings=AnthropicModelSettings(
+        anthropic_cache_instructions=True,      # 1 cache point
+        anthropic_cache_tool_definitions=True,  # 1 cache point
+    ),
+)
+
+@agent.tool_plain
+def search() -> str:
+    return 'data'
+
+# Already using 2 cache points (instructions + tools)
+# Can add 2 more CachePoint markers (4 total limit)
+result = agent.run_sync([
+    'Context 1', CachePoint(),  # Oldest - will be removed
+    'Context 2', CachePoint(),  # Will be kept (3rd point)
+    'Context 3', CachePoint(),  # Will be kept (4th point)
+    'Question'
+])
+# Final cache points: instructions + tools + Context 2 + Context 3 = 4
+print(result.output)
+usage = result.usage
+print(f'Cache write tokens: {usage.cache_write_tokens}')
+print(f'Cache read tokens: {usage.cache_read_tokens}')
+```
+
+**Key Points**:
+- System and tool cache points are **always preserved**
+- `anthropic_cache` counts as 1 cache point, just like `anthropic_cache_instructions` and `anthropic_cache_tool_definitions`
+- Excess `CachePoint` markers in messages are removed from oldest to newest when the limit is exceeded
+- This ensures critical caching (instructions/tools) is maintained while still benefiting from message-level caching
+
+## Mid-conversation system messages
+
+Adding an instruction to the agent's `system_prompt` partway through a long session rewrites the front of the prompt, which invalidates every cached prefix behind it. Anthropic avoids that by accepting a system message *inside* the conversation, at the instruction's own position in the history rather than ahead of it, so everything cached up to that point stays cached.
+
+Any [`SystemPromptPart`][pydantic_ai.messages.SystemPromptPart] outside the first [`ModelRequest`][pydantic_ai.messages.ModelRequest] is a mid-conversation instruction — whether it came from a stored `message_history` or from [`RunContext.enqueue`][pydantic_ai.tools.RunContext.enqueue] during a run. There's nothing extra to turn on:
+
+```python {title="mid_conversation_system_prompt.py"}
+from pydantic_ai import Agent, RunContext, SystemPromptPart
+
+agent = Agent('anthropic:claude-opus-4-8', system_prompt='You are a code reviewer.')
+
+
+@agent.tool
+def require_type_annotations(ctx: RunContext) -> str:
+    ctx.enqueue(SystemPromptPart(content='Every suggestion must include explicit type annotations.'))
+    return 'rule added'
+```
+
+Keeping the instruction in place leaves the prefix ahead of it reusable, but it doesn't enable caching on its own — that still comes from [`anthropic_cache`](#automatic-caching), `anthropic_cache_messages`, or an explicit [`CachePoint`][pydantic_ai.messages.CachePoint]. A `CachePoint` at the end of an enqueued batch caches everything before it in that batch, the instruction included. One with more content after it caches up to where you put it and leaves the instruction outside: the instruction is sent after the content it accompanies, so it can't be inside a boundary that content is outside of.
+
+Support varies by model and by transport — the [Microsoft Foundry](#microsoft-foundry) integration doesn't serve the role, and some Claude models accept the entry without acting on it. Anthropic's [mid-conversation system messages docs](https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages) have the current list. Pydantic AI picks the rendering that works for the model and transport you're using, falling back to a `<system>`-tagged user message at the same position, so the instruction applies where you put it either way.
+
+The difference between the two shows up on instructions a model *should* be wary of taking from its user: given the native entry, Claude will lift a restriction its top-level prompt set, and given the identical text in a `<system>` tag it refuses. For an instruction with nothing to distrust, such as a change of format, both work.
+
+See [mid-conversation system prompts](../message-history.md#mid-conversation-system-prompts) for how these behave across providers, how to phrase one, and why untrusted content doesn't belong in one.
+
+!!! note "Placement"
+    Anthropic requires a system message to sit between a user turn and the model's reply, so Pydantic AI nudges the position when a history doesn't already satisfy that: an instruction arriving with no user content alongside it gets a minimal `.` user message to follow, and one that would land ahead of another user turn moves to just before the reply it governs. Neither changes which turn the instruction applies to — only where it sits on the wire.
+
+## Fast mode
+
+Fast mode provides higher output tokens per second and is currently supported on **Claude Opus 4.6**, **Claude Opus 4.7**, **Claude Opus 4.8**, **Claude Opus 5**, and **Claude Opus 5.5**. It is a research preview. Set [`anthropic_speed`][pydantic_ai.models.anthropic.AnthropicModelSettings.anthropic_speed] to `'fast'` to enable it; Pydantic AI automatically adds the required `fast-mode-2026-02-01` beta. On unsupported models, `anthropic_speed='fast'` is ignored with a `UserWarning`. For pricing, rate limits, and the latest list of supported models, see the [Anthropic fast mode docs](https://platform.claude.com/docs/en/build-with-claude/fast-mode).
+
+```python
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModelSettings
+
+agent = Agent(
+    'anthropic:claude-opus-4-8',
+    model_settings=AnthropicModelSettings(anthropic_speed='fast'),
+)
+...
+```
+
+!!! note "Prompt cache interaction"
+    Switching between `'fast'` and `'standard'` invalidates the prompt cache. Requests at different speeds do not share cached prefixes, so pick one speed per cache-sensitive conversation.
+
+!!! note "Bedrock, Vertex, and Foundry"
+    Fast mode is only available on the direct Anthropic API. Bedrock, Vertex, and Foundry clients do not support the `speed` parameter, so `anthropic_speed='fast'` is ignored with a `UserWarning` on those clients.
+
+## Forced tool choice
+
+Most Anthropic models let you force a tool call via [`tool_choice='required'`][pydantic_ai.settings.ModelSettings.tool_choice] (or a list of tool names), except while [extended thinking](../capabilities/thinking.md#anthropic) is enabled. [Adaptive thinking](../capabilities/thinking.md#adaptive-thinking-effort) accepts forcing, but Claude answers a forced tool choice without thinking. Anthropic documents **Claude Fable 5.1**, **Claude Mythos 5.1**, **Claude Opus 5.5**, and **Claude Sonnet 5.5** as rejecting a forced tool choice unconditionally, even without thinking, and Pydantic AI marks those with [`supports_forced_tool_choice=False`][pydantic_ai.profiles.ModelProfile.supports_forced_tool_choice].
+
+On a model that doesn't support forcing, or while extended thinking is enabled:
+
+- An explicit `tool_choice='required'` (or a list of tool names) raises a [`UserError`][pydantic_ai.exceptions.UserError]; use `tool_choice='auto'` instead.
+- A `required` choice that Pydantic AI resolved on your behalf (e.g. from an [output tool](../output.md#tool-output)) falls back softly to `'auto'`. If the resolved choice named a single tool, the available tool list is filtered to that tool while `tool_choice` remains `'auto'`, which invalidates Anthropic's prompt cache since the cached prefix includes the tool array. The model may therefore answer with text instead of calling it; when an output tool is required, Pydantic AI retries with a prompt to call a tool.
+
+While adaptive thinking is on, an explicit forcing `tool_choice` is still sent, and that request comes back without thinking. A forced choice that Pydantic AI resolved on your behalf falls back to `'auto'` instead, as above, so the model keeps thinking.
+
+[Tool Output](../output.md#tool-output) forces a call to the output tool on every request that can't end with text, so a bare structured `output_type` uses [Native Output](../output.md#native-output), where the model supports it, whenever the request thinks: with a thinking setting, or with none on a model that [thinks by default](../capabilities/thinking.md#adaptive-thinking-effort), like Claude Opus 5 and later, Claude Sonnet 5, and the Claude Fable and Mythos models. On a model without JSON schema support, extended thinking falls back to [Prompted Output](../output.md#prompted-output), and adaptive thinking keeps Tool Output with the output tool offered under `tool_choice='auto'`. To keep Tool Output, turn thinking off with `thinking=False` where the model allows it. An explicit `ToolOutput(...)` keeps Tool Output, with the output tool offered under `tool_choice='auto'`.
+
+## Thinking block binding
+
+**Claude Fable 5.1**, **Claude Opus 5.5**, and **Claude Sonnet 5.5** bind each thinking block to the conversation prefix that produced it. Replaying message history after that prefix changes fails with a 400 (`The block is bound to a different conversation`), and two ordinary Pydantic AI features change it:
+
+- a [dynamic instructions](../agent.md#instructions) function whose text differs between runs, and
+- a [filtered toolset](../toolsets.md#filtering-tools) that advertises a new tool mid-conversation, unless the tool uses [deferred loading](../toolsets.md#deferred-loading).
+
+Both are the same instability that costs you a provider's prompt cache: a request prefix that changes between turns. The thinking block turns it into a 400 you can see; the cache turns it into a bill you can't — every request after the change re-sends the whole conversation at uncached rates, silently. Where the prefix can be held stable, that is worth more than handling the rejection.
+
+Anthropic enforces the check for accounts created on or after 31 August 2026. For an older account it records the mismatch but acts on it only if the request sets `thinking.block_binding.prefix_mismatch_behavior`.
+
+**Pydantic AI sets nothing by default**, so an older account keeps replaying its reasoning untouched. Where the check is enforced, the rejected request is retried once with `prefix_mismatch_behavior='drop_block'`: the stale block is dropped, the run continues, and a [`AnthropicStaleThinkingBlockWarning`][pydantic_ai.models.anthropic.AnthropicStaleThinkingBlockWarning] explains what happened. **The model no longer sees that turn's reasoning** — the trade is one turn's thinking against a failed run. Models marked [`anthropic_binds_thinking_blocks=True`][pydantic_ai.profiles.anthropic.AnthropicModelProfile.anthropic_binds_thinking_blocks] are the only ones that retry. A request whose thinking type isn't `adaptive`, such as `anthropic_thinking={'type': 'between_tools'}`, is not retried, because Anthropic accepts `block_binding` only alongside adaptive thinking: keep that conversation's prefix stable instead.
+
+Anthropic applies the drop to one request only. Its response records the transformation, so Pydantic AI uses that response history to keep sending `drop_block` for the rest of the affected conversation. This avoids another rejected request on every later turn without storing mutable state on the model or changing an unrelated conversation. The same behavior applies to [`count_tokens()`][pydantic_ai.models.Model.count_tokens]: token counting retries the first matching rejection once, and later counts carrying the recovery history send the drop immediately. A recovery seen only while counting applies only to later counts, because that endpoint omits server-side tools and can therefore have a different prefix from inference. An explicit `block_binding` still wins for both counting and inference.
+
+The automatic behavior is available through the direct Anthropic API, Pydantic AI Gateway and other `AsyncAnthropic`-compatible proxies, Claude Platform on AWS, legacy Amazon Bedrock, and Google Vertex AI. It is not enabled for the AWS-operated Bedrock Messages API client (`AsyncAnthropicBedrockMantle`), which does not accept Anthropic beta headers, or Microsoft Foundry, where this beta is not currently documented. Explicit settings remain pass-through on every transport.
+
+Anthropic reports every drop, and Pydantic AI surfaces it two ways. Under [instrumentation](../logfire.md) the Pydantic AI model request span carries an `anthropic.input_transformations` event, so a drop is visible in the trace as it happens; an unrelated ambient application span is never modified. On the response it is always recorded in `provider_details`:
+
+```python {title="dropped_thinking_blocks.py"}
+from pydantic_ai import Agent
+from pydantic_ai.messages import ModelResponse
+
+agent = Agent('anthropic:claude-fable-5-1')
+result = agent.run_sync('What is the capital of France?')
+
+for message in result.new_messages():
+    if isinstance(message, ModelResponse) and message.provider_details:
+        for transformation in message.provider_details.get('input_transformations', []):
+            print(transformation['path'], transformation['reason'])
+```
+
+To skip the rejected request — and the warning — ask for the drop up front. Pydantic AI sends an explicit `block_binding` as given, with the beta the field requires, and never retries:
+
+```python {title="drop_stale_thinking_blocks.py"}
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModelSettings
+
+settings: AnthropicModelSettings = {
+    'anthropic_thinking': {
+        'type': 'adaptive',
+        'block_binding': {'prefix_mismatch_behavior': 'drop_block'},
+    }
+}
+agent = Agent('anthropic:claude-fable-5-1', model_settings=settings)
+...
+```
+
+To fail loudly instead of losing the reasoning, set `'error'` in the same place. To keep the retry but stop hearing about it, filter the warning:
+
+```python {title="silence_stale_thinking_block_warning.py"}
+import warnings
+
+from pydantic_ai.models.anthropic import AnthropicStaleThinkingBlockWarning
+
+warnings.simplefilter('ignore', AnthropicStaleThinkingBlockWarning)
+```
+
+There is no third behavior: `prefix_mismatch_behavior` is either `'error'` or `'drop_block'`. Passing `None` is how you ask for Anthropic's account default explicitly, which keeps the block only where the check isn't enforced.
+
+Models that don't bind thinking blocks are unaffected *by default*: with no explicit `block_binding`, their requests carry neither the field nor the binding beta, and a 400 from them is never retried. Setting `block_binding` yourself puts both on the wire for any model — the beta follows the field, not the profile flag — and such a request is never retried either. Anthropic documents **Claude Mythos 5.1** as not running this check, so it is not marked either.
+
+## Message Compaction
+
+Anthropic supports [automatic context compaction](https://docs.anthropic.com/en/docs/build-with-claude/compaction) to manage long conversations. When input tokens exceed a configured threshold, the API automatically generates a summary that replaces older messages while preserving context.
+
+After compaction, subsequent requests send only the compacted window, from the latest compaction block onward, which reduces request size — the API ignores earlier content either way. The standing system prompt is unaffected: it's sent as the separate `system` parameter, which compaction doesn't replace.
+
+The easiest way to enable compaction is with the [`AnthropicCompaction`][pydantic_ai.models.anthropic.AnthropicCompaction] capability:
+
+```python {title="anthropic_compaction.py"}
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicCompaction
+
+agent = Agent(
+    'anthropic:claude-sonnet-4-6',
+    capabilities=[AnthropicCompaction(token_threshold=100_000)],
+)
+```
+
+The capability accepts:
+
+- **`token_threshold`** (default: 150,000, minimum: 50,000): Compaction triggers when input tokens exceed this value.
+- **`instructions`**: Custom instructions for how the summary should be generated.
+- **`pause_after_compaction`**: When `True`, the response stops after the compaction block with `stop_reason='compaction'`, allowing explicit handling before continuing.
+
+Alternatively, you can configure compaction directly via model settings using [`anthropic_context_management`][pydantic_ai.models.anthropic.AnthropicModelSettings.anthropic_context_management]:
+
+```python {title="anthropic_compaction_settings.py" test="skip"}
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModelSettings
+
+agent = Agent('anthropic:claude-sonnet-4-6')
+result = agent.run_sync(
+    'Hello!',
+    model_settings=AnthropicModelSettings(
+        anthropic_context_management={
+            'edits': [{'type': 'compact_20260112', 'trigger': {'type': 'input_tokens', 'value': 100_000}}]
+        }
+    ),
+)
+```
+
+!!! note
+    Compaction blocks returned by Anthropic contain readable text summaries. They are automatically round-tripped in subsequent requests when included in the message history.
+
+## Code Execution Tool Version
+
+By default, Pydantic AI chooses a compatible Anthropic code execution tool version for the selected model. You can override this with [`AnthropicModelSettings.anthropic_code_execution_tool_version`][pydantic_ai.models.anthropic.AnthropicModelSettings.anthropic_code_execution_tool_version] when you need a specific supported Anthropic tool version:
+
+```py {title="anthropic_code_execution_tool_version.py"}
+from pydantic_ai import Agent, CodeExecutionTool
+from pydantic_ai.capabilities import NativeTool
+from pydantic_ai.models.anthropic import AnthropicModelSettings
+
+agent = Agent(
+    'anthropic:claude-sonnet-4-6',
+    capabilities=[NativeTool(CodeExecutionTool())],
+    model_settings=AnthropicModelSettings(anthropic_code_execution_tool_version='20260120'),
+)
+```
+
+Pydantic AI raises a [`UserError`][pydantic_ai.exceptions.UserError] if you explicitly select a tool version that the model does not support.
+
+### Code Execution Containers
+
+When you continue a run from message history, Pydantic AI automatically reuses the Anthropic code execution container recorded in that history. Anthropic containers expire after 30 days, and a request that refers to an expired container returns an error.
+
+If a request uploads files through [`CodeExecutionTool`][pydantic_ai.native_tools.CodeExecutionTool] and Anthropic returns HTTP 500 for a history-derived container, Pydantic AI retries once without the rejected container ID so Anthropic can create a fresh container and receive the uploads. Other errors are raised without this retry. The fresh container does not contain state or files from the expired container.
+
+Set [`anthropic_container`][pydantic_ai.models.anthropic.AnthropicModelSettings.anthropic_container] explicitly when container continuity is required. An explicitly configured container is never replaced automatically; Anthropic's original error is raised instead.

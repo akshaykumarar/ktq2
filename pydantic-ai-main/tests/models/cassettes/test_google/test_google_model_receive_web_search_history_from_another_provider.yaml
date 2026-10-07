@@ -1,0 +1,1401 @@
+version: 1
+interactions:
+- request:
+    method: POST
+    uri: https://api.anthropic.com/v1/messages?beta=true
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - "318"
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+    body:
+      type: json
+      content:
+        max_tokens: 128000
+        messages:
+        - role: user
+          content:
+          - text: What are the latest news in the Netherlands?
+            type: text
+        model: claude-sonnet-4-6
+        stream: true
+        tools:
+        - name: web_search
+          type: web_search_20260209
+          max_uses: null
+          allowed_domains: null
+          blocked_domains: null
+          user_location: null
+  response:
+    status: 200
+    headers:
+      cache-control:
+      - no-cache
+      connection:
+      - keep-alive
+      content-security-policy:
+      - default-src 'none'; frame-ancestors 'none'
+      content-type:
+      - text/event-stream; charset=utf-8
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      traceresponse:
+      - 00-251073df0363e1b79911d2c44823ee97-b733e4a1a86bd11e-01
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+    body:
+      type: text
+      content: |+
+        event: message_start
+        data: {"type":"message_start","message":{"model":"claude-sonnet-4-6","id":"msg_011CfY5PBYKaRhfSqzgH1qb5","type":"message","role":"assistant","content":[],"container":null,"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":4389,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":27,"service_tier":"standard","inference_geo":"global"},"diagnostics":null}     }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":0,"content_block":{"type":"server_tool_use","id":"srvtoolu_0189KWxyNswSLatrxt4KPiuH","name":"code_execution","input":{}} }
+
+        event: ping
+        data: {"type": "ping"}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":""}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"code\": \"results"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":" = await"} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":" web_search("}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\\""}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"query\\\": \\\"latest"} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":" news Netherlands 2025"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\\\"})\\nimport"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":" json\\nfor i"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":", r in enumerate(results):"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\\n    print(f\\\""}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"Result"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":" {i}:"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":" {r['title']}\\\")"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\\n    print(r['content"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"'][:300"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"])"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\\n    print(\\\"---\\\")"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\\n"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\"}"}              }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":0            }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":1,"content_block":{"type":"server_tool_use","id":"srvtoolu_01Wa28BQ855EMtcCd8ErMvEw","name":"web_search","input":{"query":"latest news Netherlands 2025"},"caller":{"type":"code_execution_20260120","tool_id":"srvtoolu_0189KWxyNswSLatrxt4KPiuH"}}         }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":1          }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":2,"content_block":{"type":"web_search_tool_result","tool_use_id":"srvtoolu_01Wa28BQ855EMtcCd8ErMvEw","content":[{"type":"web_search_result","title":"Find all the latest news about Netherlands","url":"https://www.euronews.com/news/europe/netherlands","encrypted_content":"EpIHCioIFBgCIiQ0NGFlNjc2Yy05NThmLTRkNjgtOTEwOC1lYWU5ZGU3YjM2NmISDLte3vB/3qCMIDnN5BoMy7xhNKb1ye2im4iHIjDo+JFaywISp9OjNlOErjsQxgNXl+LU7iDu14WKLi9rnK1EFLo/qYJvOZknAx9/wQ8qlQZ5/sq1X+cV3LgBg/LsDfNYjrQ/0G1bZ0NEDsbd27EE5x6F4wki801E4S6R2m/gHWLB7zcOTBmGNrbWsIJJu/AKn/qQiafV4KVBWk9ITeeQRG9Q+W/TQpxcpnJpU79pr8W+XfsWT1jMDVAyJCQ660kESrrHHzJ9yD0uRSjUHRJtl81g8T1bQ4bIEXetYI9wD+0602BEEH7+uqX+ncRlNcqxHfPtccND1kNmAOYe4FCA4vBUV0cyrgXt4j43IlVoVZZMiM7Cg77q0akmEAK4J0rXkt2zdVDgBlLzgdS6tXR72cXBokznzlapj4VU8odXvRcMdmpKMm2amn17V9BC77OkjclMovVyRUrt+ohOkDtFJXeuLRs8uGYSkVtU+tx36qwFgzVydGycpbGfBrJtkA6Wgt+nXPOE7qyCDDO4L77SnsxqoFs1S7f6l7r82l/TziSieIdrJxiqA/qkpytw83Asb8j3oK+cm4LpzIXCiTzJUYYPRu9TpXP0mB3KBHV99XUCizNkYYc9eVF3ZYw5HmnmbsD0U+ND1lKjcMnn8GfUSY1xXDOwx2s6j4gvw3NgrJCUza1T00Wsz2C0IbLTZq8fJpwsO19UggEGV3nNpGCgplLCd6eE2WEhXzblC81n8sFpkEZB3God1bvtnOMyBnZPxzyX8HSQk9RewD0K7pETLDbbba7sGaOmbMryAKAVvVoIBfRzESdZBvVe2jE1TF3vt53oll0LNKBB3Bk41Kp/i72qvnkok+8uanqX9dL7D1Av4wXaMVcEiEf7YmFMLD3j2FP/j8e3dMy1VBAHIOH7Ohc5GepGzfcEquPU+VmfoCrxxzSEyeXuVSmw/N7RhK3+kPMuOssxx+vsKiQ8/IsVif0itpuv7y2qlxhPyR8j51EEcWGmcGi64xFbleb80Tkg7CGnc1r00jy7OYLoqRI6JguFI6x3iKtqRHqICsFoVH4vcqnFaP/8JevVeF+6uosE3v37Em2XtT0h7Qebmqgd2itwo+hDe8e4n89YC8pHJDpVg2JaGiYC9nUKeGWG7U+u41ybdCcYAw==","page_age":"242 days ago"},{"type":"web_search_result","title":"Netherlands, News and latest Headlines - i24NEWS","url":"https://www.i24news.tv/en/tags/netherlands","encrypted_content":"EqUJCioIFBgCIiQ0NGFlNjc2Yy05NThmLTRkNjgtOTEwOC1lYWU5ZGU3YjM2NmISDKJHz+RQFmnbcUvi4BoMQjzDm6paQTjGpldlIjAMsWDGa3oz7rBGA1d5E+fqbWiA77sWfle90XFEcqVPqjJqKcAL+TNbniyJ7oI96HYqqAilCv9pXtiNpaE+amzu8yCbvbNnRORX74N9uJbmx2lmTFZmRfMEFdPT6Y+mAuweVt2eliUle5PWcHRD8LFhwsTVo7ou+0HSJXk9c7lSPodFvcZ+78t6lNCVGXb8MQIva/ajlz0lKq3FzjcvrdFawnOKdYS2PxfOA/90nS3qo9MIkdZ9dZH9VYECN8msujZbSulnbknyhmIlyT8hOR2xcr/toGq0RXvOIF9IBj38MCdL4Y8xlSvPfXXx6QHmJePuO+8o51ckYbJ8686uMGbJPVMm4fxbidkK+GEu7cXhojLzx1r1u189zjSZjndGzcsgsHuTt5BgpsNPOosFBsiroc4j4ueLhvUeAHw+6lHcIOga0/mQMuiwvXJtyTM+mipn/pWgF6TKblRiI6q4u4EbWXltuCTURUj6msEA7CSYsTWxIcBIJoGGr+r+n1VQpRNxxTPsfRifD4ZhLwPMM3tOXDZ497PJB/8O5U5F/iTZ70Tn7qB6TM68oVWnhKuIDu/s4qcDfxk3JIryrNhBECWqymFWvZJCyjYuW5gpJ2arVSWAeGa0948MwOcSC5Hw4FN7M9DrSgh+W/Q+aJFk2jvnIUBdkHgN1CXq855htSQvemZI1bRXdNK294meU7xpR1nVOuHx4BAq/1fDv+5gk6x8nQfP8Izrn2zqoctq7abQnr5jT5F3CEtKTHcM91WgCd6b+SLDX/WusVQUXvKe+5o6abVH+IgIZh+7eGP564nriDZvJYyrlspe/i/bw3gw5jVDROdtwGc3lLaf/GLJ8bKNbnFhg5HQE/9y+It08MtzuqfnQduJEw7P1Mia006Z/yLWZecCKbqH3M88dyWgh1Ef8WtLlX/6aoa2JXq8/EkN/b4RE3oE6MYHdGK32Mp+CO6DdTuWQ8gXio8ojRSsY0dY4NO/99JUjwKWo8odRBsmmxofTy8Kc4AaLNsQ1PhM7RQ9qleJLgAsRObUrifj74Wm0rMYmtwfT8hQ1tGj48/4f3SBoHJ9ePtyyjbEqwYOsfG/F7qAFMEeFr5zqBbvAq2xOTjQVcBdK/2Dn6S6xewLtLK/Cb20grJvE3vkNf5y6D3VtswBMUBKSH0wmW3V7vT6sFDJmCU4xAiX8sYDfHb7jcepxVIzGn/Gd5FRN+eWZQS5XR/U/cLKdLHd9zl0aDv+0z8xG30fOrbc/Zu4d5tVmREAXp1U5wCHfIDXX8KCFaH5qy9yi8ugZPwIwl2sgV5CezrUocnMosbDoB9DbxnEGXmqJqF7EzWxIEobx86hUfbDd6OR6RHLzAg50G0S5b5LNEsPbwNOlvQosqunC1g63EEEZ8VmxskYbsudUbhqUOrtc4KjGXEoiRVsW1G1GDq5LDQYttSD/Mba5fXy6PM+3DNDXhd3itxDzJ7PxWClg/H1aQwFCuFHNchG8hgD","page_age":null},{"type":"web_search_result","title":"Netherlands news - Today’s latest updates - CBS News","url":"https://www.cbsnews.com/tag/netherlands/","encrypted_content":"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","page_age":"1390 days ago"},{"type":"web_search_result","title":"Netherlands Articles and latest stories","url":"https://www.jpost.com/tags/netherlands","encrypted_content":"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","page_age":null},{"type":"web_search_result","title":"Netherlands sees domestic decline and international tourism boost ...","url":"https://www.travelmole.com/news/netherlands-more-international-visitors-2025/","encrypted_content":"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","page_age":"162 days ago"},{"type":"web_search_result","title":"Netherlands politics","url":"https://www.euronews.com/tag/netherlands-politics","encrypted_content":"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","page_age":"218 days ago"},{"type":"web_search_result","title":"Latest","url":"https://www.government.nl/latest","encrypted_content":"EoQFCioIFBgCIiQ0NGFlNjc2Yy05NThmLTRkNjgtOTEwOC1lYWU5ZGU3YjM2NmISDMRBB/svnMWvmNfrmhoMgvB0+LPyq6DdHZUqIjDKNMYjO73//PdE5m5X1DO6I2sS/BD5ztVTgusf1Lr8jPslGvpSxDRUUOmPGZ1ZLt8qhwRMOZJxuwIYglp8V3ZncJRWZp6mYf8ztFqbsTc4LHdFEpHLrEzds5xgr2nPTjyRrRLrgSvGmqJiOfN5/s2drGEcqvufH45Wg6EgOTSaLdnjx/PKHBaR29FF5IHIwyHgwUt/8HYNS+pX89+xFrcmT0eDsODg8iQc/cZ0bzL+fMb5L7RDEzkP9i4dr6qZfJg3uTbYR+P02uESBmGVa7qF48z8v8Z7rZjCrFy3Kahit7rvOSPKpmZzjv4ourewes5dTzG6VitL3FEehHvRR5cfLG+UZVipcFqF+lZPRHuaCjWqX8WKtH70L2N7R+i1sAgjJVFiLTSSrp3fgZk5uCKufN5YcgDlbSWiS7PWBzbUT1JTintyKDovHxAz18M7X/8GQkkqB3irHvuTj871bYGoxTlOoeeNFxAdwYMbyplZHBFMeCJh1FG3qxWfjxtko1YWdYrEhOUcmhVILjrxWN5DQin7MHgLprEUVA9TZf0RlC+xv5FCGBqrtvBIVISUhxdxZBckNoHqPfgmJ7ZD8QfL5uHdTWPb9KfQ+CLm/BDCIKNDBwcasUVF6nXrQ2vlpQgSEJ2S7hr6aqTNOl1GAh1cF7p7sdtUlXeCMY64Q/h1KBJ/PSCx2ngrdTxJ6Z4UEHSVEjyANjD+9FRucZYSq5uZvYu1Mktp5UsYbBsd2JiuSHuvJDfrWyedaFkYAw==","page_age":"82 days ago"},{"type":"web_search_result","title":"Netherlands (Kingdom of The) Breaking News Headlines Today","url":"https://ground.news/interest/netherlands","encrypted_content":"Eo4NCioIFBgCIiQ0NGFlNjc2Yy05NThmLTRkNjgtOTEwOC1lYWU5ZGU3YjM2NmISDC2eZq+47p2TAwVzVxoMjdZElbhEYBGGqw0zIjC6wd3KV2tVHXz+fc0bg41RHfzqnJd3Ph9lkrKCk3Yrv3weqLgVjQpW4ygYbUwyOb8qkQxV4FqtgyEWh1aKOlvCqZDdHkHGXuO1XZkTWCrmrD1PbSBB4akWx6/vFiwv7BDiezJ30IqpY2U7S3AKjli+Gt5DFKAR2/dd0aeGo6x/wZXRR5k1cTtRI3tn7uW/IGYLlKTVKw8ejKjdW3ly4aA5IjeDJRN9xTiKSIXHVQ6vO0Cv+lt18IFyKYfD20DlRhZPCldHOTE5+5WuhLUQb5BoJBxsFYO9rPemmpac1QBdXApZlm+jgPSuMK7veP8OBDU7oVsJvfxpJZU215BTVhi7Q5qZzhqEUF9HGO1DD9Xma56El+MK5XkqoiznkpNUZpN6/WL1gNGw8xzmsd0ydmyJmkyFZM2QL9CbzukCo7ls+aizif5lfp/FI5sDz1pThCkCwx4GhOLsR7N0yCKTxgc19UxoRoVQUteyHzzSOjtA5SV3jpWv4Xa58QwUdvzN4/dfwSMEoZxWLDI2Znua+z6NNqMSwKV6sXp3r/+FBjfhPm3Sp04ZjyHYErA2AIyOBfzw6PhBO5bvZJ2LXgqtcnD33TpjAF93j4HHhdnoN1M6mAhuOV3WHLGzDHeEp6BFoAPHvD+J534LQGDarayvqw76WFobhrMJOsgXEHCDE4LSPvRXS9MUaIlBG6ShLqjf7oxkUBLSLSj6GxkElyuTVcgcaXd+I1UDEDdABSiL03O99u/gqtgWtvVaP4Lnw/P5Pg9IqoyJ2jianijEw5FO5yCcOMjCHqc5Cy2ymKqZ4uTwHKLtvWGJ88DTJnSbc2t1tP2i0k/y5Be7r2y3q9OpGbSrX2BJunqzMxkIw/MqkOYU35tlpg3d0qn30psQkDtZT0YvCZVGmO/Cb5TOXSr+cEfkvqWBFsllP3XG/fh9w85q9SwwhL/PNULo2Hz3DPfGErTLqIT0V/PsS66NmnUISfkjJxJKrp7uVRukWz774sNZLCjnKEIVK8jpZ4h1mY2KW2AzU/yodoXBz3X5iNsk+iEeFRbaqTUBwN1j8AIdBT5xb/G4yHOcNTsO+gUr27e23MCorh7lS9RssENHKY9QCcWngyTR2z/RaoxKFWHn5JCp49raCp0hICnHaIVCx+jyUE1hHrLWyj5Q7ETl71Usk2E5nhlbeWOL3O8gBr8ImKsqmlxXd5Zpj+kcnF9pvCYIECKH8oqqTaXKTqKDppIPNYzVhgo8uQBJfHTlW2kfICZuYLy6Gh91TwdHhysQG1N4SHnMIRYbQnEtACPl+DLq4652CgNnSOWH7GXg7ia8jStsBJqsj1CqtKlaj+mnnle2TmqxuKtKB9kK3Odljvgb7sWs9D5q/Bl0xUAb8jssLHBx2JxObTkRpks6E33j/K1omSgFQnfc/KrDJqZbiEUNOC6XIYJQJ7cr8H60b6Gg4IFJWnOEZ15u86Ji3D6o7hmULx6tCdDJj5QYuKFwImjNyWqP78dSwcTK+QgoK8nNvVWZIBXHPwCXDEqmDR6saTOqkDk/e5mPiptiIkz/75ccf4/gyrC4L66mM0hWRIxhNVnJ7tp44pzf2CAKxLSKnUG2s5MQbOkX+9PiZFDzUjvtvL2ZXNFM5U4GhJ2HRpdRaSIbNmKEZ5vz79Owk6/EX+16BJJDYC0nEgdau+um7c+sK490JHpVq+XWuF8pNcy0XdE7bZDxwOdOaFRpqPMs1Wi5dKlE9c8B9BInMvGnsPXWMmA2TS/tKGLgZ7cd3Zcf/VETDjHrh6WP+aWItQ7H5JvVZbqIpXrPXrsbSoKobnGZqDWO6y6QXE4bDQMU6StOFk4YB7lR2n2St690ixeO3tMK9ZU+wz901rHkJIQHpNtDhftBfJVeMuk88wYxVBl+uPnC1JG/FtHy+PQePEPXE/ul6zGo1zrfn45f1d1rRLpvFogoIRlz6sSPqbUPO6Dg/c01vFjw6DPQsxJjkHpOpQu0zsvaozsfIcsM8QWbc/xXrKO1O1HfuDcg9OcvyEUp3wiOP8p6x0qlGXboP2RxEjYA2+aNEF65MXZjQwGhUgey14EIEc2Xb02Tg4WmL4v5dnjoHxMwDA/4UUxsAGVLFr7GCDWcOzYnq4xlOkQFSk3TcBAMpC0d6BgD","page_age":"286 days ago"},{"type":"web_search_result","title":"The Netherlands contributes €500,000 to strengthen OPCW activities ...","url":"https://www.opcw.org/media-centre/news/2025/12/netherlands-contributes-eu500000-strengthen-opcw-activities-syria","encrypted_content":"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","page_age":"281 days ago"},{"type":"web_search_result","title":"NL Times","url":"https://nltimes.nl/","encrypted_content":"EsIICioIFBgCIiQ0NGFlNjc2Yy05NThmLTRkNjgtOTEwOC1lYWU5ZGU3YjM2NmISDFuWAdH58MPlCs0ZNBoM/YzSrVuH5XipkDfhIjAxbpsKyImbVI8T6d5qCWKIXEm6POv9kFEuIHfqmARm+ovxDPtYN4byudDsKhMwZ/oqxQdvhGQuvDbxrTocXuCGGgAAeOA2ukaOfX2IyexXNUn4F+Jcnfjcij1hOgIx/ePV1YPMdKGuD5shs46+Z5MzfXpi+AxJZrLvx9tUT43FpI8I0EoLlWIMIxYs/4fxRQY7SlWquY+4cBEF+z3OewlLKr5D11o9su9twgN2DtNs2lA8BQtYpsItSzuRn8DczhWXEUCrRa4gVA+VnmxNixXqJPv/ZOoNgrDx0cmimBVdgED2Odm2ht/Z7NGmWsaJWQTOquOIJ6K9L1Sy0uwgUKZpVESga/zfH994Cq1RWSqUar4yoocAi6FvOVsGX2+cKVn/KO6LFWjRvCzA+fPJNDGhFrVPbT0BjDF1vXxaukcF0XplvjXDMN5QNejec9cwQ/FmbPxyiH7UQlsvF/t9Fgbm145SQWC5UuLkyu09l2bT3AR0CxXXviIe7UtgzHfHuSz3vu7XRoA5O/NmqD8yS9eR14brk9VoH3W+6RdrwQlqbfZwbTWj/QrM064JFnThdjgHcpPLkg3tQCcSnUZ+1IefXkIPQvlAwl51ZImWYwsQ33QX0bibkhKY2WLedo7jRMIBY9/mZRt7U4ENLLA2QDLslUbIE7LSRyUtIQXWelcImKH7xTAaVRcWuX6d/jwEiF7ziYUbRu3h67RIWRpp12Pp+mO1zQGVmPm7gY2rNOveU3Hv5RX5QD9EzYaINpQo40lfsCCL7YSxvWttrB0yA9rQH9m30cyMyJz+ops3DX/oBEoKCzUIZ3CNd1l6t8qLj7c8C6hQ4Ms9BP8UkqavPaU1aP3GcLBOf3J70qvsiggCkWd4b+Gq8aVvu3iCFkRaqKttK9khmQKgTvYzeEAPUrtC3/uyKwYRe+REF+zv/4mjvMHCyHDDvmjtNp+C391oEsqWcDuusDnmKvrVpoaDLYGPy0jEn7B4CUy9nodDRQMif16aH3NdpNQGec8lKDoUbycwCbHoAkQIlM11oEYYw8KRTU8y76mLjuh42rM5SeFWOWFK+JuzH5mDNbYgWiB2ZBo8yk/gTBLAzxTdErw2DO9ZHOUa2F/sdXRaxEMSqrHaVBeY8AONfDoBvC4oJea6mB8mRAZmDVFh2jYtGO1oX7Yj3/whR3n1mnPJ6M9r+owI54uS0yU0OoJJRH3M6J8aJohKsNmwiZL3IUA06rguMJVssBqAYvWSbnFrwHrcbS7+UJycqCLK3S1opqnvd0K8LimxlaBTWdN5xjwoOLVmmtC21BkekOhadiPM+V6JkrKwIu8a6FS4kAewoFwZ+1PUyHiBRq+KoSvBpxgD","page_age":"1 days ago"}],"caller":{"type":"code_execution_20260120","tool_id":"srvtoolu_0189KWxyNswSLatrxt4KPiuH"}}            }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":2       }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":3,"content_block":{"type":"code_execution_tool_result","tool_use_id":"srvtoolu_0189KWxyNswSLatrxt4KPiuH","content":{"type":"encrypted_code_execution_result","encrypted_stdout":"Eo4BCioIFBgCIiQ0NGFlNjc2Yy05NThmLTRkNjgtOTEwOC1lYWU5ZGU3YjM2NmISDMEOxxLEBaacZPVj9RoMdG+nwsoKtni5N8MrIjCarV9s/ZGLAhSG/KpvkwPoWHIL6ONfN2BWWNRJAJuB3PY5uWWk5YhQXqBt4+yd4KwqEuvVOkWQv+USqmVWN78BA6kgSBgD","stderr":"Traceback (most recent call last):\n  File \"/usr/local/lib/python3.11/asyncio/runners.py\", line 190, in run\n    return runner.run(main)\n           ^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.11/asyncio/runners.py\", line 118, in run\n    return self._loop.run_until_complete(task)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.11/asyncio/base_events.py\", line 654, in run_until_complete\n    return future.result()\n           ^^^^^^^^^^^^^^^\n  File \"/tmp/srvtoolu_0189KWxyNswSLatrxt4KPiuH/cell.py\", line 11, in <module>\n    print(f\"Result {i}: {r['title']}\")\n                         ~^^^^^^^^^\nTypeError: string indices must be integers, not 'str'\n","return_code":1,"content":[]}}          }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":3   }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":4,"content_block":{"type":"server_tool_use","id":"srvtoolu_016zqbedYfeLRKTnrV7gYVDL","name":"code_execution","input":{}}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":""}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":"{\"code\": \"import"} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":" json\\nresults = await web_"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":"search({\\\"query\\\": \\\"latest"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":" news Netherlands 2025\\\"})"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":"\\nparsed"}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":" = json"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":".loads(results)"}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":" if isinstance(results, str)"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":" else results\\nfor i, r"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":" in enumerate(parsed):\\n    "}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":"print(f\\\"Result {i"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":"}: {r."}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":"get('title', 'N"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":"/A')}\\\")\\n    print"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":"(r.get('content',"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":" '')"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":"[:400"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":"])\\n    print(\\\"---\\\")"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":"\\n"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"input_json_delta","partial_json":"\"}"}             }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":4             }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":5,"content_block":{"type":"server_tool_use","id":"srvtoolu_019qJw91DwJQAosxRMKvYjPh","name":"web_search","input":{"query":"latest news Netherlands 2025"},"caller":{"type":"code_execution_20260120","tool_id":"srvtoolu_016zqbedYfeLRKTnrV7gYVDL"}}          }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":5       }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":6,"content_block":{"type":"web_search_tool_result","tool_use_id":"srvtoolu_019qJw91DwJQAosxRMKvYjPh","content":[{"type":"web_search_result","title":"Find all the latest news about Netherlands","url":"https://www.euronews.com/news/europe/netherlands","encrypted_content":"EpIHCioIFBgCIiQ0NGFlNjc2Yy05NThmLTRkNjgtOTEwOC1lYWU5ZGU3YjM2NmISDFdEqJ1USe+Sfc73qRoMV2GduieYJsH5leUPIjCXqLWudEovPXSMGNNmlSwPx9ynUteIOCf0ILl09G0QeeMk48yLTqR3pX6KvHkyHeoqlQYzkLgg7hbqUSsUhlQR0+MrW+yX2gFuCOsjFekS/4KkhJ2Q0ZJHe9KTWP72UbtSj0txSkcjklrMtozQTwl3J624Gv9j5qL51T+kylBy0bggD86n2Pw/hOp5WLu8xqpwGbY3Y+WMChlTS37p0Y2p00t0+pVqjR+mebjwppO8BNeTFAoJvrpugkiJxlDEzdBbpteKFzVZ87QSU4j8fLP50n3D9ingQVVFKcVjHgTQYVhvd6040xrU/4H0+5qjZjkFUJwcVl5MGh3VcARznF5Ai/CZ/sNijkcpqQhKiJhTBR35po00I5DG0ONuzlXUEIR4ocf0wzuFWDcEZxU0Rs9Q2a273K34LeZkuxv5RNe0uluwRdHLP5/58d0gz9reuQdyPv9kXZZaG6pyVNkKBd4IxfJp2rMKYbN5g6eNOTEXmd5+NgDJXSW3QspH6dy8o97xRtQ0iG7eafX8qLH+ke5W0CIMMiCglaREr/Xax/c29UA04o3GYGJ76aThUCcG3GF1jLRrMkVERSrO2caM/JNag0QNFTYcS17a7sEfzuBgrYXtX6VisexCP0mljxVVKBxh7eopTu4UAlQmX6eSbFitc6OAv6B1V005nvsqxs7I6orEvQa9xH193urjJOtSVqn4LfFS6qSPt8O7fSEcuHVs01RtJfzjhkUDmoEDqsWo/EveeQvahw5wYK5kMk9pD91uDs15Av9XfQTjXBWQH8z6VYQ7fwRTT0iYjig1pc1e7PJn4kQEltAx15flCCXdTGzfuK5len24Byia6NMW8/KiDgPWHzmakAwud9bhkPN8w6J4GMdaJaZP0+OYq6BQH0vOpvnflHslS+oq9D3s1MGssgJBXIMeQCuPeC0K49FIJWy1kXohFYMV/50CXNewmf8A6TYgckkZ0RmlMwQTXvJRUfgAac99YWRaDljDG0+wijUlxjaXF+Yt+jnr23Ly7skn4JAXCcj395tvJiall6ne2tM7okaCtKhOVUpPc2bSmU+MaJ7KiSl2j3MPHiPipW9EdUdyu39qUX17xXWgbG5HnaFLwZiN0cIYAw==","page_age":"242 days ago"},{"type":"web_search_result","title":"Netherlands, News and latest Headlines - i24NEWS","url":"https://www.i24news.tv/en/tags/netherlands","encrypted_content":"EqUJCioIFBgCIiQ0NGFlNjc2Yy05NThmLTRkNjgtOTEwOC1lYWU5ZGU3YjM2NmISDCcC55T64sDIuh9iVhoMZXIr9/+CJ1N4AlNfIjAXZiTD8rpqfHRxaOc3Wn+w0+Pmimf8CYG81s35ygrU74EvKt+snn6klnjk/TktB9EqqAiPKx03MVya7ad0gT3kGp5W5ydssYRjrxOLRAmwnWGmd1PXzEpLECfbuKvRYp98+cIp+WvyQkgnSDm+5/OG0fwxXBMeZy5ShR6GZSVOLB2duzbzzrTsAEJTutmH8txeRxg4Xvtmc35n3rfX2hjbOhgvWnhdrUU1OPrt66x3rUf4sX6IulFPZsVexltf6ODiROebq0KMi0vUuKlfuzll4ZYwXAUUXcQ3rhvbNA90NXyW+jZNmRKwsLB/wqTO3LUpqfa50jam2ebAA5q5XDcvmSF+xZh8RSp5fHpaZHSlk9AAemGNUfm92wx4hHVRVyY5sAnrLJ3fC4gA1EQDJs9BTR8YVRf4wNO6qnwVgb3cgPcYQXYGgnj4VZ7tfwc7R7h8CKPlc7/t1bE+4sKsbJc17KYTkEYljU8xhNr3I+LzUyW4uZeMEyswKaYLTuMaP6i6FcQ8AKj5KkAAIp8W7ZzaUT1e4sJy1EDi3zDDYzuZBBwX22VY9oeMZHXyDRtE/I5HQS+ETB51KdsSPQ3Q1n/d7a0yxpZZr80y4yoz2gmd/PDeBgSesK471BahiBL7fztFx8pZx+HZ7ZeDZQI1WqpfTTOK+fEOdOxW29L8GC5ciGhx72xT0PhJMZkAYTvTxO0qzHBNTC7D9Kfb0QgjcipiF0LTvNP+VM6OT/Ri2QIhNYa6DTbDzHwAP1cygVpuYN3N4QvINJf3t5TxfNPV6usbIDvD9hvdqLHDsHrRnjFrUsccLRwdrjaaunvHZB3iF2juZSKhSGR1vr7A1a7OBQh/lDZI3jyLPJiQVFhroY9RrZnBw2yJ1b21qdC2bdbg4Sp6aCingB6VK12ayIdHqHrQXB/JfRr3H3N6i2KJbMre0pp9eiSUzfUeb/u4SXii3Yno8QRwPLeZ6jPm/BoYHnj18/jIWHyI2TvvUTkjVN9DOn+7NjOsNDnSfyRznuX+oXe3WzGqLLjwPInHYvSFa0bBlr+aFFjDz+Z4IK9LtZ+7xvRDcZPOCnrjjX0TNiWJH3hR1pDKjsjrs3MI5vo4j2AsAEb2/+yNPHEsc42LfCLSn2r7sITcCHoKn//fBpGR7dIxwbz73MPFcmgr+oSsv9MS3fiEE1WRk8sxpPm7x3KZox4HAaG/0ZgtdbWeWkQyB+1bMmLwIt+9WDkeThinPTZOHleiVISkFnn8juM2jbw2K2uqD/y/fuminD1JE7/o7AmRRWE7pqtO0JFFMBsSA+xIqR6zYmO8l2bjensIvq9jbvZqDsKNiAa+GvW58WpAUDfP26rP+0IZV0/ezNYgKS8Q77DBB9EFLtGNzn3txQtSQt/iNHiCsj0cHo7BDaj2MX3R64Z2opHjWJHkJVCNHtXMPhBthic0JVmszPMwslxfE+U6yuQ+xmBH94Uh4hmQqEr8QM1LM5ugujwYFxgD","page_age":null},{"type":"web_search_result","title":"Netherlands news - Today’s latest updates - CBS News","url":"https://www.cbsnews.com/tag/netherlands/","encrypted_content":"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","page_age":"1390 days ago"},{"type":"web_search_result","title":"Netherlands Articles and latest stories","url":"https://www.jpost.com/tags/netherlands","encrypted_content":"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","page_age":null},{"type":"web_search_result","title":"Netherlands sees domestic decline and international tourism boost ...","url":"https://www.travelmole.com/news/netherlands-more-international-visitors-2025/","encrypted_content":"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","page_age":"162 days ago"},{"type":"web_search_result","title":"Netherlands politics","url":"https://www.euronews.com/tag/netherlands-politics","encrypted_content":"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","page_age":"218 days ago"},{"type":"web_search_result","title":"The Northern Times","url":"https://northerntimes.nl/","encrypted_content":"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","page_age":"2036 days ago"},{"type":"web_search_result","title":"Latest","url":"https://www.government.nl/latest","encrypted_content":"EoQFCioIFBgCIiQ0NGFlNjc2Yy05NThmLTRkNjgtOTEwOC1lYWU5ZGU3YjM2NmISDAMc6ZEmZ/DSqMlIzBoMCR1wyOQAcyFw3joEIjDe65trzKnjdi8bMKhtCupe7uWbLp//aka3Ia4hnVLAU/+NhhAnXcqh5gr1QsMmvcgqhwRzBbzLQ4fsOuZoqNQEUKUBK/0yvRXYlljhSwHMc3ondIWNv0S4QeuLtDlI0DAjgwnyuI1T17ZMCKu5dIokOeUHKY7pTDLZWmlSVeEpf9ohNTcWv49dQ4Igh0pkZklfp/l+2/oj8QxPav8KEenl/JDEpMohttLUMZjFOP6e7p6WKm0dPNdxFKxiAnvpnvCg8Gb1WvO3qkBiMH9kcgXUH5QIwkMXO6zyiIa+HxRFET4n5AaGBdtT95HFwJ53Coff6BtFIlsQLh4kFPW/RZEOvK9s0G+4l8krG/Yqpb+qVg+EofEyGB2UealOvsUdSa+zjcukUCsHUNX3uPFhds0k5kPLKV7kuNn06RKDyZ2+WeBENkB8c5rGa2PCnFRYLle5SlHjZ6BuMK0wFDvdUEE8s3tOhq0/IuCZtavHTYor1ZRbPD1ZC2FYEi4x7t0FTQSWjQHmoblmqme/xxzN85r5n1ASBbC9uZrwlmh/mTLZz1Xu7AvY3DTrQ9XSd9fBHYNt5DCcmVg8ysxiXY7iipRSCuq+cc4zHoOshljzEujQMrLD0FDnbgUmWBBSfa6mmtqfBEuU2Gdxu1ER0f+UmgDcfC2up1zr5tZhgxGhj2nXMZWo72dPNEieHgyFiRroInYYyKA1UPFzS1jiWUZm37Y98jsgfAAgsPmhBajAU8wsBnA0S4Wu7Eb5QC4YAw==","page_age":"82 days ago"},{"type":"web_search_result","title":"Netherlands (Kingdom of The) Breaking News Headlines Today","url":"https://ground.news/interest/netherlands","encrypted_content":"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","page_age":"286 days ago"},{"type":"web_search_result","title":"NL Times","url":"https://nltimes.nl/","encrypted_content":"EsIICioIFBgCIiQ0NGFlNjc2Yy05NThmLTRkNjgtOTEwOC1lYWU5ZGU3YjM2NmISDE/X80m2zsvQns4AoBoMknczt+sTseYDIhoCIjDIInwUglgFfAEB6vJqQl89WSHbsaCYDQ7tkH+jwUXa0Y+0rUq9Ws+U3AsuJjtAFukqxQe2dod8gzKspT9TCYtVhPjjvFj22MSvVUpcgX80L+QERwU+1+2uFCGWCMvZVDUBKZkCIzj+FTYjukdU+pjhWmEWmQU3rzZO11gMwnHD8bi87jVH/DUCxEher8F4lZYrqVA4OI8XqEJx5tpuCcblQGlOjSQSZwRwNHi4yfoNZgQ70ZtBc2dkwJSe6IpU0XBTHEt58eG5a4unT0uDa0QCcKu4XPqUjbK3x5dyBFnhXawKoeDN38FlQILAW664NxSrQ62jUx3BFrT6KK44vSYC1G3dCl92rICpFT0ihD/xQsEKPwk33TL6fuvjkFDFP1h8mK2L28WfAPlXoZB5w/V/lu6Ks/TMwwxQG1DvngzRkYF3PbrYL9bU3Z6T0tZunezcWCYUP3tCe+bUaofO1N7IWC5MkanB7IWJjRMz0XkKgctkP6AWXVhLlONBKPXAP9/jxx1t3dsWabojU05WAZ2Sp1RymO+R+kqn3Tb5dk1xZZdWXpOqf1Np0RmBGTi7ON8P+CrxTvObv+al1I+6tAKACTAfZTTlQNlOW13HgsrW/AKR/CE0CE8zeSqPgr3Ly8+o6W7c+nTFPe85WtM0ieBM3JOu1R2jNpzjRTJHqJrrkDzfnRPaalQVqoFK/jId+8nqX4J2nHKbyGJ8jBEwS282gqs7Pt2GgNU9ge8VcyFr6F7+1ZJvkFsQQ0TAicj5fVIrZP4cltvrk4VHt5C+BpopvSm/cvcibZSNZNON3/dEBe3l7s8PahM7yE2WwcPuHVj2Uk4SRpmtcRx3iveTNvd+Ze2WRm4+Sp3zO0q5mWpfNSsTemwjh8KTEUhHYoAwsfTPyF2GQgvwob6Orz7qbnSdv1UuRxF8QQXkKSITbiyEC9Be3btcI/89ewWTg84llJSkoOwa7qjoYMMAAaryj1K3rFMi/mekEiXF+vADkgyFUGsf9Jl9mY/r7mNBxGf8qBXGXUV2sc1Q/LHSpxIr5PfXIMN35CGi5K4VOOQQkR5T+sTR1uVFKRFQD/ItQAcHuf+xii5M0a8GXbmFUAw8ARMdCsg0knoOIsLJyobo5HJvpUgzu6X3ynRNSvQXlaroUR4onsUr1x4VclK88szzYurfUolUlnujY/TJGHgbJkICOKvmnNMDyk5XYThtwqsshEs7Dwd9DK5/F+rARDky14S6p0rSvqzRkHeJ7m3ATkHvZE8qCArzDIDVfcHPa1R+m8i9UdCdGH2inkIu345WOGE5upmccUtCWroBFuJCbA6HCOac4JBSw+5lnZwRwwpML9NWr+cBqoUdJBgD","page_age":"1 days ago"}],"caller":{"type":"code_execution_20260120","tool_id":"srvtoolu_016zqbedYfeLRKTnrV7gYVDL"}}               }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":6}
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":7,"content_block":{"type":"code_execution_tool_result","tool_use_id":"srvtoolu_016zqbedYfeLRKTnrV7gYVDL","content":{"type":"encrypted_code_execution_result","encrypted_stdout":"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","stderr":"","return_code":0,"content":[]}}        }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":7    }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":8,"content_block":{"type":"server_tool_use","id":"srvtoolu_01A7aDzENiXwRUrWN9H62dBz","name":"code_execution","input":{}}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":""}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":"{\"code\": \"for"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":" i,"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":" r"}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":" in enumerate(parsed"}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":"):"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":"\\n    print(f\\\""}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":"Result {i}:"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":" {r."}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":"get('title', 'N"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":"/A')}\\\")\\n    print"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":"(r"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":".get('content"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":"', '')[:1"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":"500"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":"])\\n    print(\\\"---\\\")"} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":"\\n"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":8,"delta":{"type":"input_json_delta","partial_json":"\"}"}    }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":8               }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":9,"content_block":{"type":"code_execution_tool_result","tool_use_id":"srvtoolu_01A7aDzENiXwRUrWN9H62dBz","content":{"type":"code_execution_result","stdout":"Result 0: Find all the latest news about Netherlands\nLatest news. The Sound of Music finally has a dedicated museum in Austria. … Young Inventors Prize 2025. Discover Algeria. Discover Türkiye. Golf Travel Tales.\n\n# Netherlands\nClaude from the Netherlands during the dress rehearsal for the Grand Final of the 69th Eurovision Song Contest, in Basel, Switzerland, Friday, May 16 2025.\n\n## More about this topic\n## Netherlands confirms Eurovision return as Spain considers boycott\n\nNumerous trains were cancelled as train travel was disrupted in some central regions of the Netherlands.\n\nProtesters attend a far-right groups' protest against immigration and asylum policies\n\n## Far-right anti-immigration rally in The Hague leads to clashes\n\n## Police clash with far-right protesters at anti-immigration rally in The Hague\n---\nResult 1: Netherlands, News and latest Headlines - i24NEWS\nGet the latest news about Netherlands from i24 news. articles, videos, opinions, and more At the click of a button >\n\n# Netherlands\n### European countries withdraw from Eurovision 2026 in boycott of Israel's participation\nEBU vote calls that Israel will participate in the Eurovision 2026 contest despite boycott calls; as Spain, Slovenia, Ireland, and the Netherlands announce their withdrawl from the singing competition\n\n### Father and sons face up to 25 years for murdering daughter over 'western' lifestyle\nDutch prosecutors seek up to 25 years for father and sons in alleged “honor killing” of 18-year-old over her refusal to conform to family’s strict cultural expectations\n\nDec 01, 2025\n\n### Dutch defense expo bars Israeli firms from 2025 event\nThe organizers of the NEDS trade show, the largest defense event in the Netherlands, have decided to exclude Israeli companies from the 2025 edition in Rotterdam\n\nAug 20, 2025\n\n\n\nPolice officers in Amsterdam deploy amid anti-Israel protests during the Ajax-Macabbi Tel Aviv soccer game\n---\nResult 2: Netherlands news - Today’s latest updates - CBS News\nWhat's on the NATO summit agenda? As tensions appear to ease in the Middle East, President Trump is meeting with NATO allies. CBS News senior White House and political correspondent Ed O'Keefe reports from The Hague, Netherlands.\n\n## Netherlands\n#### Tesla wins Dutch approval to use self-driving features, a first for Europe\nThe Netherlands' decision now goes to the European Commission for full authorization.\n\n#### Dutch angry at U.S. for yanking panels honoring Black World War II troops\nThe removal by a U.S. military cemetery in the Netherlands of two displays recognizing Black troops who fought in World War II has spurred anger there.\n\n- Dec 30, 2025\n\n#### Netherlands set to return 3,500-year-old stolen sculpture to Egypt\nA day after attending the opening ceremony of the Grand Egyptian Museum, the leader of the Netherlands said an ancient statue discovered at an art fair would be returned.\n\n- Nov 3, 2025\n\n#### Dutch far-right loses ground to centrists in close general election\n\n\nWhile no party emerges as a clear winner, Geert Wilders' far right Party for Freedom has lost 11 seats to Dutch centrist party D66.\n\n- Oct 30, 2025\n\n#### Century-old grenades found hidden in delivery of onions\nThe grenades, dating from 1925, were found in a consignment of onions heading from France to a factory in the northern Dutch province of Zeeland.\n\n- Oct 8, 2025\n\n#### Mystery behind famous Rembrandt artwork solved 4 centuries later\nThe Rijksmuseum museum said that it had finally sniffed out a s\n---\nResult 3: Netherlands Articles and latest stories\nQuarter of all Dutch discrimination offenses in 2025 were antisemitic, new report reveals. In 2025, the Dutch Public Prosecution Service recorded 46 antisemitic criminal discrimination cases, representing 26% of all registered discrimination ...\n\n# Netherlands\n### Quarter of all Dutch discrimination offenses in 2025 were antisemitic, new report reveals\nIn 2025, the Dutch Public Prosecution Service recorded 46 antisemitic criminal discrimination cases, representing 26% of all registered discrimination offenses.\n\n### Amin Abu Rashid acquitted by Dutch court of financing Hamas, convicted of sanction evasion\nAmin Abu Rashid was acquitted of financing Hamas but convicted of sanctions evasion and managing a banned organization, drawing criticism from pro-Israel groups and sparking protests in Rotterdam.\n\nProtesters take part in a demonstration organized by the Palestinian community in the Netherlands against hunger and the numerous deaths in Gaza, on Dom Square in Utrecht on August 3, 2025\n\n\n\n{\"name\":\"\",\"mainEntity\":{\"itemListElement\":[{\"name\":\"HRF files complaint against MKs over alleged 'incitement to genocide' ahead of Netherlands trip\"},{\"name\":\"New AI-powered research project aims to uncover the origins of the Dead Sea Scrolls\"},{\"name\":\"Archaeologists find over 3,000 artifacts from Stone Age to WWII in Netherlands valley\"},{\"name\":\"Dutch police foil alleged bomb, arson plot against synagogue - report\"},{\"name\":\"Why one non-Jewish woman moved to Israel amid rising antisemitism\n---\nResult 4: Netherlands sees domestic decline and international tourism boost ...\nThe Netherlands saw fewer overnight stays by Dutch but more international visitors in 2025. The Netherlands’ accommodation sector posted steady growth in 2025, with total guest numbers rising to 52.2 million across hotels, campsites and holiday ...\n\nNetherlands tourism grows in 2025 as international arrivals rise 5%, driving total guests to 52.2 million.\n\n# The Netherlands saw fewer overnight stays by Dutch but more international visitors in 2025\n**The Netherlands’ accommodation sector posted steady growth in 2025, with total guest numbers rising to 52.2 million across hotels, campsites and holiday parks,** according to provisional figures from **Statistics Netherlands.**\n\nThis marks an increase of nearly 2% compared to 2024, driven largely by international demand.\n\n**International visitors reached indeed 22.3 million, up 5% year-on-year**, while **domestic travel softened slightly**. Dutch residents accounted for 29.9 million stays, a marginal decline of 0.4%.\n\n\n\n**Groningen and Friesland also saw strong gains**, particularly in international arrivals.\n\nBy contrast, **Zeeland and Utrecht recorded declines in total guest numbers**, with Zeeland seeing drops in both domestic and international segments.\n\n**Noord-Holland, home to Amsterdam, remained the country’s top destination, attracting 16.3 million guests, up 2%.**\n\nAmong major cities, **Amsterdam recorded the largest increase in overnight stays, rising 2% to 9.5 million guests**. Rotterdam and The Hague also posted modest \n---\nResult 5: Netherlands politics\nNetherlands national elections 2025: The results in pictures. … Netherlands. Dutch far-right MP Wilders resumes campaign after alleged terror plot. Geert Wilders had suspended his election campaign after being identified among the alleged ...\n\n# Netherlands politics\n## New Dutch minority government sworn in under centrist PM Jetten\n### Centrist D66 confirmed as Dutch general election winner\nWith nearly all votes counted, Geert Wilders' far-right PVV party no longer has a chance at overtaking the centrist D66 party led by Rob Jetten.\n\n31/10/2025\n\nD66 leader Rob Jetten after the exit polls came out.\n\n### Dutch election shocker: What you need to know\nDutch election goes to the wire as progressive forces led by newcomer Rob Jetten make gains in blow to rightwing firebrand Geert Wilders.\n\n30/10/2025\n\nRob Jetten, 38, could be the next Dutch prime minister.\n\n### Who is Rob Jetten, the potential next Dutch prime minister?\n\n\nThe 38-year-old's D66 party is neck-and-neck with Geert Wilders’ far-right Party for Freedom after Wednesday's election, meaning he could become the country's youngest ever leader.\n\n30/10/2025\n\nGeert Wilders is seen on a large screen, at an election venue for the D66 party,\n\n### Scenes of joy at D66 and GreenLeft HQs on Dutch election night\nSupporters of Dutch parties reacted on Wednesday evening to the release of an exit poll published immediately after voting ended.\n\n30/10/2025\n\nADVERTISEMENT\n\nRob Jetten, leader of the center-left D66 party, speaks on stage duri\n---\nResult 6: The Northern Times\nGet the latest news, events, and insights from across the Northern Netherlands — straight to your inbox.​.\n\n# The Northern Times The Northern Times\n## EdanZ, a self-development centre popular with internationals, moves to Damsterdiep\n### Make it in the North\n### RUG suspends participation in project after reports of collaboration with Israeli army commander\n\n### Student room shortage in Groningen persists\n\n### Free seminar for international students on how to find a job while studying\n\n### University of Groningen opens central reporting point for social safety\n\n### Alternative opening of the academic year pushes back against budget cuts and heavy workload\n\n### New Safety Campus to open in Assen\n\nNew campaign encourages employers to look past language barriers\n\n### Free seminar for international students on how to find a job while studying\nSeptember 3, 2025\n\nJob vacancies in the Netherlands continue to fall\n\n\n\n## Northern cities and Kraków connected with belief of citizens as co-creators, says Northern Netherlands representative\n\nJuly 7, 2025\n\nInternational\n\n## Coming Up: Events for Internationals and Expats in Groningen\n\nJune 24, 2025\n\nExpats\n\n## We understand expats because we built our business around them – Van der Meulen Makelaars\n\nJune 11, 2025\n\n## IWCN to host spouses meetup for internationals\n### Make it in the North to launch campaign to connect international talent with Northern employers\nJune 20, 2025\n\nNS on strike again Friday: no trains in the North\n\nDrenthe\n\n### \n---\nResult 7: Latest\n2025 central government annual financial report: stable public finances in times of geopolitical uncertainty. According to the 2025 central government financial annual report, 2025 was a year of economic stability.\n\n# Latest\n## News\n12. 2025 central government annual financial report: stable public finances in times of geopolitical uncertainty According to the 2025 central government financial annual report, 2025 was a year of economic stability. Despite increasing ... 20-05-2026 16:04 Read more\n---\nResult 8: Netherlands (Kingdom of The) Breaking News Headlines Today\nStay current with all the latest and breaking news about Netherlands, compare headlines and perspectives between news sources on stories happening today. In total, 35,330 stories have been published about Netherlands which Ground News has aggregated ...\n\n# News about Netherlands\n## News about Netherlands\n### Air traffic control issue disrupts departing flights at major UK airports\nDutch Move to Ban Broadcaster After Hitler Remarks — A dynamic shot of the Netherlands flag waving against a clear blue sky, symbolizing freedom and patriotism.\n\n### Dutch Move to Ban Broadcaster After Hitler Remarks\nDutch public transport halted by strike against welfare cuts — MOUNEB TAIM/Middle East Images/AFP via Getty Images/Getty via Getty Images\n\n### Local News Publishers\n#### Consumers' Association Wants Ban on Meta Camera Glasses Privacy\nUtrecht Supporters Are Allowed to Attend Away Matches, but only by Bus.\n\n\n\n#### A wheelchair user’s guide to Amsterdam – why it’s my favourite accessible city break\nAmsterdam, Netherlands · Amsterdam See the Story\n\nLargest Increase in Dutch Industrial Production in 4 Years\n\n#### AvroTros Is Working on a Series About 'Bang Lists'.\nNetherlands · Netherlands See the Story\n\nYoung adults drive increase in Dutch library membership\n\n#### Young adults drive increase in Dutch library membership\nDutch US Exports Fall a Quarter: Machinery and Pharmaceuticals Down\n\n#### Nathalie Harp, ‘the Human Printer’, Never Complains or Whines.\nDutch PM Rob Jetten Uses AI to Write \n---\nResult 9: NL Times\nMore news stories daily than any other English news source about the Netherlands. … Family of guard shot dead at Amsterdam cafe calls reporting a ‘second slap in the face’. Subscribe to News feed Subscribe to News feed.\n\n## Latest stories\n\n- Video: Four train stations evacuated over suspicious packages; Four arrests so far\n- Mother makes new appeal to bring Insiya home 10 years after Amsterdam girl's abduction\n- Amsterdam Univ.’s social sciences department bans laptops, phones and tablets\n- Netherlands refusing to help Venezuelan opposition leader return home: report\n- Report: Buyers have fewer fixer-upper homes as only 1.3% of those for sale need work\n\n- Video: Four train stations evacuated over suspicious packages; Four arrests so far\n- Netherlands joins Germany in EU budget overhaul demands\n- Arcadis to cut 1,000 jobs, divest China operations in new \"reset\" strategy\n- Nearly 16% of Dutch can justify a man hitting his wife\n---\n","stderr":"","return_code":0,"content":[],"abort_reason":null}}      }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":9           }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":10,"content_block":{"type":"text","text":""} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":10,"delta":{"type":"text_delta","text":"Here"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":10,"delta":{"type":"text_delta","text":"'s a"}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":10,"delta":{"type":"text_delta","text":" round"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":10,"delta":{"type":"text_delta","text":"up of the latest"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":10,"delta":{"type":"text_delta","text":" news from the Netherlands across"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":10,"delta":{"type":"text_delta","text":" various"}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":10,"delta":{"type":"text_delta","text":" topics"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":10,"delta":{"type":"text_delta","text":":\n\n---"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":10,"delta":{"type":"text_delta","text":"\n\n###"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":10,"delta":{"type":"text_delta","text":" "}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":10,"delta":{"type":"text_delta","text":"🏛"}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":10,"delta":{"type":"text_delta","text":"️ Politics"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":10,"delta":{"type":"text_delta","text":"\n- "}               }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":10     }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":11,"content_block":{"citations":[],"type":"text","text":""}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":"The"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" cent"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":"rist D"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":"66"}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" party,"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" led by Rob"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" Jetten, has been"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" confirmed"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" as the winner"} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" of the Dutch"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" general election. With"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" nearly"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" all"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" votes"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" counted"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":", Ge"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":"ert Wilders'"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" far"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":"-right"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" P"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":"VV"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" party could"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":" not overt"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":"ake D"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":11,"delta":{"type":"text_delta","text":"66."} }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":11       }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":12,"content_block":{"type":"text","text":""}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":12,"delta":{"type":"text_delta","text":" "}}
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":12 }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":13,"content_block":{"citations":[],"type":"text","text":""}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":"Rob"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":" Jetten, "}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":"38"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":", could"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":" become"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":" the country"}          }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":"'s youngest"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":" ever"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":" prime"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":13,"delta":{"type":"text_delta","text":" minister."}        }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":13  }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":14,"content_block":{"type":"text","text":""}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":14,"delta":{"type":"text_delta","text":"\n\n---"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":14,"delta":{"type":"text_delta","text":"\n\n### "}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":14,"delta":{"type":"text_delta","text":"🚆"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":14,"delta":{"type":"text_delta","text":" Security"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":14,"delta":{"type":"text_delta","text":" &"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":14,"delta":{"type":"text_delta","text":" Public"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":14,"delta":{"type":"text_delta","text":" Order"} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":14,"delta":{"type":"text_delta","text":"\n- "}  }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":14}
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":15,"content_block":{"citations":[],"type":"text","text":""} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":15,"delta":{"type":"text_delta","text":"Four"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":15,"delta":{"type":"text_delta","text":" train stations were evacuated over suspicious"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":15,"delta":{"type":"text_delta","text":" packages, with"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":15,"delta":{"type":"text_delta","text":" four arrests made"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":15,"delta":{"type":"text_delta","text":" so"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":15,"delta":{"type":"text_delta","text":" far."}          }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":15           }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":16,"content_block":{"type":"text","text":""}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":16,"delta":{"type":"text_delta","text":"\n- "} }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":16          }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":17,"content_block":{"citations":[],"type":"text","text":""}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":17,"delta":{"type":"text_delta","text":"A"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":17,"delta":{"type":"text_delta","text":" far"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":17,"delta":{"type":"text_delta","text":"-right anti"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":17,"delta":{"type":"text_delta","text":"-immigration rally"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":17,"delta":{"type":"text_delta","text":" in"}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":17,"delta":{"type":"text_delta","text":" The"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":17,"delta":{"type":"text_delta","text":" Hague led"}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":17,"delta":{"type":"text_delta","text":" to cl"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":17,"delta":{"type":"text_delta","text":"ashes between"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":17,"delta":{"type":"text_delta","text":" police and protesters"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":17,"delta":{"type":"text_delta","text":"."}           }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":17       }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":18,"content_block":{"type":"text","text":""}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":18,"delta":{"type":"text_delta","text":"\n\n---\n\n### 🎶"}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":18,"delta":{"type":"text_delta","text":" Eurovision"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":18,"delta":{"type":"text_delta","text":"\n- "}     }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":18  }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":19,"content_block":{"citations":[],"type":"text","text":""}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":"The Netherlands has"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" announced"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" its"}          }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" withdrawal"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" from the Eurovision "}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":"2026"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" contest,"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" joining"} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" Spain"}          }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":", Slovenia"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":", and Ireland"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" in"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" a"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" boyc"}          }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":"ott over"}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" Israel"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":"'s"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" continued"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" participation"}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" in"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":" the competition"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":19,"delta":{"type":"text_delta","text":"."}               }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":19            }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":20,"content_block":{"type":"text","text":""}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":20,"delta":{"type":"text_delta","text":"\n\n---\n\n### "}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":20,"delta":{"type":"text_delta","text":"🚗 Technology"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":20,"delta":{"type":"text_delta","text":"\n- "}             }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":20      }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":21,"content_block":{"citations":[],"type":"text","text":""}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":"Tesla"} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" has"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" won"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" Dutch"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" approval"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" to"} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" use"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" self"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":"-driving features"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" —"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" a"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" first"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" for"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" Europe"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":"."}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" The Netherlands'"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" decision"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" now"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" goes"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" to"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" the"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" European"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" Commission"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" for"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" full"}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":" authorization"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":21,"delta":{"type":"text_delta","text":"."}     }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":21               }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":22,"content_block":{"type":"text","text":""}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":22,"delta":{"type":"text_delta","text":"\n\n---\n\n### "}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":22,"delta":{"type":"text_delta","text":"⚖️ Crime"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":22,"delta":{"type":"text_delta","text":" & Justice"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":22,"delta":{"type":"text_delta","text":"\n- "}           }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":22     }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":23,"content_block":{"citations":[],"type":"text","text":""}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":"In"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":" "}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":"2025, the Dutch"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":" Public"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":" Prosecution"}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":" Service recorded"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":" 46"}          }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":" antis"}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":"emitic criminal"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":" discrimination"}          }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":" cases,"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":" representing"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":" "}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":"26"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":"% of all registered"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":" discrimination"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":" off"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":"enses"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":23,"delta":{"type":"text_delta","text":"."}    }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":23         }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":24,"content_block":{"type":"text","text":""}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":24,"delta":{"type":"text_delta","text":"\n- "}       }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":24         }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":25,"content_block":{"citations":[],"type":"text","text":""}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":"Dutch"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" prosecutors"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" are"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" seeking"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" up"}          }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" to 25"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" years for"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" a"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" father"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" and"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" sons"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" in"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" an"}          }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" alleged"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" \""}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":"honor"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" killing\" of"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" an"}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" 18-year-old over"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" her"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" ref"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":"usal to conform"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" to her"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" family"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":"'s strict"}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" cultural"}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":25,"delta":{"type":"text_delta","text":" expectations."}  }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":25 }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":26,"content_block":{"type":"text","text":""}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":26,"delta":{"type":"text_delta","text":"\n\n---\n\n### "}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":26,"delta":{"type":"text_delta","text":"🌍 Tourism"} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":26,"delta":{"type":"text_delta","text":" & Economy"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":26,"delta":{"type":"text_delta","text":"\n- "}           }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":26          }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":27,"content_block":{"citations":[],"type":"text","text":""}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":"The Netherlands'"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" accommodation"}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" sector posted"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" steady"}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" growth in 2025, with"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" total"}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" guest"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" numbers"}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" rising"}          }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" to"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" 52"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":"."}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":"2"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" million across"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" hotels"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":","}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" cam"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":"psites, and holiday"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":" parks"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":27,"delta":{"type":"text_delta","text":"."}           }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":27           }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":28,"content_block":{"type":"text","text":""}        }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":28,"delta":{"type":"text_delta","text":" "}}
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":28          }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":29,"content_block":{"citations":[],"type":"text","text":""}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":29,"delta":{"type":"text_delta","text":"International"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":29,"delta":{"type":"text_delta","text":" visitors"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":29,"delta":{"type":"text_delta","text":" reached"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":29,"delta":{"type":"text_delta","text":" 22"} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":29,"delta":{"type":"text_delta","text":".3"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":29,"delta":{"type":"text_delta","text":" million,"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":29,"delta":{"type":"text_delta","text":" up "}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":29,"delta":{"type":"text_delta","text":"5"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":29,"delta":{"type":"text_delta","text":"% year-on-year."} }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":29        }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":30,"content_block":{"type":"text","text":""}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":30,"delta":{"type":"text_delta","text":"\n- "}     }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":30}
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":31,"content_block":{"citations":[],"type":"text","text":""}          }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":31,"delta":{"type":"text_delta","text":"According"}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":31,"delta":{"type":"text_delta","text":" to the 2025 central"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":31,"delta":{"type":"text_delta","text":" government financial annual report, 2"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":31,"delta":{"type":"text_delta","text":"025 was a year of economic"} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":31,"delta":{"type":"text_delta","text":" stability for"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":31,"delta":{"type":"text_delta","text":" the Netherlands,"}  }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":31,"delta":{"type":"text_delta","text":" despite"}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":31,"delta":{"type":"text_delta","text":" increasing ge"}          }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":31,"delta":{"type":"text_delta","text":"opolitical uncertainty."}}
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":31  }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":32,"content_block":{"type":"text","text":""}         }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":32,"delta":{"type":"text_delta","text":"\n\n---\n\n### "}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":32,"delta":{"type":"text_delta","text":"🏛"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":32,"delta":{"type":"text_delta","text":"️ Culture & History"}              }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":32,"delta":{"type":"text_delta","text":"\n- "}      }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":32             }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":33,"content_block":{"citations":[],"type":"text","text":""}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":"The Netherlands is"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" set"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" to return"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" a"}    }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" "}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":"3"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":","}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":"500"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":"-year-old stolen"}          }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" sculpture"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" to Egypt"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":", a"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" day"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" after attending"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" the"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" opening"}     }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" ceremony"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" of the Grand"}   }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" Egyptian"}      }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":33,"delta":{"type":"text_delta","text":" Museum."}        }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":33        }
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":34,"content_block":{"type":"text","text":""}          }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":34,"delta":{"type":"text_delta","text":"\n\n---\n\nThese"} }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":34,"delta":{"type":"text_delta","text":" are the most"}             }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":34,"delta":{"type":"text_delta","text":" prominent"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":34,"delta":{"type":"text_delta","text":" stories making"}           }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":34,"delta":{"type":"text_delta","text":" headlines in the Netherlands right"}            }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":34,"delta":{"type":"text_delta","text":" now. Would"}               }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":34,"delta":{"type":"text_delta","text":" you like more"}       }
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":34,"delta":{"type":"text_delta","text":" details on any specific topic?"}      }
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":34      }
+
+        event: message_delta
+        data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":{"id":"container_011hmzmoU4KyBQ4wvsBFexS2","expires_at":"2026-09-29T17:51:36.629489Z"}},"usage":{"input_tokens":24097,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":1102,"server_tool_use":{"web_search_requests":2,"web_fetch_requests":0}}  }
+
+        event: message_stop
+        data: {"type":"message_stop"}
+
+  recorded_at: 2026-09-29T16:51:52.186402+00:00
+- request:
+    method: POST
+    uri: >-
+      https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
+    headers:
+      accept:
+      - "*/*"
+      accept-encoding:
+      - gzip, deflate, br, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - "2873"
+      content-type:
+      - application/json
+      host:
+      - generativelanguage.googleapis.com
+    body:
+      type: json
+      content:
+        contents:
+        - parts:
+          - text: What are the latest news in the Netherlands?
+          role: user
+        - parts:
+          - text: |-
+              Here's a roundup of the latest news from the Netherlands across various topics:
+
+              ---
+
+              ### 🏛️ Politics
+              -
+          - text: >-
+              The centrist D66 party, led by Rob Jetten, has been confirmed as the winner of
+              the Dutch general election. With nearly all votes counted, Geert Wilders'
+              far-right PVV party could not overtake D66.
+          - text: " "
+          - text: Rob Jetten, 38, could become the country's youngest ever prime minister.
+          - text: |-
+
+
+              ---
+
+              ### 🚆 Security & Public Order
+              -
+          - text: >-
+              Four train stations were evacuated over suspicious packages, with four arrests
+              made so far.
+          - text: |-
+
+              -
+          - text: >-
+              A far-right anti-immigration rally in The Hague led to clashes between police
+              and protesters.
+          - text: |-
+
+
+              ---
+
+              ### 🎶 Eurovision
+              -
+          - text: >-
+              The Netherlands has announced its withdrawal from the Eurovision 2026 contest,
+              joining Spain, Slovenia, and Ireland in a boycott over Israel's continued
+              participation in the competition.
+          - text: |-
+
+
+              ---
+
+              ### 🚗 Technology
+              -
+          - text: >-
+              Tesla has won Dutch approval to use self-driving features -- a first for
+              Europe. The Netherlands' decision now goes to the European Commission for full
+              authorization.
+          - text: |-
+
+
+              ---
+
+              ### ⚖️ Crime & Justice
+              -
+          - text: >-
+              In 2025, the Dutch Public Prosecution Service recorded 46 antisemitic criminal
+              discrimination cases, representing 26% of all registered discrimination offenses.
+          - text: |-
+
+              -
+          - text: >-
+              Dutch prosecutors are seeking up to 25 years for a father and sons in an
+              alleged "honor killing" of an 18-year-old over her refusal to conform to her family's
+              strict cultural expectations.
+          - text: |-
+
+
+              ---
+
+              ### 🌍 Tourism & Economy
+              -
+          - text: >-
+              The Netherlands' accommodation sector posted steady growth in 2025, with total
+              guest numbers rising to 52.2 million across hotels, campsites, and holiday parks.
+          - text: " "
+          - text: International visitors reached 22.3 million, up 5% year-on-year.
+          - text: |-
+
+              -
+          - text: >-
+              According to the 2025 central government financial annual report, 2025 was a
+              year of economic stability for the Netherlands, despite increasing geopolitical
+              uncertainty.
+          - text: |-
+
+
+              ---
+
+              ### 🏛️ Culture & History
+              -
+          - text: >-
+              The Netherlands is set to return a 3,500-year-old stolen sculpture to Egypt, a
+              day after attending the opening ceremony of the Grand Egyptian Museum.
+          - text: |-
+
+
+              ---
+
+              These are the most prominent stories making headlines in the Netherlands right now. Would you like more details on any specific topic?
+          role: model
+        - parts:
+          - text: What day is tomorrow?
+          role: user
+        generationConfig:
+          responseModalities:
+          - TEXT
+  response:
+    status: 200
+    headers:
+      alt-svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-type:
+      - application/json; charset=UTF-8
+      server-timing:
+      - gfet4t7; dur=1163
+      transfer-encoding:
+      - chunked
+      vary:
+      - Origin
+      - X-Origin
+      - Referer
+    body:
+      type: json
+      content:
+        candidates:
+        - content:
+            parts:
+            - text: Tomorrow is **Wednesday, June 12, 2024**.
+            role: model
+          finishReason: STOP
+          index: 0
+        usageMetadata:
+          promptTokenCount: 527
+          candidatesTokenCount: 16
+          totalTokenCount: 670
+          promptTokensDetails:
+          - modality: TEXT
+            tokenCount: 527
+          thoughtsTokenCount: 127
+          serviceTier: standard
+        modelVersion: gemini-2.5-flash
+        responseId: qOy7aqKNOO2hz7IP_qWm0QM
+  recorded_at: 2026-09-29T16:51:53.861969+00:00

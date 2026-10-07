@@ -1,0 +1,79 @@
+interactions:
+- request:
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '120'
+      content-type:
+      - application/json
+      host:
+      - api.deepseek.com
+    method: POST
+    parsed_body:
+      messages:
+      - content: How do I cross the street?
+        role: user
+      model: deepseek-v4-flash
+      stream: false
+    uri: https://api.deepseek.com/chat/completions
+  response:
+    headers:
+      access-control-allow-credentials:
+      - 'true'
+      connection:
+      - keep-alive
+      content-length:
+      - '1306'
+      content-type:
+      - application/json
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      transfer-encoding:
+      - chunked
+      vary:
+      - origin, access-control-request-method, access-control-request-headers
+    parsed_body:
+      choices:
+      - finish_reason: stop
+        index: 0
+        logprobs: null
+        message:
+          content: |-
+            Look both ways before you step off the curb:
+
+            1. Stop at the edge of the sidewalk or curb.
+            2. Look left, right, and left again.
+            3. Use a crosswalk or traffic signal if available.
+            4. Wait for the walk signal, or make sure traffic has cleared.
+            5. Keep looking both ways while crossing.
+            6. Don't use your phone or wear headphones--stay alert.
+
+            When in doubt, wait. Cars can be fast and quiet, so make eye contact with drivers if possible.
+          reasoning_content: We need answer user. Need maybe simple instructions. Need consider safety. User asks "How do
+            I cross the street?" Could be literal. Need provide general pedestrian safety steps. Maybe mention look left-right-left,
+            use crosswalk, wait for signal, avoid distractions, etc. Need be concise.
+          role: assistant
+      created: 1786656310
+      id: 32beb152-2946-409a-8986-7f0e1e351ed2
+      model: deepseek-v4-flash
+      object: chat.completion
+      system_fingerprint: a26a7955944dc5c60445bff77fac9c8e
+      usage:
+        completion_tokens: 166
+        completion_tokens_details:
+          reasoning_tokens: 59
+        prompt_cache_hit_tokens: 0
+        prompt_cache_miss_tokens: 90
+        prompt_tokens: 90
+        prompt_tokens_details:
+          cached_tokens: 0
+        total_tokens: 256
+    status:
+      code: 200
+      message: OK
+version: 1
