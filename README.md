@@ -180,7 +180,13 @@ curl -X POST http://localhost:8000/api/vendor-responses \
 
 ## Step 3: Natural Language Analysis, Decision Support & Award Optimization
 
-Step 3 equips buyers with natural language analysis, side-by-side comparison grids, trust & risk scoring, deterministic award optimization, Chart.js visual analytics, and export packs (XLSX).
+Step 3 equips buyers with natural language analysis, original RFI specification review, side-by-side comparison grids, trust & risk scoring, deterministic award optimization, Chart.js visual analytics, and export packs (XLSX).
+
+### Decision Analyst Workbench (`/ui/analyst.html`)
+- **RFI Details & Items Tab**: View the complete original RFI scope, commercial terms (payment terms, delivery terms, validity, response deadline), estimated target spend, live line items search filter, and full line item specifications table (dimensions, materials, quantities, target prices, total line values, required dates, specifications, and total summary row). Includes quick action buttons to jump directly into the AI Chat assistant or vendor comparison grid.
+- **Analyst & Vendor Chat Tab**: Natural language AI assistant with 0-token caching for repeated questions, Chart.js diagrams, and transparent *How I Got This* step audit traces.
+- **Comparison Grid & Widgets Tab**: Side-by-side line item comparison matrix and ready-made SQL benchmark widgets with L1 pricing, price spreads, and evidence crops.
+- **Trust & Risk Tab**: Vendor trust scores (0-100), risk audits, quotation confidence levels, and money-at-risk breakdown.
 
 ### REST Endpoints
 
@@ -213,7 +219,7 @@ curl -X POST http://localhost:8000/api/analyst/ask \
 ```bash
 curl -X GET http://localhost:8000/api/rfx/6/comparison
 ```
-*Returns side-by-side matrix along with deterministic SQL widgets: `basket_summary`, `l1_items`, `price_spread`, and `vendor_leaderboard`.*
+*Returns side-by-side matrix along with deterministic SQL widgets: `basket_summary` (with full vs partial quote counts), `vendor_coverage` (100% quoted vs partial responses per vendor), `l1_items`, `price_spread`, and `vendor_leaderboard`.*
 
 #### 3. Fetch Stored Graphs & Reports (0 Tokens):
 ```bash

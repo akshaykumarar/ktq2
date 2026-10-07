@@ -120,14 +120,24 @@
 - **UI Tooltips & Cleanliness**:
   - Added informative Vuetify tooltips (`<v-tooltip>`) across all Decision Analyst tabs.
   - Hidden the Award Scenarios tab from the UI to streamline buyer workflows.
-- **Ready-Made Comparison Widgets (Standard SQL - No AI)**:
-  - Added 4 deterministic SQL widgets directly in `backend/app/analyst/tools/comparison.py` and `chatbot/analyst.html`:
-    1. *Overall Basket KPI Banner* (Target Spend, Optimal Basket Spend, Potential Savings Amount and %).
-    2. *L1 Best Price Summary & Savings* (Lowest quoted prices vs target prices per item).
-    3. *Price Spread & Bidder Variance* (Min, Max, Absolute Spread, Spread % per line item).
-- **Dynamic RFX Selector Dropdown**:
-  - Replaced manual/numeric text input in the Decision Analyst app bar with a dynamic `<v-select>` dropdown querying `GET /api/rfi`.
-  - Displays rich RFX metadata (ID, title, category, uppercase status chip) and triggers automatic asynchronous reload of comparison grids, trust audits, and cached artifacts upon selection.
+- **Ready-Made Comparison Widgets & Response Coverage (Standard SQL - No AI)**:
+  - Added 5 deterministic SQL widgets directly in `backend/app/analyst/tools/comparison.py` and `chatbot/analyst.html`:
+    1. *Overall Basket KPI Banner* (Target Spend, Optimal Basket Spend, Potential Savings Amount/%, Full Quote count vs Partial Response count).
+    2. *Vendor Response Coverage Breakdown* (Total vendors, Full Quotes on 100% of line items vs Partial Quotes with coverage %, confident quotes, and spend per vendor).
+    3. *L1 Best Price Summary & Savings* (Lowest quoted prices vs target prices per item).
+    4. *Price Spread & Bidder Variance* (Min, Max, Absolute Spread, Spread % per line item).
+    5. *Vendor Win Count Leaderboard* (Items won L1 and spend share).
+- **Dynamic RFX Selector & Quick Chips**:
+  - Replaced manual text input with a dynamic `<v-select>` dropdown and quick RFX switcher chip bar querying `GET /api/rfi`.
+  - Displays rich RFX metadata (ID, title, category, uppercase status chip) and triggers automatic asynchronous reload of RFI specifications, comparison grids, trust audits, and cached artifacts upon selection.
+- **RFI Details & Line Items Specification Tab (`chatbot/analyst.html`)**:
+  - Dedicated *RFI Details & Items* tab (`<v-tab value="rfi">`) in the Analyst workbench.
+  - Displays structured overview banner with commercial terms (Payment Terms, Delivery Terms, Validity & Response Deadline, Estimated Target Budget, Scope notes).
+  - Quick action buttons to navigate directly from RFI details into AI Chat Assistant ("Ask AI About RFI") and comparison matrix ("Compare Vendor Bids").
+  - Live client-side keyword search filter (`rfiItemSearch`) to filter line items by description, product code, material, item number, or specifications.
+  - Renders complete line item specifications table with item numbering, descriptions, item codes, quantities with unit chips, material chips, formatted dimensions (`L × W × H unit`), unit target prices in INR, total target values, required dates, specifications, and total summary aggregation row.
+  - URL query parameter auto-initialization (`?rfx_id=...` / `?id=...` / `?tab=...`) to immediately focus on the specified RFX and tab upon landing.
+  - Automatically loads and refreshes `/api/rfi/{id}` on RFX selection or manual refresh.
 
 
 

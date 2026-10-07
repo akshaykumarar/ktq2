@@ -252,11 +252,12 @@ flowchart TD
 ```mermaid
 flowchart TD
     subgraph ClientUI["1. Unified Client Interface (chatbot/analyst.html)"]
-        UI1["Analyst & Vendor Chat (Tooltip-Guided)"]
-        UI2["Comparison Grid & SQL Widgets"]
-        UI3["Trust & Risk Audits"]
-        UI4["Saved Graphs & Reports Viewer"]
-        UI5["Dynamic RFX Dropdown Selector (GET /api/rfi)"]
+        UI1["RFI Specification & Line Items Table"]
+        UI2["Analyst & Vendor Chat (Tooltip-Guided)"]
+        UI3["Comparison Grid & SQL Widgets"]
+        UI4["Trust & Risk Audits"]
+        UI5["Saved Graphs & Reports Viewer"]
+        UI6["Dynamic RFX Dropdown Selector (GET /api/rfi)"]
     end
 
     subgraph TokenOptimization["2. Token Optimization & Artifact Storage"]
@@ -266,10 +267,11 @@ flowchart TD
     end
 
     subgraph DeterministicWidgets["3. Ready-Made Comparison Widgets (Standard SQL - No AI)"]
-        W1["Basket KPI Summary (Target vs L1 Optimal vs Savings)"]
-        W2["L1 Best Price Summary & Savings"]
-        W3["Price Spread & Bidder Variance Matrix"]
-        W4["Vendor Win Count Leaderboard"]
+        W1["Basket KPI Summary (Target vs L1 Optimal vs Full/Partial Quotes)"]
+        W2["Vendor Response Coverage Breakdown (Full vs Partial Quotations)"]
+        W3["L1 Best Price Summary & Savings"]
+        W4["Price Spread & Bidder Variance Matrix"]
+        W5["Vendor Win Count Leaderboard"]
     end
 
     UI1 --> C1

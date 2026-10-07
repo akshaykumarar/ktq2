@@ -204,6 +204,17 @@ def get_comparison_grid(rfx_id: int, secrets: AppSecrets | None = None) -> dict[
         spend = vendor_spend_totals.get(vid, 0.0)
         
         cov_label = "Full Coverage (100%)" if cov_pct >= 100.0 else f"Partial Coverage ({quoted_cnt}/{total_rfx_items_count} items - {cov_pct:.0f}%)"
+        totals_with_coverage.append({
+            "vendor_id": vid,
+            "vendor_name": vname,
+            "response_id": v.get("response_id"),
+            "total_spend_inr": round(spend, 2),
+            "coverage_label": cov_label,
+            "coverage_pct": cov_pct,
+            "quoted_items_count": quoted_cnt,
+            "total_items_count": total_rfx_items_count,
+            "is_full_coverage": cov_pct >= 100.0,
+        })
     # ── Ready-Made Comparison Widgets (Pure SQL / Deterministic - No AI) ─────
     # Widget 1: L1 Best Price Summary & Savings
     l1_items_widget = []
@@ -301,7 +312,54 @@ def get_comparison_grid(rfx_id: int, secrets: AppSecrets | None = None) -> dict[
         })
     leaderboard_widget.sort(key=lambda x: x["items_won"], reverse=True)
 
-    # Widget 4: Overall Basket Spend Summary
+    # Widget 4: Vendor Coverage Breakdown (Full vs Partial Response)
+    full_cov_vendors = []
+    partial_cov_vendors = []
+    no_cov_vendors = []
+
+    for v in vendors:
+        vid = v["vendor_id"]
+        vname = v["vendor_name"]
+        cov_pct = float(v.get("coverage_pct") or 0.0)
+        quoted_cnt = vendor_quoted_counts.get(vid, int(v.get("matched_items_count") or 0))
+        spend = vendor_spend_totals.get(vid, 0.0)
+        conf_cnt = int(v.get("confident_items_count") or 0)
+        rev_cnt = int(v.get("review_items_count") or 0)
+        miss_cnt = int(v.get("missing_items_count") or 0)
+
+        entry = {
+            "vendor_id": vid,
+            "vendor_name": vname,
+            "response_id": v.get("response_id"),
+            "quoted_items_count": quoted_cnt,
+            "total_rfx_items": total_rfx_items_count,
+            "coverage_pct": cov_pct,
+            "total_spend_inr": round(spend, 2),
+            "confident_items_count": conf_cnt,
+            "review_items_count": rev_cnt,
+            "missing_items_count": miss_cnt,
+            "status_label": "Full Response (All Items)" if cov_pct >= 100.0 else f"Partial Response ({quoted_cnt}/{total_rfx_items_count} items)",
+            "is_full_coverage": cov_pct >= 100.0,
+        }
+
+        if cov_pct >= 100.0:
+            full_cov_vendors.append(entry)
+        elif quoted_cnt > 0 or cov_pct > 0.0:
+            partial_cov_vendors.append(entry)
+        else:
+            no_cov_vendors.append(entry)
+
+    coverage_widget = {
+        "total_vendors": len(vendors),
+        "full_coverage_count": len(full_cov_vendors),
+        "partial_coverage_count": len(partial_cov_vendors),
+        "no_coverage_count": len(no_cov_vendors),
+        "full_coverage_vendors": full_cov_vendors,
+        "partial_coverage_vendors": partial_cov_vendors,
+        "all_vendors": full_cov_vendors + partial_cov_vendors + no_cov_vendors,
+    }
+
+    # Widget 5: Overall Basket Spend Summary
     potential_savings_val = (total_target_spend - total_optimal_spend) if total_target_spend > 0 else 0.0
     potential_savings_pct = round((potential_savings_val / total_target_spend * 100.0), 1) if total_target_spend > 0 else 0.0
 
@@ -312,6 +370,9 @@ def get_comparison_grid(rfx_id: int, secrets: AppSecrets | None = None) -> dict[
         "potential_savings_pct": potential_savings_pct,
         "total_line_items": total_rfx_items_count,
         "total_vendors_participating": len(vendors),
+        "full_coverage_vendors_count": len(full_cov_vendors),
+        "partial_coverage_vendors_count": len(partial_cov_vendors),
+        "no_coverage_vendors_count": len(no_cov_vendors),
     }
 
     # Standard SQL scripts documentation
@@ -326,6 +387,7 @@ def get_comparison_grid(rfx_id: int, secrets: AppSecrets | None = None) -> dict[
         "l1_items": l1_items_widget,
         "price_spread": price_spread_widget,
         "vendor_leaderboard": leaderboard_widget,
+        "vendor_coverage": coverage_widget,
         "sql_scripts": standard_sql_scripts,
     }
 

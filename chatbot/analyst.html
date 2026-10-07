@@ -97,6 +97,43 @@
       margin-right: auto;
       max-width: 90%;
     }
+
+    .rfi-spec-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      font-size: 0.875rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+
+    .rfi-spec-table th {
+      background: #f1f5f9;
+      color: #1e293b;
+      font-weight: 600;
+      padding: 10px 14px;
+      border-bottom: 2px solid #cbd5e1;
+      border-right: 1px solid #e2e8f0;
+      font-size: 0.8125rem;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+    }
+
+    .rfi-spec-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      border-right: 1px solid #e2e8f0;
+      vertical-align: middle;
+    }
+
+    .rfi-spec-table tbody tr:hover {
+      background: #f8fafc;
+    }
+
+    .rfi-spec-table tbody tr.total-row {
+      background: #f1f5f9;
+      font-weight: 700;
+    }
   </style>
 </head>
 
@@ -107,31 +144,21 @@
       <v-app-bar color="indigo-darken-3" density="compact" elevation="2">
         <v-app-bar-title class="font-weight-bold">
           <v-icon icon="mdi-chart-timeline-variant-shimmer" class="mr-2"></v-icon>
-          AI Procurement Analyst & Vendor Responses
+          AI Analyst
         </v-app-bar-title>
         <v-spacer></v-spacer>
         <div class="d-flex align-center mr-4" style="min-width: 320px; max-width: 440px;">
-          <v-select
-            v-model="rfxId"
-            :items="rfxOptions"
-            item-title="label"
-            item-value="id"
-            label="Select RFX"
-            density="compact"
-            hide-details
-            variant="solo-filled"
-            bg-color="indigo-darken-4"
-            :loading="loadingRfxList"
-            @update:model-value="onRfxChanged"
-            prepend-inner-icon="mdi-format-list-bulleted-type"
-          >
+          <v-select v-model="rfxId" :items="rfxOptions" item-title="label" item-value="id" label="Select RFX"
+            density="compact" hide-details variant="solo-filled" bg-color="indigo-darken-4" :loading="loadingRfxList"
+            @update:model-value="onRfxChanged" prepend-inner-icon="mdi-format-list-bulleted-type">
             <template v-slot:selection="{ item }">
               <span class="text-caption font-weight-bold text-white text-truncate">{{ item.raw.label }}</span>
             </template>
             <template v-slot:item="{ item, props }">
               <v-list-item v-bind="props" :title="item.raw.label" :subtitle="item.raw.subtitle">
                 <template v-slot:append>
-                  <v-chip size="x-small" :color="item.raw.status === 'triggered' || item.raw.status === 'ready' ? 'green' : 'grey'">
+                  <v-chip size="x-small"
+                    :color="item.raw.status === 'triggered' || item.raw.status === 'ready' ? 'green' : 'grey'">
                     {{ (item.raw.status || 'draft').toUpperCase() }}
                   </v-chip>
                 </template>
@@ -145,9 +172,28 @@
       <!-- Main Container with Tabs -->
       <v-main>
         <v-container fluid class="pa-4">
+          <!-- Quick RFX Selection Bar -->
+          <div class="d-flex align-center flex-wrap mb-3" v-if="rfxOptions.length > 0">
+            <span class="text-caption font-weight-bold text-grey-darken-2 mr-2">SELECT RFX / RFI:</span>
+            <v-chip v-for="opt in rfxOptions" :key="opt.id" size="small"
+              :color="opt.id === rfxId ? 'indigo' : 'grey-lighten-2'"
+              :variant="opt.id === rfxId ? 'flat' : 'outlined'"
+              class="mr-2 mb-1 font-weight-medium"
+              @click="onRfxChanged(opt.id)">
+              <v-icon :icon="opt.id === rfxId ? 'mdi-check-circle' : 'mdi-folder-outline'" size="14" class="mr-1"></v-icon>
+              RFX #{{ opt.id }} ({{ opt.status.toUpperCase() }})
+            </v-chip>
+          </div>
+
           <v-card elevation="1">
             <!-- Tabs with Tooltips (Award Scenarios hidden) -->
             <v-tabs v-model="activeTab" bg-color="indigo-darken-2" slider-color="amber">
+              <v-tab value="rfi">
+                <v-icon icon="mdi-file-document-outline" class="mr-1"></v-icon> RFI Details & Items
+                <v-tooltip activator="parent" location="bottom">
+                  View original RFI scope, commercial terms, line item specifications, quantities, and target prices.
+                </v-tooltip>
+              </v-tab>
               <v-tab value="chat">
                 <v-icon icon="mdi-message-text" class="mr-1"></v-icon> Analyst & Vendor Chat
                 <v-tooltip activator="parent" location="bottom">
@@ -171,6 +217,198 @@
             </v-tabs>
 
             <v-window v-model="activeTab" class="pa-4">
+              <!-- TAB 0: RFI DETAILS & LINE ITEMS TABLE -->
+              <v-window-item value="rfi">
+                <div v-if="loadingRfi" class="text-center py-8">
+                  <v-progress-circular indeterminate color="indigo"></v-progress-circular>
+                  <span class="text-caption text-grey ml-2">Loading RFI specifications and line items...</span>
+                </div>
+
+                <div v-else-if="rfiError" class="pa-4">
+                  <v-alert type="error" variant="tonal" class="mb-4">
+                    <strong>Failed to load RFI:</strong> {{ rfiError }}
+                    <div class="mt-2">
+                      <v-btn size="small" color="error" variant="outlined" @click="loadRfiDetails">
+                        <v-icon icon="mdi-refresh" class="mr-1"></v-icon> Retry
+                      </v-btn>
+                    </div>
+                  </v-alert>
+                </div>
+
+                <div v-else-if="rfiData">
+                  <!-- RFI Overview & Commercial Terms Banner -->
+                  <v-card variant="outlined" class="pa-4 mb-4 bg-white">
+                    <div class="d-flex align-center justify-space-between flex-wrap mb-3">
+                      <div>
+                        <div class="d-flex align-center flex-wrap">
+                          <span class="text-h6 font-weight-bold mr-3">{{ rfiData.title || 'Packaging RFI' }}</span>
+                          <v-chip size="small" :color="rfiData.status === 'triggered' || rfiData.status === 'ready' || rfiData.status === 'completed' ? 'green' : 'grey'" class="font-weight-bold mr-2">
+                            {{ (rfiData.status || 'draft').toUpperCase() }}
+                          </v-chip>
+                          <v-chip size="small" color="indigo" variant="tonal" class="font-weight-medium">
+                            {{ (rfiData.items || []).length }} Line Items
+                          </v-chip>
+                        </div>
+                        <div class="text-caption text-grey-darken-1 mt-1">
+                          <span class="font-weight-medium">RFX ID:</span> #{{ rfiData.id }} &bull;
+                          <span class="font-weight-medium">Category:</span> {{ rfiData.category || 'Packaging' }} &bull;
+                          <span class="font-weight-medium">Created:</span> {{ formatDate(rfiData.created_at) }}
+                          <span v-if="rfiData.triggered_at"> &bull; <span class="font-weight-medium">Triggered:</span> {{ formatDate(rfiData.triggered_at) }}</span>
+                        </div>
+                      </div>
+
+                      <div class="d-flex align-center mt-2 mt-sm-0 flex-wrap">
+                        <v-btn size="small" color="indigo" variant="flat" class="mr-2 mb-1" prepend-icon="mdi-message-text" @click="activeTab = 'chat'">
+                          Ask AI About RFI
+                        </v-btn>
+                        <v-btn size="small" color="teal" variant="flat" class="mr-2 mb-1" prepend-icon="mdi-table" @click="activeTab = 'grid'">
+                          Compare Vendor Bids
+                        </v-btn>
+                        <v-btn size="small" color="indigo" variant="tonal" class="mb-1" prepend-icon="mdi-refresh" @click="loadRfiDetails">
+                          Refresh
+                        </v-btn>
+                      </div>
+                    </div>
+
+                    <v-divider class="my-3"></v-divider>
+
+                    <!-- Key Commercial Terms Grid -->
+                    <v-row density="compact">
+                      <v-col cols="12" sm="6" md="3">
+                        <div class="pa-2 rounded bg-grey-lighten-5 border">
+                          <div class="text-caption text-grey font-weight-bold">PAYMENT TERMS</div>
+                          <div class="text-body-2 font-weight-medium">{{ rfiData.payment_terms || 'Standard (Net 30)' }}</div>
+                        </div>
+                      </v-col>
+                      <v-col cols="12" sm="6" md="3">
+                        <div class="pa-2 rounded bg-grey-lighten-5 border">
+                          <div class="text-caption text-grey font-weight-bold">DELIVERY TERMS</div>
+                          <div class="text-body-2 font-weight-medium">{{ rfiData.delivery_terms || 'Delivered to warehouse dock' }}</div>
+                        </div>
+                      </v-col>
+                      <v-col cols="12" sm="6" md="3">
+                        <div class="pa-2 rounded bg-grey-lighten-5 border">
+                          <div class="text-caption text-grey font-weight-bold">VALIDITY & DEADLINE</div>
+                          <div class="text-body-2 font-weight-medium">
+                            {{ rfiData.validity_days ? rfiData.validity_days + ' days' : '30 days' }}
+                            <span v-if="rfiData.response_deadline" class="text-caption text-grey">({{ rfiData.response_deadline }})</span>
+                          </div>
+                        </div>
+                      </v-col>
+                      <v-col cols="12" sm="6" md="3">
+                        <div class="pa-2 rounded bg-grey-lighten-5 border">
+                          <div class="text-caption text-grey font-weight-bold">ESTIMATED TARGET BUDGET</div>
+                          <div class="text-body-2 font-weight-bold text-teal">
+                            ₹{{ computeTotalTargetSpend(rfiData.items).toLocaleString() }}
+                          </div>
+                        </div>
+                      </v-col>
+                    </v-row>
+
+                    <div v-if="rfiData.scope" class="mt-3 text-caption text-grey-darken-2">
+                      <strong>Scope / Notes:</strong> {{ rfiData.scope }}
+                    </div>
+                  </v-card>
+
+                  <!-- RFI Line Items Table -->
+                  <v-card variant="outlined" class="pa-3">
+                    <div class="d-flex align-center justify-space-between mb-3 flex-wrap">
+                      <div class="d-flex align-center flex-wrap">
+                        <div class="text-subtitle-2 font-weight-bold mr-2">
+                          <v-icon icon="mdi-format-list-numbered" color="indigo" class="mr-1"></v-icon>
+                          RFI Line Items Specification
+                        </div>
+                        <v-chip size="x-small" color="indigo" variant="tonal" class="mr-2">
+                          Showing {{ filteredRfiItems.length }} of {{ (rfiData.items || []).length }} Items
+                        </v-chip>
+                        <v-chip size="x-small" color="teal" variant="flat">
+                          Currency: {{ rfiData.currency || 'INR' }}
+                        </v-chip>
+                      </div>
+
+                      <div class="mt-2 mt-sm-0" style="min-width: 260px;">
+                        <v-text-field v-model="rfiItemSearch" density="compact" variant="outlined" hide-details
+                          placeholder="Filter items by desc, material, spec..." prepend-inner-icon="mdi-magnify" clearable>
+                        </v-text-field>
+                      </div>
+                    </div>
+
+                    <div style="overflow-x: auto; width: 100%; border: 1px solid #e2e8f0; border-radius: 8px;">
+                      <table class="rfi-spec-table">
+                        <thead>
+                          <tr>
+                            <th class="text-center" style="width: 70px;">Item #</th>
+                            <th style="min-width: 220px;">Description & Code</th>
+                            <th style="min-width: 120px;">Quantity</th>
+                            <th style="min-width: 130px;">Material</th>
+                            <th style="min-width: 160px;">Dimensions</th>
+                            <th class="text-right" style="min-width: 120px;">Target Price</th>
+                            <th class="text-right" style="min-width: 130px;">Target Value</th>
+                            <th style="min-width: 110px;">Required Date</th>
+                            <th style="min-width: 200px;">Specifications & Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-if="!filteredRfiItems || filteredRfiItems.length === 0">
+                            <td colspan="9" class="text-center text-grey py-6">
+                              <span v-if="rfiItemSearch">No line items match "{{ rfiItemSearch }}".</span>
+                              <span v-else>No line items specified for this RFI.</span>
+                            </td>
+                          </tr>
+                          <tr v-for="(item, idx) in (filteredRfiItems || [])" :key="item?.id || idx">
+                            <td class="text-center font-weight-bold text-indigo">#{{ item?.item_number || (idx + 1) }}</td>
+                            <td>
+                              <div class="font-weight-bold text-grey-darken-4">{{ item?.description || 'Packaging Item' }}</div>
+                              <div v-if="item?.item_code" class="text-caption text-grey">Code: {{ item.item_code }}</div>
+                            </td>
+                            <td>
+                              <span class="font-weight-bold text-body-2">{{ item?.quantity ? Number(item.quantity).toLocaleString() : '-' }}</span>
+                              <v-chip size="x-small" color="blue-grey" variant="tonal" class="ml-1 font-weight-medium">{{ item?.unit || 'pcs' }}</v-chip>
+                            </td>
+                            <td>
+                              <v-chip v-if="item?.material" size="x-small" color="indigo" variant="outlined">{{ item.material }}</v-chip>
+                              <span v-else class="text-grey">-</span>
+                            </td>
+                            <td>
+                              <span class="text-caption font-weight-medium text-grey-darken-3">{{ formatDimensions(item?.dimensions) }}</span>
+                            </td>
+                            <td class="text-right font-weight-medium text-body-2">
+                              {{ (item?.target_price !== null && item?.target_price !== undefined && item?.target_price !== '') ? '₹' + Number(item.target_price).toLocaleString() : '-' }}
+                            </td>
+                            <td class="text-right font-weight-bold text-teal text-body-2">
+                              {{ (item?.target_price && item?.quantity) ? '₹' + (Number(item.target_price) * Number(item.quantity)).toLocaleString() : '-' }}
+                            </td>
+                            <td class="text-caption">
+                              {{ item?.required_date || '-' }}
+                            </td>
+                            <td class="text-caption text-grey-darken-2">
+                              {{ item?.specifications || '-' }}
+                            </td>
+                          </tr>
+                          <!-- Summary Total Row inside tbody -->
+                          <tr v-if="filteredRfiItems && filteredRfiItems.length > 0" class="total-row">
+                            <td colspan="2" class="font-weight-bold">
+                              Total ({{ filteredRfiItems.length }} item{{ filteredRfiItems.length === 1 ? '' : 's' }})
+                            </td>
+                            <td class="font-weight-bold">{{ computeTotalQuantity(filteredRfiItems) }} units</td>
+                            <td colspan="3" class="text-right font-weight-bold">Total Estimated Target Spend:</td>
+                            <td class="text-right text-teal font-weight-bold">
+                              ₹{{ Number(computeTotalTargetSpend(filteredRfiItems) || 0).toLocaleString() }}
+                            </td>
+                            <td colspan="2"></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </v-card>
+                </div>
+
+                <div v-else class="text-center text-grey py-12">
+                  <v-icon icon="mdi-file-document-remove-outline" size="48" class="mb-2"></v-icon>
+                  <p class="text-subtitle-1">No RFI selected or data available.</p>
+                </div>
+              </v-window-item>
+
               <!-- TAB 1: ANALYST & VENDOR CHAT -->
               <v-window-item value="chat">
                 <v-row>
@@ -380,7 +618,14 @@
                         <div class="text-h6 font-weight-bold text-indigo">
                           {{ gridData.widgets.basket_summary.total_vendors_participating }}
                         </div>
-                        <div class="text-caption text-indigo-darken-1 font-weight-medium">Active proposals</div>
+                        <div class="d-flex align-center mt-1 flex-wrap">
+                          <v-chip size="x-small" color="green" class="mr-1 mb-1 font-weight-bold">
+                            {{ gridData.widgets.basket_summary.full_coverage_vendors_count || 0 }} Full (All Items)
+                          </v-chip>
+                          <v-chip size="x-small" color="orange" class="mb-1 font-weight-bold">
+                            {{ gridData.widgets.basket_summary.partial_coverage_vendors_count || 0 }} Partial
+                          </v-chip>
+                        </div>
                       </div>
                     </v-col>
                   </v-row>
@@ -389,12 +634,10 @@
                   <div class="d-flex align-center justify-space-between mt-3 mb-2 flex-wrap">
                     <v-btn-toggle v-model="gridViewMode" color="indigo" density="compact" mandatory rounded="lg">
                       <v-btn value="matrix"><v-icon icon="mdi-grid" class="mr-1"></v-icon> Side-by-Side Matrix</v-btn>
-                      <v-btn value="l1_summary"><v-icon icon="mdi-trophy-outline" class="mr-1"></v-icon> L1 Best Price
-                        Summary</v-btn>
-                      <v-btn value="price_spread"><v-icon icon="mdi-arrow-expand-horizontal" class="mr-1"></v-icon>
-                        Price Spread & Spread %</v-btn>
-                      <v-btn value="leaderboard"><v-icon icon="mdi-podium" class="mr-1"></v-icon> Vendor Win
-                        Leaderboard</v-btn>
+                      <v-btn value="l1_summary"><v-icon icon="mdi-trophy-outline" class="mr-1"></v-icon> L1 Best Price</v-btn>
+                      <v-btn value="price_spread"><v-icon icon="mdi-arrow-expand-horizontal" class="mr-1"></v-icon> Price Spread</v-btn>
+                      <v-btn value="vendor_coverage"><v-icon icon="mdi-account-multiple-check" class="mr-1"></v-icon> Vendor Response Coverage</v-btn>
+                      <v-btn value="leaderboard"><v-icon icon="mdi-podium" class="mr-1"></v-icon> Vendor Win Leaderboard</v-btn>
                     </v-btn-toggle>
 
                     <v-chip size="x-small" color="blue-grey" variant="flat">
@@ -575,6 +818,69 @@
                     </v-table>
                   </v-card>
                 </div>
+
+                <!-- VIEW 5: Vendor Response Coverage Breakdown (Widget 4) -->
+                <div v-if="gridData && gridViewMode === 'vendor_coverage'" class="overflow-x-auto">
+                  <v-card variant="outlined" class="pa-3">
+                    <div class="d-flex align-center justify-space-between mb-3 flex-wrap">
+                      <div class="text-subtitle-2 font-weight-bold">
+                        <v-icon icon="mdi-account-multiple-check" color="teal" class="mr-1"></v-icon>
+                        Vendor Response Coverage: Full vs Partial Quotations (Computed via Standard SQL)
+                      </div>
+                      <div class="d-flex align-center mt-1 mt-sm-0">
+                        <v-chip size="small" color="green" class="mr-2 font-weight-bold">
+                          {{ (gridData.widgets?.vendor_coverage?.full_coverage_count) || 0 }} Full Quotes (All Items)
+                        </v-chip>
+                        <v-chip size="small" color="orange" class="font-weight-bold">
+                          {{ (gridData.widgets?.vendor_coverage?.partial_coverage_count) || 0 }} Partial Quotes
+                        </v-chip>
+                      </div>
+                    </div>
+
+                    <v-table density="compact" class="border">
+                      <thead>
+                        <tr class="bg-grey-lighten-3">
+                          <th class="text-left font-weight-bold">Vendor Name</th>
+                          <th class="text-center font-weight-bold">Coverage Status</th>
+                          <th class="text-center font-weight-bold">Quoted Items</th>
+                          <th class="text-center font-weight-bold">Coverage %</th>
+                          <th class="text-center font-weight-bold">Price Confidence</th>
+                          <th class="text-right font-weight-bold">Total Quoted Spend (INR)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-if="!gridData.widgets?.vendor_coverage?.all_vendors || gridData.widgets.vendor_coverage.all_vendors.length === 0">
+                          <td colspan="6" class="text-center text-grey py-6">No vendor responses received for this RFX.</td>
+                        </tr>
+                        <tr v-for="v in (gridData.widgets?.vendor_coverage?.all_vendors || [])" :key="v.response_id || v.vendor_id">
+                          <td class="font-weight-bold">
+                            <v-icon :icon="v.is_full_coverage ? 'mdi-check-decagram' : 'mdi-alert-circle-outline'"
+                              :color="v.is_full_coverage ? 'green' : 'orange'" size="16" class="mr-1"></v-icon>
+                            {{ v.vendor_name }}
+                          </td>
+                          <td class="text-center">
+                            <v-chip size="x-small" :color="v.is_full_coverage ? 'green' : 'orange'" class="font-weight-bold">
+                              {{ v.is_full_coverage ? 'FULL QUOTE (ALL ITEMS)' : 'PARTIAL RESPONSE' }}
+                            </v-chip>
+                          </td>
+                          <td class="text-center font-weight-medium">
+                            {{ v.quoted_items_count }} / {{ v.total_rfx_items }} items
+                          </td>
+                          <td class="text-center font-weight-bold" :class="v.is_full_coverage ? 'text-success' : 'text-orange-darken-2'">
+                            {{ v.coverage_pct }}%
+                          </td>
+                          <td class="text-center text-caption">
+                            <span class="text-success font-weight-medium">{{ v.confident_items_count }} Confident</span>
+                            <span v-if="v.review_items_count > 0" class="text-orange font-weight-medium ml-1">/ {{ v.review_items_count }} Review</span>
+                          </td>
+                          <td class="text-right font-weight-bold">
+                            ₹{{ Number(v.total_spend_inr || 0).toLocaleString() }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </v-table>
+                  </v-card>
+                </div>
               </v-window-item>
 
               <!-- TAB 3: TRUST & RISK -->
@@ -656,7 +962,7 @@
   </div>
 
   <script>
-    const { createApp, ref, onMounted, nextTick } = Vue;
+    const { createApp, ref, computed, onMounted, nextTick } = Vue;
     const { createVuetify } = Vuetify;
     const vuetify = createVuetify();
 
@@ -666,7 +972,7 @@
         const rfxList = ref([]);
         const rfxOptions = ref([]);
         const loadingRfxList = ref(false);
-        const activeTab = ref('chat');
+        const activeTab = ref('rfi');
         const gridViewMode = ref('matrix');
         const sessionId = ref('buyer_session_' + Math.random().toString(36).substring(7));
         const userQuery = ref('');
@@ -679,6 +985,42 @@
         const selectedCell = ref(null);
         const feedbackModal = ref(false);
         const feedbackForm = ref({ trace_id: '', rating: 1, comment: '', corrected_sql: '' });
+
+        const rfiData = ref(null);
+        const loadingRfi = ref(false);
+        const rfiError = ref(null);
+        const rfiItemSearch = ref('');
+
+        const filteredRfiItems = computed(() => {
+          if (!rfiData.value || !Array.isArray(rfiData.value.items)) return [];
+          const q = (rfiItemSearch.value || '').trim().toLowerCase();
+          if (!q) return rfiData.value.items;
+          return rfiData.value.items.filter(it => {
+            const desc = (it.description || '').toLowerCase();
+            const code = (it.item_code || '').toLowerCase();
+            const mat = (it.material || '').toLowerCase();
+            const spec = (it.specifications || '').toLowerCase();
+            const num = String(it.item_number || '');
+            return desc.includes(q) || code.includes(q) || mat.includes(q) || spec.includes(q) || num.includes(q);
+          });
+        });
+
+        function initFromUrlParams() {
+          try {
+            const params = new URLSearchParams(window.location.search);
+            const forcedRfx = params.get('rfx_id') || params.get('id') || params.get('rfi_id');
+            if (forcedRfx) {
+              const parsed = parseInt(forcedRfx, 10);
+              rfxId.value = isNaN(parsed) ? forcedRfx : parsed;
+            }
+            const forcedTab = params.get('tab');
+            if (forcedTab && ['rfi', 'chat', 'grid', 'trust'].includes(forcedTab)) {
+              activeTab.value = forcedTab;
+            }
+          } catch (e) {
+            console.warn('Failed parsing URL query params:', e);
+          }
+        }
 
         const quickQuestions = [
           "Show quotation summary for all vendors",
@@ -725,42 +1067,137 @@
           }
         }
 
-        async function onRfxChanged(newVal) {
-          rfxId.value = newVal;
-          chatHistory.value = [];
-          await loadAllData();
+        function getActiveRfxId(forcedId) {
+          if (forcedId !== undefined && forcedId !== null && forcedId !== '') {
+            const parsed = (typeof forcedId === 'object') ? (forcedId.id || forcedId.value) : forcedId;
+            const num = parseInt(parsed, 10);
+            return isNaN(num) ? parsed : num;
+          }
+          if (rfxId.value !== undefined && rfxId.value !== null && rfxId.value !== '') {
+            const parsed = (typeof rfxId.value === 'object') ? (rfxId.value.id || rfxId.value.value) : rfxId.value;
+            const num = parseInt(parsed, 10);
+            return isNaN(num) ? parsed : num;
+          }
+          return 6;
         }
 
-        async function loadGrid() {
-          if (!rfxId.value) return;
+        async function onRfxChanged(newVal) {
+          const targetId = getActiveRfxId(newVal);
+          rfxId.value = targetId;
+          chatHistory.value = [];
+          await loadAllData(targetId);
+        }
+
+        function formatDimensions(dim) {
+          if (!dim) return '-';
+          if (typeof dim === 'string') {
+            try {
+              const parsed = JSON.parse(dim);
+              if (parsed && typeof parsed === 'object') {
+                dim = parsed;
+              } else {
+                return dim.trim() || '-';
+              }
+            } catch (e) {
+              return dim.trim() || '-';
+            }
+          }
+          if (typeof dim === 'object' && !Array.isArray(dim)) {
+            const parts = [];
+            if (dim.length !== undefined && dim.length !== null && dim.length !== '') parts.push(`L: ${dim.length}`);
+            if (dim.width !== undefined && dim.width !== null && dim.width !== '') parts.push(`W: ${dim.width}`);
+            if (dim.height !== undefined && dim.height !== null && dim.height !== '') parts.push(`H: ${dim.height}`);
+            const unit = dim.unit || 'mm';
+            if (parts.length > 0) return `${parts.join(' × ')} ${unit}`;
+          }
+          if (Array.isArray(dim)) {
+            return dim.filter(Boolean).join(' × ') || '-';
+          }
+          return '-';
+        }
+
+        function formatDate(dtStr) {
+          if (!dtStr) return '-';
           try {
-            const res = await fetch(`/api/rfx/${rfxId.value}/comparison`);
+            const d = new Date(dtStr);
+            return isNaN(d.getTime()) ? dtStr : d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          } catch (e) {
+            return dtStr;
+          }
+        }
+
+        function computeTotalTargetSpend(items) {
+          if (!items) return 0;
+          const list = Array.isArray(items) ? items : (items.value || (typeof items === 'object' ? Object.values(items) : []));
+          if (!Array.isArray(list)) return 0;
+          return list.reduce((acc, item) => {
+            if (!item) return acc;
+            const qty = Number(item.quantity) || 0;
+            const price = Number(item.target_price) || 0;
+            return acc + (qty * price);
+          }, 0) || 0;
+        }
+
+        async function loadRfiDetails(forcedId) {
+          const targetId = getActiveRfxId(forcedId);
+          if (!targetId) return;
+          loadingRfi.value = true;
+          rfiError.value = null;
+          try {
+            const res = await fetch(`/api/rfi/${targetId}`);
+            if (res.ok) {
+              const data = await res.json();
+              rfiData.value = data;
+            } else {
+              rfiError.value = `Error ${res.status}: Failed to load RFI #${targetId}`;
+              rfiData.value = null;
+            }
+          } catch (e) {
+            console.error('Failed to load RFI details:', e);
+            rfiError.value = e.message || 'Network error fetching RFI details';
+            rfiData.value = null;
+          } finally {
+            loadingRfi.value = false;
+          }
+        }
+
+        async function loadGrid(forcedId) {
+          const targetId = getActiveRfxId(forcedId);
+          if (!targetId) return;
+          try {
+            const res = await fetch(`/api/rfx/${targetId}/comparison`);
             gridData.value = await res.json();
           } catch (e) { console.error(e); }
         }
 
-        async function loadTrust() {
-          if (!rfxId.value) return;
+        async function loadTrust(forcedId) {
+          const targetId = getActiveRfxId(forcedId);
+          if (!targetId) return;
           try {
-            const res = await fetch(`/api/rfx/${rfxId.value}/trust`);
+            const res = await fetch(`/api/rfx/${targetId}/trust`);
             trustData.value = await res.json();
           } catch (e) { console.error(e); }
         }
 
-        async function loadArtifacts() {
-          if (!rfxId.value) return;
+        async function loadArtifacts(forcedId) {
+          const targetId = getActiveRfxId(forcedId);
+          if (!targetId) return;
           try {
-            const res = await fetch(`/api/rfx/${rfxId.value}/artifacts`);
+            const res = await fetch(`/api/rfx/${targetId}/artifacts`);
             const data = await res.json();
             savedArtifacts.value = data.artifacts || [];
           } catch (e) { console.error(e); }
         }
 
-        async function loadAllData() {
-          if (!rfxId.value) return;
-          await loadGrid();
-          await loadTrust();
-          await loadArtifacts();
+        async function loadAllData(forcedId) {
+          const targetId = getActiveRfxId(forcedId);
+          if (!targetId) return;
+          await Promise.all([
+            loadRfiDetails(targetId),
+            loadGrid(targetId),
+            loadTrust(targetId),
+            loadArtifacts(targetId)
+          ]);
         }
 
         function askQuick(q) {
@@ -859,7 +1296,16 @@
           } catch (e) { console.error(e); }
         }
 
+        function computeTotalQuantity(items) {
+          if (!items) return '0';
+          const list = Array.isArray(items) ? items : (items.value || (typeof items === 'object' ? Object.values(items) : []));
+          if (!Array.isArray(list)) return '0';
+          const total = list.reduce((s, i) => s + (Number(i?.quantity) || 0), 0);
+          return total.toLocaleString();
+        }
+
         onMounted(async () => {
+          initFromUrlParams();
           await loadRfxList();
           await loadAllData();
         });
@@ -868,6 +1314,8 @@
           rfxId, rfxList, rfxOptions, loadingRfxList, onRfxChanged,
           activeTab, gridViewMode, sessionId, userQuery, chatHistory, loadingChat,
           gridData, trustData, savedArtifacts, cellModal, selectedCell, feedbackModal, feedbackForm,
+          rfiData, loadingRfi, rfiError, rfiItemSearch, filteredRfiItems, loadRfiDetails,
+          formatDimensions, formatDate, computeTotalTargetSpend, computeTotalQuantity,
           quickQuestions,
           renderMarkdown, askQuick, sendQuery, openCellModal, openFeedback, sendFeedback,
           showSavedArtifact, loadAllData
