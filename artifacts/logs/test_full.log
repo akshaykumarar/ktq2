@@ -1,0 +1,36 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0 -- /Users/akshaykumar/code/ktq2/.venv/bin/python3.14
+cachedir: .pytest_cache
+rootdir: /Users/akshaykumar/code/ktq2
+plugins: logfire-5.1.1, platformdirs-4.12.3, anyio-4.15.1
+collecting ... collected 13 items
+
+tests/test_vendor_intake.py::test_normalization_inr_direct PASSED        [  7%]
+tests/test_vendor_intake.py::test_normalization_per_100_trap PASSED      [ 15%]
+tests/test_vendor_intake.py::test_normalization_foreign_currency_usd PASSED [ 23%]
+tests/test_vendor_intake.py::test_normalization_usd_per_100_combined PASSED [ 30%]
+tests/test_vendor_intake.py::test_validation_clean_confident_item PASSED [ 38%]
+tests/test_vendor_intake.py::test_validation_unresolved_reference PASSED [ 46%]
+tests/test_vendor_intake.py::test_validation_pricing_trap_per_100 PASSED [ 53%]
+tests/test_vendor_intake.py::test_validation_not_quoted_item PASSED      [ 61%]
+tests/test_vendor_intake.py::test_resolution_explicit_rfx_ref PASSED     [ 69%]
+tests/test_vendor_intake.py::test_resolution_text_pattern_reference PASSED [ 76%]
+tests/test_vendor_intake.py::test_preprocessing_text_and_email PASSED    [ 84%]
+tests/test_vendor_intake.py::test_api_submit_vendor_response_empty_payload PASSED [ 92%]
+tests/test_vendor_intake.py::test_api_submit_vendor_response_text_body PASSED [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/google/genai/types.py:42
+  /Users/akshaykumar/code/ktq2/.venv/lib/python3.14/site-packages/google/genai/types.py:42: DeprecationWarning: '_UnionGenericAlias' is deprecated and slated for removal in Python 3.17
+    VersionedUnionType = Union[builtin_types.UnionType, _UnionGenericAlias]
+
+tests/test_vendor_intake.py::test_api_submit_vendor_response_empty_payload
+  /Users/akshaykumar/code/ktq2/.venv/lib/python3.14/site-packages/fastapi/routing.py:360: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    return await dependant.call(**values)
+
+tests/test_vendor_intake.py::test_api_submit_vendor_response_text_body
+  /Users/akshaykumar/code/ktq2/backend/app/vendor/service.py:101: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    received_at=received_at or datetime.utcnow(),
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 13 passed, 3 warnings in 18.90s ========================

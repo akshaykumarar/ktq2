@@ -124,5 +124,81 @@ flowchart TD
 - `POST /api/rfi/{id}/trigger`: Validates readiness, transitions status to `TRIGGERED`, records `triggered_at`.
 
 ### 7. WrenAI Role & Intelligence Layer
-- WrenAI is retained as a secondary intelligence layer for semantic analytics and natural-language reporting over PostgreSQL data (e.g., supplier response times, price variance by packaging category, pending RFIs).
-- The primary intake workflow does not block on WrenAI, ensuring low-latency, resilient procurement operations.
+---
+
+## Step 2: Vendor Quotation Intake & Extraction Architecture
+
+```mermaid
+flowchart TD
+    subgraph Ingestion["1. Multi-Modal Ingestion (202 Accepted)"]
+        V1["Multipart POST /api/vendor-responses"]
+        V2["Store Raw Bytes & Hashes Byte-for-Byte"]
+        V3["Check Idempotency (SHA-256) / Supersede Old Version"]
+    end
+
+    subgraph Preprocessing["2. Preprocessing & Rasterization"]
+        P1["Excel/CSV (openpyxl coordinate dumper)"]
+        P2["PDF (Text extraction + Scanned page rasterization)"]
+        P3["Word (Paragraphs, Tables, Footnotes)"]
+        P4["Email (Headers, Body, Quoted History)"]
+        P5["Images/Photos (Auto-orient, Contrast enhancement)"]
+    end
+
+    subgraph Resolution["3. Scored RFx & Vendor Resolution"]
+        R1["Signal 1: Explicit rfx_ref"]
+        R2["Signal 2: Pattern matching in text/subject"]
+        R3["Signal 3: Reply-thread hints"]
+        R4["Signal 4: Line item content similarity"]
+        R5["Signal 5: Single open RFx for vendor"]
+        R6["Signal 6: Fallback (Most recent open RFx)"]
+        R7["Ambiguity Detection & Entity Auto-Creation"]
+    end
+
+    subgraph ExtractionReconciliation["4. Extraction & Reconciliation"]
+        E1["Provider-Agnostic LLM Vision / Structured Extraction"]
+        E2["Multi-Document Conflict Reconciliation"]
+        E3["Pydantic Strict Validation & Single Retry on Failure"]
+    end
+
+    subgraph Matching["5. RFx Line Item Matching"]
+        M1["Semantic Matching to rfx_items"]
+        M2["MATCHED / EXTRA / ALTERNATE / NOT_QUOTED Classification"]
+        M3["Many-to-One / One-to-Many Linking"]
+    end
+
+    subgraph NormalizationValidation["6. Pure Python Normalization & Validation"]
+        N1["Unit Conversions (uom table)"]
+        N2["Foreign Currency Conversion (FX rates to INR)"]
+        N3["Pricing Traps (per-100 vs per-unit detection)"]
+        N4["Rule-Based Flags (Outliers, Expirations, Conflicting docs)"]
+        N5["State Evaluation (CONFIDENT / REVIEW / MISSING)"]
+        N6["Plain-Language Explainability (why_unsure / how_to_resolve)"]
+        N7["Visual Bounding Box Evidence Cropping"]
+    end
+
+    V1 --> V2 --> V3 --> P1 & P2 & P3 & P4 & P5
+    P1 & P2 & P3 & P4 & P5 --> R1 & R2 & R3 & R4 & R5 & R6 --> R7
+    R7 --> E1 --> E2 --> E3 --> M1 --> M2 --> M3
+    M3 --> N1 --> N2 --> N3 --> N4 --> N5 --> N6 --> N7
+```
+
+### State Machine Lifecycle
+`received` ➔ `preprocessing` ➔ `extracting` ➔ `resolving` ➔ `matching` ➔ `normalizing` ➔ `validating` ➔ `done` | `needs_review` | `failed`
+
+### Read-Only SQL Views for Analysis
+1. `v_response_items_current`: Clean current line items with RFx item details, normalized prices in INR, flags, and crop URLs.
+2. `v_vendor_coverage`: Summary per vendor response (total items, quoted count, coverage %, min/max price, open critical flags).
+3. `v_open_flags`: Unresolved review flags with plain-language explanations for buyer intervention.
+4. `v_rfx_comparison`: Cross-vendor comparison table per RFx item, computing lowest normalized price and ranking.
+
+---
+
+## Running Tests
+
+Run the full pytest suite:
+
+```bash
+PYTHONPATH=. .venv/bin/pytest tests/ -v
+```
+
+Test logs are output to [`artifacts/logs/test_full.log`](file:///Users/akshaykumar/code/ktq2/artifacts/logs/test_full.log).

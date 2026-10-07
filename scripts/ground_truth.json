@@ -1,0 +1,105 @@
+{
+  "sample_1_restructured_excel": {
+    "expected_rfx_id": 1,
+    "expected_vendor_name": "Packaging Solutions Pvt Ltd",
+    "expected_items": [
+      {
+        "description_substring": "Corrugated Box",
+        "expected_kind": "MATCHED",
+        "expected_raw_price": 42.5,
+        "expected_unit": "pcs",
+        "expected_currency": "INR",
+        "expected_state": "CONFIDENT"
+      },
+      {
+        "description_substring": "Brown Tape",
+        "expected_kind": "EXTRA",
+        "expected_raw_price": 38.0,
+        "expected_unit": "roll",
+        "expected_state": "REVIEW"
+      },
+      {
+        "description_substring": "pallet base",
+        "expected_kind": "EXTRA",
+        "expected_raw_price": 550.0,
+        "expected_state": "REVIEW"
+      }
+    ],
+    "expected_flags": [
+      "extra_item",
+      "conditional_discount_present"
+    ]
+  },
+  "sample_2_letterhead_quote": {
+    "expected_rfx_id": 1,
+    "expected_vendor_name": "Premier Cartons & Packaging Ltd",
+    "expected_items": [
+      {
+        "description_substring": "Corrugated Box",
+        "expected_kind": "MATCHED",
+        "expected_raw_price": 44.0,
+        "expected_unit": "pcs",
+        "expected_state": "CONFIDENT"
+      }
+    ],
+    "expected_terms": [
+      "freight",
+      "payment_terms",
+      "gst"
+    ]
+  },
+  "sample_3_word_partial_alternate": {
+    "expected_rfx_id": 1,
+    "expected_vendor_name": "Apex Packaging Corporation",
+    "expected_items": [
+      {
+        "description_substring": "Corrugated Box",
+        "expected_kind": "ALTERNATE",
+        "expected_raw_price": 39.5,
+        "expected_state": "REVIEW"
+      }
+    ],
+    "expected_flags": [
+      "alternate_item"
+    ]
+  },
+  "sample_4_phone_photo_usd_ratecard": {
+    "expected_rfx_id": 1,
+    "expected_vendor_name": "Global Pack Corp",
+    "expected_items": [
+      {
+        "description_substring": "Corrugated Boxes",
+        "expected_kind": "MATCHED",
+        "expected_raw_price": 52.0,
+        "expected_unit": "per 100",
+        "expected_currency": "USD",
+        "expected_normalized_price_inr_approx": 44.98
+      }
+    ],
+    "expected_flags": [
+      "currency_not_inr",
+      "fx_rate_assumed"
+    ]
+  },
+  "sample_5_email_unresolved_ref": {
+    "expected_rfx_id": 1,
+    "expected_vendor_name": "Sharma Packaging & Co.",
+    "expected_items": [
+      {
+        "description_substring": "Corrugated Box",
+        "expected_kind": "MATCHED",
+        "expected_raw_price": 43.2,
+        "expected_state": "CONFIDENT"
+      },
+      {
+        "description_substring": "BOPP Tape",
+        "expected_kind": "EXTRA",
+        "expected_state": "REVIEW",
+        "has_unresolved_reference": true
+      }
+    ],
+    "expected_flags": [
+      "unresolved_reference"
+    ]
+  }
+}

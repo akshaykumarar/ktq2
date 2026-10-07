@@ -13,6 +13,7 @@ from backend.app.config.settings import load_config
 from backend.app.agents.factory import AgentFactory
 from backend.app.api.chat import router as chat_router
 from backend.app.api.rfi import router as rfi_router
+from backend.app.api.vendor import router as vendor_router
 from backend.app.db.health import check_database_connection
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -54,6 +55,7 @@ app.add_middleware(
 # Include API routes
 app.include_router(chat_router)
 app.include_router(rfi_router)
+app.include_router(vendor_router)
 
 
 @app.get("/health", tags=["system"])

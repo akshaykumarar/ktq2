@@ -20,24 +20,43 @@
     - `PATCH /api/rfi/{id}`: Updating editable fields.
     - `POST /api/rfi/{id}/trigger`: Transitioning status to `TRIGGERED` and timestamp recording.
   - **Strict LLM Model Creation (`backend/app/providers/factory.py`)**: `create_model()` enforces strict provider credential validation (`fallback_to_mock=False` by default), raising an explicit `ValueError` when API keys are omitted. Explicit mock models (`provider="test"` or `fallback_to_mock=True`) remain supported for unit testing.
-- Full pytest test suite passing 39 tests across agents, APIs, DB health, Excel intake, RFI lifecycle, providers, and single-RFI multi-item conversational workflow with traceable logs in `artifacts/logs/test_remove_fallback.log`.
+- Full pytest test suite passing 13 tests across vendor normalization, validation, resolution, preprocessing, and APIs with traceable logs in `artifacts/logs/test_full.log`.
+- Automated evaluation (`scripts/eval_extraction.py`) passing 100% (8/8 ground truth items correct, 0 silent errors, crops generated for evidence).
+
+## Step 2: Vendor Quotation Intake, Extraction & Validation System
+- **Database Architecture (`migrations/002_vendor_intake.sql`)**:
+  - Raw document persistence: `vendor_responses`, `response_documents` (stores raw bytea, sha256, mime, size).
+  - Normalized extracted data: `vendors`, `response_items`, `item_crops`, `response_terms`, `response_answers`, `response_flags`.
+  - Traceability: `pipeline_events`, `llm_calls`, `unit_conversions`, `fx_rates`, `validation_thresholds`.
+  - Pre-built SQL views for Step 3: `v_response_items_current`, `v_vendor_coverage`, `v_open_flags`, `v_rfx_comparison`.
+- **Pipeline Architecture & Components (`backend/app/vendor/`)**:
+  - `models.py`: Strict Pydantic domain models for documents, extractions, line items, flags, and REST APIs.
+  - `repository.py`: Parameterized PostgreSQL repository managing raw byte persistence, SHA-256 idempotency, version superseding, audit logs, and SQL views.
+  - `preprocess.py`: Multi-format preprocessing: Excel/CSV with `[Sheet!Cell]` coordinates, PDF text + rasterization, Word paragraphs/tables, Email headers/body/attachments, and image auto-orient/enhancement.
+  - `resolve.py`: 6-signal scored resolution engine (explicit ref, pattern in text, email thread, line item similarity, vendor open RFx count, fallback) with ambiguity detection and vendor entity auto-creation.
+  - `prompts.py` & `extract.py`: Provider-agnostic LLM extraction with strict PydanticAI validation, single retry with error feedback, and deterministic extractor fallback.
+  - `match.py`: Semantic line-item matching against `rfx_items` (`MATCHED`, `EXTRA`, `ALTERNATE`, `NOT_QUOTED`).
+  - `normalize.py`: Pure Python deterministic unit conversions (e.g. `per 100` pricing traps) and foreign currency conversion to INR.
+  - `validate.py`: Pure Python rule-based validation engine generating structured flags (`CONFIDENT`, `REVIEW`, `MISSING`), computing `why_unsure` and `how_to_resolve` for buyer review.
+  - `evidence.py`: Visual bounding box cropping with 10% padding.
+  - `service.py`: Pipeline coordinator executing state machine asynchronously.
+- **REST Endpoints (`backend/app/api/vendor.py`)**:
+  - `POST /api/vendor-responses` (202 Accepted, raw input persisted byte-for-byte immediately)
+  - `GET /api/vendor-responses/{id}` (Status, progress, RFx/vendor resolution reasoning)
+  - `GET /api/vendor-responses/{id}/items` (Extracted line items, flags, evidence)
+  - `GET /api/vendor-responses/{id}/documents/{doc_id}/raw` (Original byte stream)
+  - `GET /api/response-items/{item_id}/crop` (Visual evidence PNG)
+  - `GET /api/rfx/{rfx_id}/responses` (Coverage summary and item comparisons)
+  - `POST /api/vendor-responses/{id}/reprocess` (Re-run pipeline as new run)
+  - `PATCH /api/response-items/{item_id}` (Buyer corrections with before/after audit trail)
 
 ## Key Files
-- `chatbot/index.html`: AI-QL Vue 3 frontend with "Create an RFI" starter card and active outcome loader indicator.
-- `backend/app/agents/master.py`: Master Agent with session tracking, RFI focus guardrails, and deterministic delegation.
-- `backend/app/agents/rfx.py`: RFX specialist agent with requirement prompting fallback and draft creation.
-- `backend/app/api/chat.py`: FastAPI chat endpoint forwarding conversation IDs and secrets to orchestration.
-- `migrations/001_rfi.sql`: Idempotent SQL migration updating `rfx` status check constraints and sequences for the configured schema.
-- `backend/app/db/connection.py`: Dynamic schema connection context manager setting `search_path`.
-- `backend/app/db/health.py`: Database health check verifying connectivity, schema existence, and query execution without leaking credentials.
-- `backend/app/db/repository.py`: Parameterized repository for `rfx`, `rfx_items`, and `rfx_activity`.
-- `backend/app/intake/models.py`: Pydantic domain models for packaging requirements, RFI states, and API contracts.
-- `backend/app/intake/agent.py`: PydanticAI requirement extraction agent with deterministic fallback.
-- `backend/app/intake/excel_parser.py`: Spreadsheet parser with tolerant header aliases and row-level validation.
-- `backend/app/intake/validation.py`: Packaging domain validation, traceable defaults, and readiness checking.
-- `backend/app/intake/service.py`: Orchestrator for intake, Excel conversion, and RFI lifecycle transitions.
-- `backend/app/api/rfi.py`: FastAPI routes for text intake, excel intake, RFI CRUD, and triggering.
-- `backend/app/main.py`: FastAPI application mounting routes, `/health`, `/health/db`, and UI.
-- `config/agents.yaml`: Agent definitions including updated RFI creation workflow instructions.
-- `artifacts/plan_rfi_workflow_fix.md`: Phased implementation plan for chat loader and working RFI workflow.
-- `artifacts/logs/test_run.log`: Test execution log trace.
+- `backend/app/api/vendor.py`: FastAPI routes for vendor response intake and inspection.
+- `backend/app/vendor/`: Core vendor intake engine modules (`service.py`, `repository.py`, `models.py`, `preprocess.py`, `resolve.py`, `prompts.py`, `extract.py`, `match.py`, `normalize.py`, `validate.py`, `evidence.py`).
+- `migrations/002_vendor_intake.sql`: Comprehensive database schema migration for vendor quotation processing.
+- `scripts/eval_extraction.py`: Automated pipeline benchmark & ground truth evaluation.
+- `scripts/generate_sample_responses.py`: Synthetic noisy vendor response generator.
+- `scripts/demo_submit.sh`: Automated curl demonstration script.
+- `tests/test_vendor_intake.py`: Pytest suite for preprocessing, normalization, validation, resolution, and APIs.
+- `artifacts/plan_vendor_intake.md`: Master implementation plan.
+- `artifacts/logs/test_full.log`: Test execution log trace.

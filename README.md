@@ -135,6 +135,48 @@ Then visit:
 
 ---
 
+## Step 2: Vendor Quotation Intake, OCR & Extraction Endpoints
+
+### 1. Vendor Response Submission (Multipart / Asynchronous)
+- `POST /api/vendor-responses` (Status: `202 Accepted`)
+  - Accepts vendor quotation in **ANY** shape (Excel, CSV, PDF, Word, Email `.eml`, Images/Photos, raw text, JSON payload).
+  - Immediately stores raw files/payloads byte-for-byte with SHA-256 idempotency before async processing.
+  - Returns `{ "response_id": ..., "status": "received", "rfx_resolution_preview": ... }`.
+
+#### Request Parameters (Multipart Form-Data):
+- `files`: (0..n files) `.xlsx`, `.xls`, `.csv`, `.pdf`, `.docx`, `.doc`, `.txt`, `.eml`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.heic`
+- `body_text`: Raw email body or pasted quote text
+- `body_json`: Arbitrary JSON quotation payload
+- `subject`: Email subject or submission title
+- `sender_email`: Email address of the vendor representative
+- `sender_name`: Name of the vendor contact or company
+- `channel`: `email` | `upload` | `api` | `simulated` (default: `upload`)
+- `received_at`: Timestamp (ISO format, defaults to current time)
+- `rfx_ref`: Optional RFx reference code / number (e.g. `RFQ-2026-001` or `1`)
+- `vendor_name`: Optional explicit vendor company name
+
+#### cURL Example:
+```bash
+curl -X POST http://localhost:8000/api/vendor-responses \
+  -F "files=@samples/Apex_Packaging_Quote.xlsx" \
+  -F "sender_email=sales@apexpackaging.in" \
+  -F "sender_name=Apex Packaging" \
+  -F "subject=Quotation for RFQ-2026-001" \
+  -F "rfx_ref=RFQ-2026-001" \
+  -F "channel=email"
+```
+
+### 2. Response Status & Inspection
+- `GET /api/vendor-responses/{id}`: Detailed status, per-document processing progress, RFx & vendor resolution with confidence scores and reasoning, summary counts.
+- `GET /api/vendor-responses/{id}/items`: Extracted line items with matching state (`MATCHED`, `EXTRA`, `ALTERNATE`, `NOT_QUOTED`), validation state (`CONFIDENT`, `REVIEW`, `MISSING`), flags, reasoning, and crop coordinates.
+- `GET /api/vendor-responses/{id}/documents/{doc_id}/raw`: Retrieve original document byte-for-byte exactly as received.
+- `GET /api/response-items/{item_id}/crop`: Cropped PNG evidence image from PDF/image pages with 10% bounding padding.
+- `GET /api/rfx/{rfx_id}/responses`: All vendor responses for an RFx with coverage summary, flags, and item comparisons.
+- `POST /api/vendor-responses/{id}/reprocess`: Re-run the real extraction & validation pipeline (new run created, previous run preserved).
+- `PATCH /api/response-items/{item_id}`: Human buyer correction audit trail (records before/after diffs, user, and timestamp).
+
+---
+
 ## Configuration
 
 Agent and model configurations are decoupled from Python code:
@@ -148,7 +190,8 @@ Agent and model configurations are decoupled from Python code:
 Run the full pytest suite:
 
 ```bash
-.venv/bin/pytest backend/tests -v
+PYTHONPATH=. .venv/bin/pytest tests/ -v
 ```
 
-Test logs are output to [`artifacts/logs/test_run.log`](file:///Users/akshaykumar/code/ktq2/artifacts/logs/test_run.log).
+Test logs are output to [`artifacts/logs/test_full.log`](file:///Users/akshaykumar/code/ktq2/artifacts/logs/test_full.log).
+
