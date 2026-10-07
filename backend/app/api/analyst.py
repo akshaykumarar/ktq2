@@ -90,6 +90,18 @@ def get_rfx_trust_report(id: int) -> TrustReportResult:
     return compute_trust_report(id)
 
 
+@router.get("/api/rfx/{id}/artifacts")
+def get_rfx_artifacts(id: int) -> dict[str, Any]:
+    """Retrieve all stored and cached graphs, charts, and reports generated for a given RFX ID."""
+    repo = get_repository()
+    artifacts = repo.get_rfx_artifacts(id)
+    return {
+        "rfx_id": id,
+        "count": len(artifacts),
+        "artifacts": artifacts,
+    }
+
+
 # ── Award Scenarios & Finalization ───────────────────────────────────────────
 
 @router.post("/api/rfx/{id}/award/scenarios")

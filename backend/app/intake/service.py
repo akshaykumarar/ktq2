@@ -466,3 +466,10 @@ def _format_line_items_and_terms(state: PackagingIntakeState) -> str:
         terms += "\n- Custom terms: " + "; ".join(state.terms.custom_terms)
 
     return "Line items:\n" + "\n".join(line_bits) + "\n\nTerms:\n" + terms
+
+
+def list_rfis(secrets: AppSecrets, limit: int = 50) -> list[dict[str, Any]]:
+    """Fetch list of all RFI/RFX records for dropdown selectors."""
+    repo = RFIRepository(secrets)
+    return repo.list_all(limit=limit)
+

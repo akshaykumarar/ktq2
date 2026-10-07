@@ -115,6 +115,7 @@ Then visit:
 
 ### 4. RFI Lifecycle & Management
 - `POST /api/rfi`: Direct creation of an RFI with structured requirements.
+- `GET /api/rfi`: Retrieve list of all available RFIs/RFXs for dropdown selectors.
 - `GET /api/rfi/{id}`: Retrieve RFI metadata, commercial terms, and line items.
 - `PATCH /api/rfi/{id}`: Safely update editable fields (`title`, `terms`, `status`, `validity_days`, `response_deadline`).
 - `POST /api/rfi/{id}/trigger`: Validates readiness, transitions status to `TRIGGERED`, records `triggered_at` timestamp.
@@ -197,35 +198,26 @@ Step 3 equips buyers with natural language analysis, side-by-side comparison gri
 
 ### cURL Examples
 
-#### 1. Ask a Decision Question:
+#### 1. Ask a Decision Question (with 0-token caching for repeated questions):
 ```bash
 curl -X POST http://localhost:8000/api/analyst/ask \
   -H "Content-Type: application/json" \
   -d '{
     "rfx_id": 6,
     "session_id": "buyer_session_1",
-    "question": "Split the award: cheapest per line, but only among vendors who cleared the quality questionnaire"
+    "question": "Who is cheapest vendor for each item?"
   }'
 ```
 
-#### 2. Fetch Comparison Grid:
+#### 2. Fetch Comparison Grid with Ready-Made SQL Widgets:
 ```bash
 curl -X GET http://localhost:8000/api/rfx/6/comparison
 ```
+*Returns side-by-side matrix along with deterministic SQL widgets: `basket_summary`, `l1_items`, `price_spread`, and `vendor_leaderboard`.*
 
-#### 3. Run Award Scenario (Max 60% Share):
+#### 3. Fetch Stored Graphs & Reports (0 Tokens):
 ```bash
-curl -X POST http://localhost:8000/api/rfx/6/award/scenarios \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Split with 60% Max Share",
-    "constraints": {
-      "strategy": "multi_vendor_split",
-      "max_share_per_vendor_pct": 60.0,
-      "require_knockout_pass": true,
-      "include_review_prices": true
-    }
-  }'
+curl -X GET http://localhost:8000/api/rfx/6/artifacts
 ```
 
 #### 4. Finalize Award Scenario with Flag Acceptance:

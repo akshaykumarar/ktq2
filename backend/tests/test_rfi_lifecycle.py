@@ -90,3 +90,17 @@ def test_rfi_not_found_handling() -> None:
 
     res_trigger = client.post("/api/rfi/9999999/trigger")
     assert res_trigger.status_code == 400 or res_trigger.status_code == 404
+
+
+def test_list_all_rfis_endpoint() -> None:
+    """Verify GET /api/rfi returns list of RFX records with id, title, and status for dropdowns."""
+    res = client.get("/api/rfi?limit=10")
+    assert res.status_code == 200
+    rfis = res.json()
+    assert isinstance(rfis, list)
+    if rfis:
+        first = rfis[0]
+        assert "id" in first
+        assert "title" in first
+        assert "status" in first
+

@@ -204,16 +204,130 @@ def get_comparison_grid(rfx_id: int, secrets: AppSecrets | None = None) -> dict[
         spend = vendor_spend_totals.get(vid, 0.0)
         
         cov_label = "Full Coverage (100%)" if cov_pct >= 100.0 else f"Partial Coverage ({quoted_cnt}/{total_rfx_items_count} items - {cov_pct:.0f}%)"
-        totals_with_coverage.append({
-            "vendor_id": vid,
-            "vendor_name": vname,
-            "total_spend_inr": round(spend, 2),
-            "items_quoted": quoted_cnt,
-            "total_rfx_items": total_rfx_items_count,
-            "coverage_pct": cov_pct,
-            "coverage_label": cov_label,
-            "is_comparable": cov_pct >= 100.0,
+    # ── Ready-Made Comparison Widgets (Pure SQL / Deterministic - No AI) ─────
+    # Widget 1: L1 Best Price Summary & Savings
+    l1_items_widget = []
+    total_target_spend = 0.0
+    total_optimal_spend = 0.0
+    vendor_wins_count: dict[str, int] = {}
+    vendor_wins_spend: dict[str, float] = {}
+
+    for it in items:
+        iid = it["id"]
+        qty = float(it.get("quantity") or 1.0)
+        target = float(it["target_price"]) if it.get("target_price") is not None else None
+        if target is not None:
+            total_target_spend += (target * qty)
+
+        # Find L1 vendor for this item
+        l1_price = min_price_by_item.get(iid)
+        l1_vendor_name = None
+        if l1_price is not None:
+            for vid, cell in grid.get(iid, {}).items():
+                if cell.get("is_l1"):
+                    # Find vendor name
+                    for v in vendors:
+                        if v["vendor_id"] == vid:
+                            l1_vendor_name = v["vendor_name"]
+                            break
+                    break
+
+        item_optimal_spend = (l1_price * qty) if l1_price is not None else 0.0
+        total_optimal_spend += item_optimal_spend
+
+        unit_savings = (target - l1_price) if (target is not None and l1_price is not None) else None
+        total_savings = (unit_savings * qty) if unit_savings is not None else None
+        savings_pct = round((unit_savings / target * 100.0), 1) if (unit_savings is not None and target and target > 0) else None
+
+        if l1_vendor_name:
+            vendor_wins_count[l1_vendor_name] = vendor_wins_count.get(l1_vendor_name, 0) + 1
+            vendor_wins_spend[l1_vendor_name] = vendor_wins_spend.get(l1_vendor_name, 0.0) + item_optimal_spend
+
+        l1_items_widget.append({
+            "item_id": iid,
+            "item_number": it["item_number"],
+            "description": it["description"],
+            "quantity": qty,
+            "unit": it.get("unit", "pcs"),
+            "target_price": target,
+            "l1_vendor_name": l1_vendor_name or "Not Quoted",
+            "l1_unit_price": l1_price,
+            "total_l1_spend": round(item_optimal_spend, 2) if l1_price is not None else None,
+            "unit_savings": round(unit_savings, 2) if unit_savings is not None else None,
+            "total_savings": round(total_savings, 2) if total_savings is not None else None,
+            "savings_pct": savings_pct,
         })
+
+    # Widget 2: Price Spread & Bidder Variance per Line Item
+    price_spread_widget = []
+    for it in items:
+        iid = it["id"]
+        prices = [
+            float(c["effective_price_inr"])
+            for c in grid.get(iid, {}).values()
+            if c.get("effective_price_inr") is not None and c.get("effective_price_inr") > 0
+        ]
+        bidders = len(prices)
+        p_min = min(prices) if prices else None
+        p_max = max(prices) if prices else None
+        spread = (p_max - p_min) if (p_min is not None and p_max is not None) else None
+        spread_pct = round((spread / p_min * 100.0), 1) if (spread is not None and p_min and p_min > 0) else 0.0
+
+        price_spread_widget.append({
+            "item_id": iid,
+            "item_number": it["item_number"],
+            "description": it["description"],
+            "bidders_count": bidders,
+            "min_price": p_min,
+            "max_price": p_max,
+            "spread_inr": round(spread, 2) if spread is not None else None,
+            "spread_pct": spread_pct,
+        })
+
+    # Widget 3: Vendor Win Count (L1 Leaderboard)
+    leaderboard_widget = []
+    for v in vendors:
+        vname = v["vendor_name"]
+        wins = vendor_wins_count.get(vname, 0)
+        spend_share = vendor_wins_spend.get(vname, 0.0)
+        win_pct = round(wins / total_rfx_items_count * 100.0, 1) if total_rfx_items_count > 0 else 0.0
+        leaderboard_widget.append({
+            "vendor_id": v["vendor_id"],
+            "vendor_name": vname,
+            "items_won": wins,
+            "total_items": total_rfx_items_count,
+            "win_pct": win_pct,
+            "l1_spend_share_inr": round(spend_share, 2),
+        })
+    leaderboard_widget.sort(key=lambda x: x["items_won"], reverse=True)
+
+    # Widget 4: Overall Basket Spend Summary
+    potential_savings_val = (total_target_spend - total_optimal_spend) if total_target_spend > 0 else 0.0
+    potential_savings_pct = round((potential_savings_val / total_target_spend * 100.0), 1) if total_target_spend > 0 else 0.0
+
+    basket_summary_widget = {
+        "total_target_spend_inr": round(total_target_spend, 2),
+        "optimal_basket_spend_inr": round(total_optimal_spend, 2),
+        "potential_savings_inr": round(potential_savings_val, 2),
+        "potential_savings_pct": potential_savings_pct,
+        "total_line_items": total_rfx_items_count,
+        "total_vendors_participating": len(vendors),
+    }
+
+    # Standard SQL scripts documentation
+    standard_sql_scripts = {
+        "l1_summary_sql": "SELECT ri.item_number, ri.description, ri.quantity, ri.target_price, c.vendor_name as l1_vendor, MIN(c.effective_price_inr) as l1_price FROM ktq.rfx_items ri JOIN ktq.v_rfx_comparison c ON ri.id = c.rfx_item_id WHERE c.rfx_id = :rfx_id GROUP BY ri.id, ri.item_number, ri.description, ri.quantity, ri.target_price, c.vendor_name",
+        "price_spread_sql": "SELECT item_number, description, COUNT(DISTINCT vendor_id) as bidder_count, MIN(effective_price_inr) as min_price, MAX(effective_price_inr) as max_price, (MAX(effective_price_inr) - MIN(effective_price_inr)) as price_spread FROM ktq.v_rfx_comparison WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL GROUP BY item_number, description ORDER BY item_number",
+        "vendor_coverage_sql": "SELECT vendor_name, coverage_pct, matched_items_count, total_rfx_items, confident_items_count, review_items_count FROM ktq.v_vendor_coverage WHERE rfx_id = :rfx_id ORDER BY coverage_pct DESC",
+    }
+
+    widgets = {
+        "basket_summary": basket_summary_widget,
+        "l1_items": l1_items_widget,
+        "price_spread": price_spread_widget,
+        "vendor_leaderboard": leaderboard_widget,
+        "sql_scripts": standard_sql_scripts,
+    }
 
     return {
         "rfx": dict(rfx_row),
@@ -223,4 +337,5 @@ def get_comparison_grid(rfx_id: int, secrets: AppSecrets | None = None) -> dict[
         "totals_with_coverage": totals_with_coverage,
         "questionnaire_summary": questionnaire_by_vendor,
         "documents": docs,
+        "widgets": widgets,
     }

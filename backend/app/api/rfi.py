@@ -101,6 +101,22 @@ async def create_new_rfi(
 
 
 @router.get(
+    "",
+    summary="List all RFIs",
+    description="Retrieve list of all RFIs with id, title, status, and category for dropdown selectors.",
+)
+async def list_all_rfis_endpoint(
+    request: Request,
+    limit: Annotated[int, Query(ge=1, le=100, description="Max number of RFIs to return")] = 50,
+) -> list[dict[str, Any]]:
+    """Fetch list of all RFIs for dropdown selectors."""
+    from backend.app.intake.service import list_rfis
+
+    secrets, _ = _get_app_context(request)
+    return list_rfis(secrets, limit=limit)
+
+
+@router.get(
     "/{rfi_id}",
     response_model=RFIDetailResponse,
     summary="Get RFI details",

@@ -81,6 +81,25 @@ class DecisionAnalystOrchestrator:
         session_id = req.session_id
         question = req.question
 
+        # ── Step 0: Check Token Optimization Cache ──────────────────────────────
+        if not req.options.get("bypass_cache", False):
+            cached_resp = self._repo.get_cached_response(rfx_id, question)
+            if cached_resp:
+                logger.info("Cache hit for RFx #%s: '%s' (0 tokens consumed)", rfx_id, question)
+                try:
+                    resp_model = AnalystResponse.model_validate(cached_resp)
+                    # Update trace id and mark cached in debug
+                    resp_model.trace_id = f"cached_{trace_id}"
+                    if req.options.get("debug"):
+                        resp_model.debug = {
+                            "cache_hit": True,
+                            "tokens_saved": True,
+                            "elapsed_sec": time.time() - start_time,
+                        }
+                    return resp_model
+                except Exception as e:
+                    logger.debug("Error deserializing cached response: %s", e)
+
         tool_records: list[ToolStepRecord] = []
         sql_executed: list[str] = []
         collected_numbers: set[float] = set()
@@ -345,7 +364,8 @@ class DecisionAnalystOrchestrator:
             } or None,
         )
 
-        # ── Step 4: Persist Telemetry Trace ──────────────────────────────────────
+        # ── Step 4: Persist Telemetry Trace & Store RFX Artifacts ────────────────
+        resp_dict = response_obj.model_dump()
         self._repo.record_trace(
             trace_id=trace_id,
             rfx_id=rfx_id,
@@ -356,11 +376,20 @@ class DecisionAnalystOrchestrator:
             path_used=path_used,
             latencies={"total_ms": int((time.time() - start_time) * 1000)},
             tokens={"prompt_tokens": 0, "completion_tokens": 0},
-            final_response=response_obj.model_dump(),
+            final_response=resp_dict,
             confidence=confidence,
             confidence_reason=confidence_reason,
             prompt_version="1.0.0",
             semantic_model_version="1.0.0",
         )
+
+        # Cache response for future identical/similar RFX queries
+        self._repo.save_cached_response(rfx_id, question, resp_dict)
+
+        # Store generated charts and table reports for this RFX
+        for ch in charts:
+            self._repo.store_rfx_artifact(rfx_id, "chart", ch.title, ch.model_dump())
+        for tb in tables:
+            self._repo.store_rfx_artifact(rfx_id, "table", tb.title, tb.model_dump())
 
         return response_obj

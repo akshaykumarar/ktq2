@@ -20,11 +20,123 @@ from backend.app.analyst.models import (
 logger = logging.getLogger(__name__)
 
 
+# In-memory stores for fast response and artifact caching per RFX ID
+_RESPONSE_CACHE: dict[str, dict[str, Any]] = {}
+_RFX_ARTIFACTS_CACHE: dict[int, list[dict[str, Any]]] = {}
+
+
 class AnalystRepository:
-    """Manages PostgreSQL persistence for Step 3 Decision Analyst."""
+    """Manages PostgreSQL persistence and token-optimizing caching for Step 3 Decision Analyst."""
 
     def __init__(self, secrets: AppSecrets | None = None):
         self._secrets = secrets or AppSecrets()
+
+    def get_cached_response(self, rfx_id: int, question: str) -> dict[str, Any] | None:
+        """Retrieve cached analysis response for an RFX ID and question to optimize token usage."""
+        cache_key = f"{rfx_id}:{question.strip().lower()}"
+        if cache_key in _RESPONSE_CACHE:
+            return _RESPONSE_CACHE[cache_key]
+
+        if not self._secrets.db_configured:
+            return None
+
+        query = """
+            SELECT final_response
+            FROM ktq.analyst_traces
+            WHERE rfx_id = %s AND LOWER(TRIM(question)) = LOWER(TRIM(%s)) AND error IS NULL
+            ORDER BY created_at DESC
+            LIMIT 1;
+        """
+        try:
+            with get_db_connection(self._secrets) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute(query, (rfx_id, question.strip()))
+                    row = cur.fetchone()
+                    if row and row.get("final_response"):
+                        resp = row["final_response"]
+                        _RESPONSE_CACHE[cache_key] = resp
+                        return resp
+        except Exception as e:
+            logger.debug("Cache lookup failed: %s", e)
+        return None
+
+    def save_cached_response(self, rfx_id: int, question: str, response_data: dict[str, Any]) -> None:
+        """Cache an analysis response in memory."""
+        cache_key = f"{rfx_id}:{question.strip().lower()}"
+        _RESPONSE_CACHE[cache_key] = response_data
+
+    def store_rfx_artifact(self, rfx_id: int, artifact_type: str, title: str, payload: dict[str, Any]) -> None:
+        """Store a generated chart/report artifact for an RFX ID."""
+        if rfx_id not in _RFX_ARTIFACTS_CACHE:
+            _RFX_ARTIFACTS_CACHE[rfx_id] = []
+        
+        # Deduplicate by title + type
+        _RFX_ARTIFACTS_CACHE[rfx_id] = [
+            a for a in _RFX_ARTIFACTS_CACHE[rfx_id] if not (a.get("title") == title and a.get("type") == artifact_type)
+        ]
+        _RFX_ARTIFACTS_CACHE[rfx_id].append({
+            "rfx_id": rfx_id,
+            "type": artifact_type,
+            "title": title,
+            "data": payload,
+            "created_at": datetime.now().isoformat(),
+        })
+
+    def get_rfx_artifacts(self, rfx_id: int) -> list[dict[str, Any]]:
+        """Fetch all stored graphs, charts, and reports for a given RFX ID."""
+        in_memory = list(_RFX_ARTIFACTS_CACHE.get(rfx_id, []))
+        if in_memory:
+            return in_memory
+
+        if not self._secrets.db_configured:
+            return []
+
+        # Extract previously generated charts and reports from traces
+        query = """
+            SELECT final_response, created_at
+            FROM ktq.analyst_traces
+            WHERE rfx_id = %s AND error IS NULL
+            ORDER BY created_at DESC
+            LIMIT 20;
+        """
+        results: list[dict[str, Any]] = []
+        seen_titles = set()
+        try:
+            with get_db_connection(self._secrets) as conn:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute(query, (rfx_id,))
+                    rows = cur.fetchall()
+                    for r in rows:
+                        resp = r.get("final_response") or {}
+                        # Charts
+                        for chart in resp.get("charts", []):
+                            title = chart.get("title", "Chart")
+                            if title not in seen_titles:
+                                seen_titles.add(title)
+                                results.append({
+                                    "rfx_id": rfx_id,
+                                    "type": "chart",
+                                    "title": title,
+                                    "data": chart,
+                                    "created_at": str(r.get("created_at")),
+                                })
+                        # Tables / Reports
+                        for tbl in resp.get("tables", []):
+                            title = tbl.get("title", "Table Report")
+                            if title not in seen_titles:
+                                seen_titles.add(title)
+                                results.append({
+                                    "rfx_id": rfx_id,
+                                    "type": "table",
+                                    "title": title,
+                                    "data": tbl,
+                                    "created_at": str(r.get("created_at")),
+                                })
+            _RFX_ARTIFACTS_CACHE[rfx_id] = results
+            return results
+        except Exception as e:
+            logger.debug("Failed to retrieve RFX artifacts from DB: %s", e)
+            return []
 
     def record_trace(
         self,

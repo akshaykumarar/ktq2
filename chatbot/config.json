@@ -1,9 +1,8 @@
 {
   "chatbotStore": {
     "url": "http://localhost:8000/api/chat",
-    "vendorWebhookUrl": "https://hook.eu1.make.com/ah791mkhp7r10xwsoljltui2jaymc5xr",
-    "apiKey": "aerchain3",
-    "authHeader": "x-make-apikey",
+    "apiKey": "",
+    "authHeader": "",
     "path": "",
     "mode": "webhook",
     "authPrefix": "",

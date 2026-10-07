@@ -247,6 +247,61 @@ flowchart TD
 
 ---
 
+## Step 4: Unified Decision Analyst & Token-Optimized Artifact Architecture
+
+```mermaid
+flowchart TD
+    subgraph ClientUI["1. Unified Client Interface (chatbot/analyst.html)"]
+        UI1["Analyst & Vendor Chat (Tooltip-Guided)"]
+        UI2["Comparison Grid & SQL Widgets"]
+        UI3["Trust & Risk Audits"]
+        UI4["Saved Graphs & Reports Viewer"]
+        UI5["Dynamic RFX Dropdown Selector (GET /api/rfi)"]
+    end
+
+    subgraph TokenOptimization["2. Token Optimization & Artifact Storage"]
+        C1["Repository Cache Lookup (rfx_id + query)"]
+        C2["Artifact Persistence (charts/reports by rfx_id)"]
+        C3["0-Token Instant Cache Hit Execution"]
+    end
+
+    subgraph DeterministicWidgets["3. Ready-Made Comparison Widgets (Standard SQL - No AI)"]
+        W1["Basket KPI Summary (Target vs L1 Optimal vs Savings)"]
+        W2["L1 Best Price Summary & Savings"]
+        W3["Price Spread & Bidder Variance Matrix"]
+        W4["Vendor Win Count Leaderboard"]
+    end
+
+    UI1 --> C1
+    C1 -->|Hit| C3 --> UI1
+    C1 -->|Miss| UI1
+    UI2 --> W1 & W2 & W3 & W4
+    UI4 --> C2
+```
+
+### Ready-Made Standard SQL Comparison Queries
+1. **L1 Best Price & Savings**:
+   ```sql
+   SELECT ri.item_number, ri.description, ri.quantity, ri.target_price,
+          c.vendor_name as l1_vendor, MIN(c.effective_price_inr) as l1_price
+   FROM ktq.rfx_items ri
+   JOIN ktq.v_rfx_comparison c ON ri.id = c.rfx_item_id
+   WHERE c.rfx_id = :rfx_id
+   GROUP BY ri.id, ri.item_number, ri.description, ri.quantity, ri.target_price, c.vendor_name;
+   ```
+2. **Price Spread & Bidder Variance**:
+   ```sql
+   SELECT item_number, description, COUNT(DISTINCT vendor_id) as bidder_count,
+          MIN(effective_price_inr) as min_price, MAX(effective_price_inr) as max_price,
+          (MAX(effective_price_inr) - MIN(effective_price_inr)) as price_spread
+   FROM ktq.v_rfx_comparison
+   WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL
+   GROUP BY item_number, description
+   ORDER BY item_number;
+   ```
+
+---
+
 ## Running Tests
 
 Run the full pytest suite:
@@ -256,3 +311,4 @@ PYTHONPATH=. .venv/bin/pytest tests/ backend/tests/ -v
 ```
 
 Test logs are output to [`artifacts/logs/test_full_suite.log`](file:///Users/akshaykumar/code/ktq2/artifacts/logs/test_full_suite.log).
+

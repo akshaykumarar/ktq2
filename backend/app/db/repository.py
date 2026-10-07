@@ -301,6 +301,49 @@ class RFIRepository:
 
         return _MEMORY_RFIS.get(rfi_id)
 
+    def list_all(self, limit: int = 50) -> list[dict[str, Any]]:
+        """List all RFX records from table with metadata for dropdown selectors."""
+        if self.secrets.db_configured:
+            try:
+                with get_db_connection(self.secrets) as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            """
+                            SELECT id, title, category, status, currency, created_at
+                            FROM rfx
+                            ORDER BY id DESC
+                            LIMIT %s;
+                            """,
+                            (limit,),
+                        )
+                        rows = cur.fetchall()
+                        return [
+                            {
+                                "id": r[0],
+                                "title": r[1] or f"RFX #{r[0]}",
+                                "category": r[2] or "Packaging",
+                                "status": r[3] or "draft",
+                                "currency": r[4] or "INR",
+                                "created_at": r[5].isoformat() if r[5] else None,
+                            }
+                            for r in rows
+                        ]
+            except Exception as exc:
+                logger.warning("Database query failed: %s", exc)
+
+        # Fallback to memory store
+        items = []
+        for rfi in sorted(_MEMORY_RFIS.values(), key=lambda x: x["id"], reverse=True)[:limit]:
+            items.append({
+                "id": rfi["id"],
+                "title": rfi.get("title") or f"RFX #{rfi['id']}",
+                "category": rfi.get("category") or "Packaging",
+                "status": rfi.get("status") or "draft",
+                "currency": rfi.get("currency") or "INR",
+                "created_at": rfi.get("created_at"),
+            })
+        return items
+
     def update(self, rfi_id: int, updates: dict[str, Any]) -> dict[str, Any] | None:
         """Update allowed fields of an RFI."""
         allowed_fields = {

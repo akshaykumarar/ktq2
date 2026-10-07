@@ -83,3 +83,44 @@ def test_session_assumptions_management():
     # Reset
     reset_assumptions(sess_id)
     assert get_assumptions(sess_id)["fx_rates"]["USD"] == 84.0
+
+
+def test_analyst_repository_artifact_caching():
+    """Verify storing and retrieving charts/reports per rfx_id without database dependency."""
+    from backend.app.analyst.repository import AnalystRepository
+
+    repo = AnalystRepository()
+    rfx_id = 9999
+    
+    # Store chart artifact
+    chart_payload = {
+        "title": "Vendor Spend Breakdown",
+        "type": "pie",
+        "spec": {"data": [100, 200]}
+    }
+    repo.store_rfx_artifact(rfx_id, "chart", "Vendor Spend Breakdown", chart_payload)
+    
+    # Store table artifact
+    table_payload = {
+        "title": "L1 Savings Summary",
+        "columns": ["Item", "L1 Vendor"],
+        "rows": [["Box 1", "Vendor A"]]
+    }
+    repo.store_rfx_artifact(rfx_id, "table", "L1 Savings Summary", table_payload)
+
+    # Retrieve artifacts
+    artifacts = repo.get_rfx_artifacts(rfx_id)
+    assert len(artifacts) == 2
+    types = {a["type"] for a in artifacts}
+    assert "chart" in types
+    assert "table" in types
+
+    # Test response caching
+    question = "Who is the cheapest vendor for Box 1?"
+    mock_resp = {"answer_text": "Vendor A is cheapest at 10 INR", "confidence": "high"}
+    repo.save_cached_response(rfx_id, question, mock_resp)
+
+    cached = repo.get_cached_response(rfx_id, question)
+    assert cached is not None
+    assert cached["answer_text"] == "Vendor A is cheapest at 10 INR"
+

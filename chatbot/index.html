@@ -343,27 +343,30 @@
 <body>
     <div id="app" v-cloak>
         <v-app>
-            <v-container v-show="messageStore.conversation.length === 0" class="welcome-container d-flex flex-column justify-center align-center">
+            <v-container v-show="messageStore.conversation.length === 0"
+                class="welcome-container d-flex flex-column justify-center align-center">
                 <div class="welcome-header text-center mb-8">
                     <v-avatar color="primary" size="64" class="mb-4 elevation-2">
                         <v-icon size="36" color="white">mdi-robot-outline</v-icon>
                     </v-avatar>
                     <div class="text-h4 font-weight-bold mb-2">RFX Procurement Assistant</div>
-                    <div class="text-body-1 text-medium-emphasis">Select a workflow to start interacting with the AI agent</div>
+                    <div class="text-body-1 text-medium-emphasis">Select a workflow to start interacting with the AI
+                        agent</div>
                 </div>
 
                 <v-row class="w-100 welcome-cards-row" justify="center">
-                    <v-col cols="12" md="4" sm="6">
-                        <v-card class="welcome-card pa-6 h-100 d-flex flex-column justify-space-between rounded-xl elevation-1"
-                                hover
-                                @click="selectOption('Create an RFI')">
+                    <v-col cols="12" md="6" sm="12">
+                        <v-card
+                            class="welcome-card pa-6 h-100 d-flex flex-column justify-space-between rounded-xl elevation-1"
+                            hover @click="selectOption('Create an RFI')">
                             <div>
                                 <v-avatar color="primary" variant="tonal" size="56" class="mb-4">
                                     <v-icon size="30" color="primary">mdi-file-document-plus-outline</v-icon>
                                 </v-avatar>
                                 <div class="text-h6 font-weight-bold mb-2 text-primary">Create an RFI</div>
                                 <div class="text-body-2 text-medium-emphasis mb-4">
-                                    Draft packaging requirements, define line item specifications, and generate new RFI requests.
+                                    Draft packaging requirements, define line item specifications, and generate new RFI
+                                    requests.
                                 </div>
                             </div>
                             <v-btn color="primary" variant="tonal" rounded="lg" block class="mt-2 font-weight-bold">
@@ -373,41 +376,22 @@
                         </v-card>
                     </v-col>
 
-                    <v-col cols="12" md="4" sm="6">
-                        <v-card class="welcome-card pa-6 h-100 d-flex flex-column justify-space-between rounded-xl elevation-1"
-                                hover
-                                @click="selectOption('Check Vendor response')">
-                            <div>
-                                <v-avatar color="indigo" variant="tonal" size="56" class="mb-4">
-                                    <v-icon size="30" color="indigo">mdi-clipboard-check-outline</v-icon>
-                                </v-avatar>
-                                <div class="text-h6 font-weight-bold mb-2 text-indigo">Check Vendor Response</div>
-                                <div class="text-body-2 text-medium-emphasis mb-4">
-                                    Review submitted vendor proposals, assess compliance, and compare responses.
-                                </div>
-                            </div>
-                            <v-btn color="indigo" variant="tonal" rounded="lg" block class="mt-2 font-weight-bold">
-                                Start Workflow
-                                <v-icon end>mdi-arrow-right</v-icon>
-                            </v-btn>
-                        </v-card>
-                    </v-col>
-
-                    <v-col cols="12" md="4" sm="6">
-                        <v-card class="welcome-card pa-6 h-100 d-flex flex-column justify-space-between rounded-xl elevation-1"
-                                hover
-                                href="/ui/analyst.html">
+                    <v-col cols="12" md="6" sm="12">
+                        <v-card
+                            class="welcome-card pa-6 h-100 d-flex flex-column justify-space-between rounded-xl elevation-1"
+                            hover href="/ui/analyst.html">
                             <div>
                                 <v-avatar color="teal" variant="tonal" size="56" class="mb-4">
                                     <v-icon size="30" color="teal">mdi-chart-timeline-variant-shimmer</v-icon>
                                 </v-avatar>
-                                <div class="text-h6 font-weight-bold mb-2 text-teal">Decision Analyst (Step 3)</div>
+                                <div class="text-h6 font-weight-bold mb-2 text-teal">AI Procurement Analyst & Vendor Responses</div>
                                 <div class="text-body-2 text-medium-emphasis mb-4">
-                                    Natural language analysis, side-by-side comparison grid, trust audits, and award optimization scenarios.
+                                    Comprehensive vendor quotation analysis, line item comparison grid, L1 pricing, trust & risk audits, and natural language Q&A.
                                 </div>
                             </div>
-                            <v-btn color="teal" variant="tonal" rounded="lg" block class="mt-2 font-weight-bold" href="/ui/analyst.html">
-                                Open Analyst
+                            <v-btn color="teal" variant="tonal" rounded="lg" block class="mt-2 font-weight-bold"
+                                href="/ui/analyst.html">
+                                Open Analyst & Vendor Hub
                                 <v-icon end>mdi-arrow-right</v-icon>
                             </v-btn>
                         </v-card>
@@ -423,8 +407,10 @@
                         <v-avatar :size="settingStore.avatarSize" class="mt-1 mr-3 mr-lg-6" color="teal">
                             <v-icon color="white">mdi-lightning-bolt-circle</v-icon>
                         </v-avatar>
-                        <v-card class="pa-4 d-flex align-center rounded-xl" elevation="1" color="#f8fafc" min-width="260" border>
-                            <v-progress-circular indeterminate color="primary" size="22" width="3" class="mr-3"></v-progress-circular>
+                        <v-card class="pa-4 d-flex align-center rounded-xl" elevation="1" color="#f8fafc"
+                            min-width="260" border>
+                            <v-progress-circular indeterminate color="primary" size="22" width="3"
+                                class="mr-3"></v-progress-circular>
                             <span class="text-body-2 font-weight-medium text-primary">
                                 Assistant is processing your request...
                             </span>
@@ -439,8 +425,9 @@
                         <v-row>
                             <v-textarea class="input-box" dirty color="primary" type="text" variant="solo" counter
                                 clearable @keydown="messageStore.handleKeydown" v-model="messageStore.userMessage"
-                                :loading="messageStore.generating" :label="" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
-                                :rows="settingStore.inputRow" auto-grow max-rows="15">
+                                :loading="messageStore.generating" :label="" @focus="settingStore.setInputRow(2,0)"
+                                @blur="settingStore.setInputRow(1,150)" :rows="settingStore.inputRow" auto-grow
+                                max-rows="15">
                                 <template v-slot:prepend-inner>
                                     <v-container>
                                         <v-row>
@@ -1836,7 +1823,7 @@
                                 if (chatBot) {
                                     window.scrollTo({ top: chatBot.scrollHeight + 120, behavior: "smooth" });
                                 }
-                            } catch (e) {}
+                            } catch (e) { }
                             await createCompletion(this.conversation);
                             await this.postToolCall()
                         },
@@ -2090,7 +2077,7 @@
                     }, []);
 
                     const isWebhook = chatbotStore.mode === 'webhook' ||
-                                      (chatbotStore.url && (chatbotStore.url.includes('hook.') || chatbotStore.url.includes('make.com') || chatbotStore.url.includes('webhook')));
+                        (chatbotStore.url && (chatbotStore.url.includes('hook.') || chatbotStore.url.includes('make.com') || chatbotStore.url.includes('webhook')));
 
                     if (isWebhook) {
                         try {
@@ -2106,17 +2093,16 @@
                                 }
                             }
 
-                            const apiKey = chatbotStore.apiKey || "aerchain3";
                             const headers = {
                                 "Content-Type": chatbotStore.contentType || "application/json",
-                                "x-make-apikey": apiKey,
-                                "x-mak-api-key": apiKey
                             };
-                            if (chatbotStore.authHeader) {
-                                headers[chatbotStore.authHeader] = apiKey;
-                            }
-                            if (chatbotStore.authPrefix) {
-                                headers["Authorization"] = `${chatbotStore.authPrefix} ${apiKey}`;
+                            if (chatbotStore.apiKey) {
+                                if (chatbotStore.authHeader) {
+                                    headers[chatbotStore.authHeader] = chatbotStore.apiKey;
+                                }
+                                if (chatbotStore.authPrefix) {
+                                    headers["Authorization"] = `${chatbotStore.authPrefix} ${chatbotStore.apiKey}`;
+                                }
                             }
 
                             const payload = {
@@ -2124,11 +2110,7 @@
                                 conversation_id: messageStore.conversationId || Date.now().toString()
                             };
 
-                            const isVendorFlow = messageText.toLowerCase().includes('check vendor response');
-                            let targetUrl = chatbotStore.url + (chatbotStore.path ? chatbotStore.path : '');
-                            if (isVendorFlow && chatbotStore.vendorWebhookUrl) {
-                                targetUrl = chatbotStore.vendorWebhookUrl;
-                            }
+                            const targetUrl = chatbotStore.url + (chatbotStore.path ? chatbotStore.path : '');
 
                             const response = await fetch(targetUrl, {
                                 method: chatbotStore.method || "POST",
@@ -2146,7 +2128,7 @@
                                     try {
                                         const errText = await response.text();
                                         if (errText) errorMsg = `${response.status}: ${errText}`;
-                                    } catch (e2) {}
+                                    } catch (e2) { }
                                 }
                                 snackbarStore.showErrorMessage(errorMsg);
                                 return;
@@ -2525,7 +2507,7 @@
                                     });
                                     break;
                                 }
-                            } catch (err) {}
+                            } catch (err) { }
                         }
                     } catch (e) {
                         console.warn('Could not read .env file directly:', e);

@@ -107,3 +107,27 @@
   - Standardized parameterized logging across analyst telemetry and semantic execution layers.
 - **Documentation Parity**: Synchronized section numbering in `architecture.md`, completed the semantic decision intelligence layer overview, and cleaned Markdown syntax across `README.md` and `AI_context.md`.
 
+## Step 4: Decision Analyst & Vendor Intelligence Unification
+- **Workflow & Skill Consolidation**:
+  - Combined disparate "Check Vendor Response" and "Analyst Chat" into a unified **AI Procurement Analyst & Vendor Responses** hub.
+  - Eliminated external make.com webhook intercept (`isVendorFlow` / `vendorWebhookUrl`) returning raw `"Accepted"`; routed all responses directly to unified backend endpoints.
+  - Simplified landing page to 2 clear primary workflow cards: (1) *Create an RFI* and (2) *AI Procurement Analyst & Vendor Responses*.
+- **Token Optimization & Artifact Caching**:
+  - Persisted and cached all generated graphs, charts, and table reports per `rfx_id` in `AnalystRepository`.
+  - Implemented automatic token optimization in `DecisionAnalystOrchestrator.ask()`: queries for identical RFX queries return cached responses with 0 tokens consumed.
+  - Added REST endpoint `GET /api/rfx/{id}/artifacts` to fetch stored graphs and reports.
+  - Added "Saved Graphs & Reports (0 tokens)" instant viewer drawer in `chatbot/analyst.html`.
+- **UI Tooltips & Cleanliness**:
+  - Added informative Vuetify tooltips (`<v-tooltip>`) across all Decision Analyst tabs.
+  - Hidden the Award Scenarios tab from the UI to streamline buyer workflows.
+- **Ready-Made Comparison Widgets (Standard SQL - No AI)**:
+  - Added 4 deterministic SQL widgets directly in `backend/app/analyst/tools/comparison.py` and `chatbot/analyst.html`:
+    1. *Overall Basket KPI Banner* (Target Spend, Optimal Basket Spend, Potential Savings Amount and %).
+    2. *L1 Best Price Summary & Savings* (Lowest quoted prices vs target prices per item).
+    3. *Price Spread & Bidder Variance* (Min, Max, Absolute Spread, Spread % per line item).
+- **Dynamic RFX Selector Dropdown**:
+  - Replaced manual/numeric text input in the Decision Analyst app bar with a dynamic `<v-select>` dropdown querying `GET /api/rfi`.
+  - Displays rich RFX metadata (ID, title, category, uppercase status chip) and triggers automatic asynchronous reload of comparison grids, trust audits, and cached artifacts upon selection.
+
+
+
