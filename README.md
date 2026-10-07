@@ -177,8 +177,6 @@ curl -X POST http://localhost:8000/api/vendor-responses \
 
 ---
 
----
-
 ## Step 3: Natural Language Analysis, Decision Support & Award Optimization
 
 Step 3 equips buyers with natural language analysis, side-by-side comparison grids, trust & risk scoring, deterministic award optimization, Chart.js visual analytics, and export packs (XLSX).

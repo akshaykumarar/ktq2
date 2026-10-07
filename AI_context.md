@@ -1,4 +1,6 @@
-## Current State
+# AI Context & Project Source of Truth
+
+## Step 1: Packaging RFI Workflow & Intake System
 - Configurable multi-agent chatbot system extended with end-to-end Packaging RFI workflow:
   - **Conversational RFI Chat Workflow (`POST /api/chat`)**:
     - **Welcome Card Initiation**: UI starter card updated to "Create an RFI".
@@ -95,3 +97,13 @@
 - `artifacts/plan_analyst.md`: Step 3 master implementation plan.
 - `artifacts/logs/eval_analyst.log`: 33-question benchmark run trace.
 - `artifacts/logs/test_full_suite.log`: 69-test full regression execution trace.
+- `artifacts/logs/test_cleanup_pass.log`: Test execution log verifying 69 tests across offline/mock and database-dependent components with graceful pytest skipping.
+
+## Codebase Cleanup & Baseline Stabilization
+- **Test Harness Standardization**: Created `tests/conftest.py` with dynamic `requires_db` marker to automatically and gracefully skip tests requiring live network/DB connections during offline runs.
+- **Python Modernization & Cleanliness**:
+  - Replaced deprecated `datetime.utcnow()` with `datetime.now(timezone.utc)` in `backend/app/vendor/service.py`.
+  - Removed unused imports across `semantic.py`, `sql_runner.py`, `trust.py`, `optimizer.py`, and `analyst/repository.py`.
+  - Standardized parameterized logging across analyst telemetry and semantic execution layers.
+- **Documentation Parity**: Synchronized section numbering in `architecture.md`, completed the semantic decision intelligence layer overview, and cleaned Markdown syntax across `README.md` and `AI_context.md`.
+

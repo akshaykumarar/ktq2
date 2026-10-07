@@ -6,7 +6,7 @@ import hashlib
 import io
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from PIL import Image
@@ -98,7 +98,7 @@ class VendorResponseService:
             sender_email=sender_email,
             body_text=body_text,
             body_json=body_json,
-            received_at=received_at or datetime.utcnow(),
+            received_at=received_at or datetime.now(timezone.utc),
             version=version,
             supersedes_response_id=superseded_id,
         )

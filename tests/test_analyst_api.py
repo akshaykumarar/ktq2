@@ -1,4 +1,8 @@
-"""Integration tests for Step 3 Decision Analyst REST APIs (CP4 & CP5)."""
+"""Integration tests for Step 3 Decision Analyst REST APIs (CP4 & CP5).
+
+Note: All tests in this file require a live PostgreSQL connection.
+They are automatically skipped when the database is unavailable (see conftest.py).
+"""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,6 +11,7 @@ from backend.app.main import app
 client = TestClient(app)
 
 
+@pytest.mark.requires_db
 def test_analyst_ask_cheapest_query():
     """Verify /api/analyst/ask returns valid JSON response contract for pricing query."""
     payload = {
@@ -28,6 +33,7 @@ def test_analyst_ask_cheapest_query():
     assert len(data["how_i_got_this"]["steps"]) > 0
 
 
+@pytest.mark.requires_db
 def test_analyst_ask_award_split():
     """Verify /api/analyst/ask returns allocation tables, charts, and exports for award query."""
     payload = {
@@ -44,6 +50,7 @@ def test_analyst_ask_award_split():
     assert data["exports"][0]["url"].startswith("/api/exports/")
 
 
+@pytest.mark.requires_db
 def test_analyst_session_history_and_feedback():
     """Verify session history retrieval and feedback submission."""
     sess_id = "test_sess_hist_1"
@@ -70,6 +77,7 @@ def test_analyst_session_history_and_feedback():
     assert fb_resp.json()["status"] == "ok"
 
 
+@pytest.mark.requires_db
 def test_comparison_and_trust_endpoints():
     """Verify /api/rfx/{id}/comparison and /api/rfx/{id}/trust endpoints."""
     comp_resp = client.get("/api/rfx/6/comparison")
@@ -85,6 +93,7 @@ def test_comparison_and_trust_endpoints():
     assert "overall_confidence" in trust_data
 
 
+@pytest.mark.requires_db
 def test_award_scenario_lifecycle_and_finalization():
     """Verify creating, fetching, and finalizing award scenario with review flag governance."""
     # 1. Create scenario
@@ -119,6 +128,7 @@ def test_award_scenario_lifecycle_and_finalization():
     assert fin_resp.json()["status"] == "finalized"
 
 
+@pytest.mark.requires_db
 def test_export_file_download():
     """Verify downloading an exported XLSX workbook."""
     # Trigger an award query that generates an export

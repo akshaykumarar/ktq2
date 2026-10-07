@@ -6,7 +6,6 @@ import json
 import logging
 from datetime import datetime
 from typing import Any
-import psycopg
 from psycopg.rows import dict_row
 
 from backend.app.config.settings import AppSecrets
@@ -88,7 +87,7 @@ class AnalystRepository:
                     )
                 conn.commit()
         except Exception as e:
-            logger.error(f"Failed to record analyst trace: {e}", exc_info=True)
+            logger.error("Failed to record analyst trace: %s", e, exc_info=True)
 
     def get_session_history(self, session_id: str) -> list[dict[str, Any]]:
         """Retrieve historical interaction turns for a given session."""
@@ -110,7 +109,7 @@ class AnalystRepository:
                     rows = cur.fetchall()
                     return [dict(row) for row in rows]
         except Exception as e:
-            logger.error(f"Failed to get session history: {e}", exc_info=True)
+            logger.error("Failed to get session history: %s", e, exc_info=True)
             return []
 
     def record_feedback(self, feedback: AnalystFeedbackRequest) -> int | None:
@@ -143,7 +142,7 @@ class AnalystRepository:
                     conn.commit()
                     return row[0] if row else None
         except Exception as e:
-            logger.error(f"Failed to record feedback: {e}", exc_info=True)
+            logger.error("Failed to record feedback: %s", e, exc_info=True)
             return None
 
     def get_all_feedback(self) -> list[FeedbackRecord]:
@@ -163,7 +162,7 @@ class AnalystRepository:
                     rows = cur.fetchall()
                     return [FeedbackRecord(**row) for row in rows]
         except Exception as e:
-            logger.error(f"Failed to fetch feedback: {e}", exc_info=True)
+            logger.error("Failed to fetch feedback: %s", e, exc_info=True)
             return []
 
     def create_scenario(
@@ -210,7 +209,7 @@ class AnalystRepository:
                     conn.commit()
                     return row[0] if row else None
         except Exception as e:
-            logger.error(f"Failed to create award scenario: {e}", exc_info=True)
+            logger.error("Failed to create award scenario: %s", e, exc_info=True)
             return None
 
     def get_scenario(self, scenario_id: int) -> dict[str, Any] | None:
@@ -231,7 +230,7 @@ class AnalystRepository:
                     row = cur.fetchone()
                     return dict(row) if row else None
         except Exception as e:
-            logger.error(f"Failed to get scenario: {e}", exc_info=True)
+            logger.error("Failed to get scenario: %s", e, exc_info=True)
             return None
 
     def finalize_scenario(
@@ -286,5 +285,5 @@ class AnalystRepository:
                 conn.commit()
                 return True
         except Exception as e:
-            logger.error(f"Failed to finalize scenario: {e}", exc_info=True)
+            logger.error("Failed to finalize scenario: %s", e, exc_info=True)
             return False
