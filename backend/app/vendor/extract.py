@@ -466,12 +466,12 @@ class ExtractionEngine:
                 model=model_name,
                 prompt_version=EXTRACTION_PROMPT_VERSION,
                 tokens_in=len(user_prompt) // 4,
-                tokens_out=len(result.data.model_dump_json()) // 4,
+                tokens_out=len(result.output.model_dump_json()) // 4,
                 latency_ms=duration_ms,
                 validation_ok=True,
                 retries=0,
             )
-            return result.data
+            return result.output
         except Exception as exc:
             err_str = str(exc).lower()
             if "401" in err_str or "api key" in err_str or "unauthorized" in err_str or "auth" in err_str:
@@ -502,12 +502,12 @@ class ExtractionEngine:
                     model=model_name,
                     prompt_version=EXTRACTION_PROMPT_VERSION,
                     tokens_in=len(retry_prompt) // 4,
-                    tokens_out=len(result.data.model_dump_json()) // 4,
+                    tokens_out=len(result.output.model_dump_json()) // 4,
                     latency_ms=duration_ms,
                     validation_ok=True,
                     retries=1,
                 )
-                return result.data
+                return result.output
             except Exception as retry_exc:
                 logger.error("LLM retry extraction failed on %s: %s. Falling back to deterministic extractor.", filename, retry_exc)
                 fallback_res = deterministic_text_extractor(parsed_text, filename)

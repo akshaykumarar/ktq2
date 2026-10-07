@@ -30,4 +30,4 @@ tests/test_vendor_intake.py::test_api_submit_vendor_response_empty_payload
     return await dependant.call(**values)
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================== 14 passed, 2 warnings in 2.47s ========================
+======================== 14 passed, 2 warnings in 2.40s ========================

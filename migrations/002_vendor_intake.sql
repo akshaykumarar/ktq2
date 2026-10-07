@@ -454,3 +454,47 @@ LEFT JOIN ktq.response_items ri ON ri.rfx_item_id = rxi.id AND ri.is_current = T
 LEFT JOIN ktq.vendor_responses vr ON ri.response_id = vr.id AND vr.is_current = TRUE
 LEFT JOIN ktq.vendors v ON vr.vendor_id = v.id
 ORDER BY rxi.rfx_id, rxi.item_number, effective_price_inr ASC NULLS LAST;
+
+-- 14. Compatibility Views for Legacy / Supplier Schemas
+CREATE OR REPLACE VIEW ktq.suppliers AS 
+SELECT 
+    id, 
+    name, 
+    name AS contact_person, 
+    email, 
+    phone, 
+    gstin AS gst_number, 
+    address, 
+    'active' AS status, 
+    created_at, 
+    updated_at 
+FROM ktq.vendors;
+
+CREATE OR REPLACE VIEW ktq.rfx_responses AS 
+SELECT 
+    id, 
+    rfx_id, 
+    vendor_id AS supplier_id, 
+    id::text AS response_number, 
+    status, 
+    'INR' AS quoted_currency, 
+    received_at AS submitted_at, 
+    created_at, 
+    updated_at 
+FROM ktq.vendor_responses;
+
+CREATE OR REPLACE VIEW ktq.rfx_response_items AS 
+SELECT 
+    id, 
+    response_id, 
+    rfx_item_id, 
+    vendor_line_no, 
+    raw_description AS description, 
+    raw_qty AS quantity, 
+    raw_unit AS unit, 
+    raw_price AS unit_price, 
+    normalized_price_inr AS total_price, 
+    lead_time_days, 
+    created_at 
+FROM ktq.response_items;
+
