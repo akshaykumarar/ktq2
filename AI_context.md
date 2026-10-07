@@ -33,8 +33,8 @@
   - `models.py`: Strict Pydantic domain models for documents, extractions, line items, flags, and REST APIs.
   - `repository.py`: Parameterized PostgreSQL repository managing raw byte persistence, SHA-256 idempotency, version superseding, audit logs, and SQL views.
   - `preprocess.py`: Multi-format preprocessing: Excel/CSV with `[Sheet!Cell]` coordinates, PDF text + rasterization, Word paragraphs/tables, Email headers/body/attachments, and image auto-orient/enhancement.
-  - `resolve.py`: 6-signal scored resolution engine (explicit ref, pattern in text, email thread, line item similarity, vendor open RFx count, fallback) with ambiguity detection and vendor entity auto-creation.
-  - `prompts.py` & `extract.py`: Provider-agnostic LLM extraction with strict PydanticAI validation, single retry with error feedback, and deterministic extractor fallback.
+  - `resolve.py`: 6-signal scored resolution engine (explicit ref, pattern in text, email thread, line item similarity, vendor open RFx count, fallback) with ambiguity detection and vendor entity auto-creation from extracted quotation/signature details.
+  - `prompts.py` & `extract.py`: Provider-agnostic LLM extraction with strict PydanticAI validation, single retry with error feedback, and deterministic extractor supporting inline `body_text`, Indian Rupee glyphs (`₹`), multi-tier price clauses, and email signatures (contact person, company, phone, email, location).
   - `match.py`: Semantic line-item matching against `rfx_items` (`MATCHED`, `EXTRA`, `ALTERNATE`, `NOT_QUOTED`).
   - `normalize.py`: Pure Python deterministic unit conversions (e.g. `per 100` pricing traps) and foreign currency conversion to INR.
   - `validate.py`: Pure Python rule-based validation engine generating structured flags (`CONFIDENT`, `REVIEW`, `MISSING`), computing `why_unsure` and `how_to_resolve` for buyer review.

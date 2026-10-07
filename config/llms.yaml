@@ -1,12 +1,12 @@
 llms:
   reasoning:
     provider: openai
-    model: gpt-5
+    model: gpt-4o
     temperature: 0.2
     max_tokens: 4000
 
   fast:
     provider: openai
-    model: gpt-5-mini
+    model: gpt-4o-mini
     temperature: 0.2
     max_tokens: 2500

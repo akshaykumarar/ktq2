@@ -3,19 +3,20 @@ platform darwin -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0 -- /Users/akshaykum
 cachedir: .pytest_cache
 rootdir: /Users/akshaykumar/code/ktq2
 plugins: logfire-5.1.1, platformdirs-4.12.3, anyio-4.15.1
-collecting ... collected 13 items
+collecting ... collected 14 items
 
 tests/test_vendor_intake.py::test_normalization_inr_direct PASSED        [  7%]
-tests/test_vendor_intake.py::test_normalization_per_100_trap PASSED      [ 15%]
-tests/test_vendor_intake.py::test_normalization_foreign_currency_usd PASSED [ 23%]
-tests/test_vendor_intake.py::test_normalization_usd_per_100_combined PASSED [ 30%]
-tests/test_vendor_intake.py::test_validation_clean_confident_item PASSED [ 38%]
-tests/test_vendor_intake.py::test_validation_unresolved_reference PASSED [ 46%]
-tests/test_vendor_intake.py::test_validation_pricing_trap_per_100 PASSED [ 53%]
-tests/test_vendor_intake.py::test_validation_not_quoted_item PASSED      [ 61%]
-tests/test_vendor_intake.py::test_resolution_explicit_rfx_ref PASSED     [ 69%]
-tests/test_vendor_intake.py::test_resolution_text_pattern_reference PASSED [ 76%]
-tests/test_vendor_intake.py::test_preprocessing_text_and_email PASSED    [ 84%]
+tests/test_vendor_intake.py::test_normalization_per_100_trap PASSED      [ 14%]
+tests/test_vendor_intake.py::test_normalization_foreign_currency_usd PASSED [ 21%]
+tests/test_vendor_intake.py::test_normalization_usd_per_100_combined PASSED [ 28%]
+tests/test_vendor_intake.py::test_validation_clean_confident_item PASSED [ 35%]
+tests/test_vendor_intake.py::test_validation_unresolved_reference PASSED [ 42%]
+tests/test_vendor_intake.py::test_validation_pricing_trap_per_100 PASSED [ 50%]
+tests/test_vendor_intake.py::test_validation_not_quoted_item PASSED      [ 57%]
+tests/test_vendor_intake.py::test_resolution_explicit_rfx_ref PASSED     [ 64%]
+tests/test_vendor_intake.py::test_resolution_text_pattern_reference PASSED [ 71%]
+tests/test_vendor_intake.py::test_preprocessing_text_and_email PASSED    [ 78%]
+tests/test_vendor_intake.py::test_deterministic_text_extractor_email_signature PASSED [ 85%]
 tests/test_vendor_intake.py::test_api_submit_vendor_response_empty_payload PASSED [ 92%]
 tests/test_vendor_intake.py::test_api_submit_vendor_response_text_body PASSED [100%]
 
@@ -28,9 +29,5 @@ tests/test_vendor_intake.py::test_api_submit_vendor_response_empty_payload
   /Users/akshaykumar/code/ktq2/.venv/lib/python3.14/site-packages/fastapi/routing.py:360: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
     return await dependant.call(**values)
 
-tests/test_vendor_intake.py::test_api_submit_vendor_response_text_body
-  /Users/akshaykumar/code/ktq2/backend/app/vendor/service.py:101: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    received_at=received_at or datetime.utcnow(),
-
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================= 13 passed, 3 warnings in 18.90s ========================
+======================== 14 passed, 2 warnings in 2.47s ========================

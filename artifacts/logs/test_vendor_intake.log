@@ -3,22 +3,180 @@ platform darwin -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0 -- /Users/akshaykum
 cachedir: .pytest_cache
 rootdir: /Users/akshaykumar/code/ktq2
 plugins: logfire-5.1.1, platformdirs-4.12.3, anyio-4.15.1
-collecting ... collected 13 items
+collecting ... collected 14 items
 
 tests/test_vendor_intake.py::test_normalization_inr_direct PASSED        [  7%]
-tests/test_vendor_intake.py::test_normalization_per_100_trap PASSED      [ 15%]
-tests/test_vendor_intake.py::test_normalization_foreign_currency_usd PASSED [ 23%]
-tests/test_vendor_intake.py::test_normalization_usd_per_100_combined PASSED [ 30%]
-tests/test_vendor_intake.py::test_validation_clean_confident_item PASSED [ 38%]
-tests/test_vendor_intake.py::test_validation_unresolved_reference PASSED [ 46%]
-tests/test_vendor_intake.py::test_validation_pricing_trap_per_100 PASSED [ 53%]
-tests/test_vendor_intake.py::test_validation_not_quoted_item PASSED      [ 61%]
-tests/test_vendor_intake.py::test_resolution_explicit_rfx_ref PASSED     [ 69%]
-tests/test_vendor_intake.py::test_resolution_text_pattern_reference PASSED [ 76%]
-tests/test_vendor_intake.py::test_preprocessing_text_and_email PASSED    [ 84%]
+tests/test_vendor_intake.py::test_normalization_per_100_trap PASSED      [ 14%]
+tests/test_vendor_intake.py::test_normalization_foreign_currency_usd PASSED [ 21%]
+tests/test_vendor_intake.py::test_normalization_usd_per_100_combined PASSED [ 28%]
+tests/test_vendor_intake.py::test_validation_clean_confident_item PASSED [ 35%]
+tests/test_vendor_intake.py::test_validation_unresolved_reference PASSED [ 42%]
+tests/test_vendor_intake.py::test_validation_pricing_trap_per_100 PASSED [ 50%]
+tests/test_vendor_intake.py::test_validation_not_quoted_item PASSED      [ 57%]
+tests/test_vendor_intake.py::test_resolution_explicit_rfx_ref PASSED     [ 64%]
+tests/test_vendor_intake.py::test_resolution_text_pattern_reference PASSED [ 71%]
+tests/test_vendor_intake.py::test_preprocessing_text_and_email PASSED    [ 78%]
+tests/test_vendor_intake.py::test_deterministic_text_extractor_email_signature PASSED [ 85%]
 tests/test_vendor_intake.py::test_api_submit_vendor_response_empty_payload PASSED [ 92%]
-tests/test_vendor_intake.py::test_api_submit_vendor_response_text_body PASSED [100%]
+tests/test_vendor_intake.py::test_api_submit_vendor_response_text_body FAILED [100%]
 
+=================================== FAILURES ===================================
+__________________ test_api_submit_vendor_response_text_body ___________________
+
+test_client = <starlette.testclient.TestClient object at 0x1143ab750>
+
+    def test_api_submit_vendor_response_text_body(test_client: TestClient) -> None:
+        """Test POST /api/vendor-responses accepts body_text and returns 202 Accepted."""
+>       resp = test_client.post(
+            "/api/vendor-responses",
+            data={
+                "body_text": "Quotation for RFX #1: Corrugated Box 600x400x300 mm at Rs 42.50 per piece. Quantity: 5000 pcs.",
+                "sender_name": "Fast Packaging Ltd",
+                "sender_email": "fast@packaging.in",
+                "channel": "email",
+                "rfx_ref": "1",
+            },
+        )
+
+tests/test_vendor_intake.py:280: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.venv/lib/python3.14/site-packages/httpx2/_client.py:1204: in post
+    return self.request(
+.venv/lib/python3.14/site-packages/starlette/testclient.py:463: in request
+    return super().request(
+.venv/lib/python3.14/site-packages/httpx2/_client.py:797: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/httpx2/_client.py:980: in send
+    response = self._send_handling_auth(
+.venv/lib/python3.14/site-packages/httpx2/_client.py:1008: in _send_handling_auth
+    response = self._send_handling_redirects(
+.venv/lib/python3.14/site-packages/httpx2/_client.py:1043: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/httpx2/_client.py:1076: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/starlette/testclient.py:360: in handle_request
+    raise exc
+.venv/lib/python3.14/site-packages/starlette/testclient.py:357: in handle_request
+    portal.call(self.app, scope, receive, send)
+.venv/lib/python3.14/site-packages/anyio/from_thread.py:340: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/concurrent/futures/_base.py:454: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/concurrent/futures/_base.py:396: in __get_result
+    raise self._exception
+.venv/lib/python3.14/site-packages/anyio/from_thread.py:265: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/fastapi/applications.py:1215: in __call__
+    await super().__call__(scope, receive, send)
+.venv/lib/python3.14/site-packages/starlette/applications.py:96: in __call__
+    await self.middleware_stack(scope, receive, send)
+.venv/lib/python3.14/site-packages/starlette/middleware/errors.py:186: in __call__
+    raise exc
+.venv/lib/python3.14/site-packages/starlette/middleware/errors.py:164: in __call__
+    await self.app(scope, receive, _send)
+.venv/lib/python3.14/site-packages/fastapi/telemetry/_asgi.py:151: in __call__
+    await self.app(scope, receive, send)
+.venv/lib/python3.14/site-packages/starlette/middleware/cors.py:91: in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+.venv/lib/python3.14/site-packages/starlette/middleware/cors.py:149: in simple_response
+    await self.app(scope, receive, send)
+.venv/lib/python3.14/site-packages/starlette/middleware/exceptions.py:63: in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+.venv/lib/python3.14/site-packages/starlette/_exception_handler.py:53: in wrapped_app
+    raise exc
+.venv/lib/python3.14/site-packages/starlette/_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+.venv/lib/python3.14/site-packages/fastapi/middleware/asyncexitstack.py:18: in __call__
+    await self.app(scope, receive, send)
+.venv/lib/python3.14/site-packages/starlette/routing.py:676: in __call__
+    await self.middleware_stack(scope, receive, send)
+.venv/lib/python3.14/site-packages/fastapi/routing.py:2786: in app
+    await route.handle(scope, receive, send)
+.venv/lib/python3.14/site-packages/fastapi/routing.py:1817: in handle
+    await self.original_router.handle(scope, receive, send)
+.venv/lib/python3.14/site-packages/fastapi/routing.py:2869: in handle
+    await included_router._handle_selected(scope, receive, send)
+.venv/lib/python3.14/site-packages/fastapi/routing.py:1843: in _handle_selected
+    await original_route.handle(scope, receive, send)
+.venv/lib/python3.14/site-packages/fastapi/routing.py:1308: in handle
+    await effective_context.app(scope, receive, send)
+.venv/lib/python3.14/site-packages/fastapi/routing.py:165: in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+.venv/lib/python3.14/site-packages/starlette/_exception_handler.py:53: in wrapped_app
+    raise exc
+.venv/lib/python3.14/site-packages/starlette/_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+.venv/lib/python3.14/site-packages/fastapi/routing.py:151: in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/fastapi/routing.py:727: in app
+    raw_response = await run_endpoint_function(
+.venv/lib/python3.14/site-packages/fastapi/routing.py:360: in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/app/api/vendor.py:101: in submit_vendor_response
+    preview = svc.submit_vendor_response(
+backend/app/vendor/service.py:81: in submit_vendor_response
+    existing_vendor = self.repo.find_vendor_by_email_or_name(sender_email, vendor_name)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/app/vendor/repository.py:61: in find_vendor_by_email_or_name
+    with get_db_connection(self.secrets) as conn:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/contextlib.py:141: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+backend/app/db/connection.py:60: in get_db_connection
+    with psycopg.connect(conninfo, connect_timeout=5) as conn:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.14/site-packages/psycopg/connection.py:100: in connect
+    attempts = conninfo_attempts(params)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+params = {'user': 'neondb_owner', 'password': 'npg_Kw9TnWl2Gygz', 'channel_binding': 'require', 'dbname': 'neondb', ...}
+
+    def conninfo_attempts(params: ConnMapping) -> list[ConnDict]:
+        """Split a set of connection params on the single attempts to perform.
+    
+        A connection param can perform more than one attempt more than one ``host``
+        is provided.
+    
+        Also perform async resolution of the hostname into hostaddr. Because a host
+        can resolve to more than one address, this can lead to yield more attempts
+        too. Raise `OperationalError` if no host could be resolved.
+    
+        Because the libpq async function doesn't honour the timeout, we need to
+        reimplement the repeated attempts.
+        """
+        last_exc = None
+        attempts = []
+        if prefer_standby := (
+            get_param(params, "target_session_attrs") == "prefer-standby"
+        ):
+            params = {k: v for k, v in params.items() if k != "target_session_attrs"}
+    
+        for attempt in split_attempts(params):
+            try:
+                attempts.extend(_resolve_hostnames(attempt))
+            except OSError as ex:
+                last_exc = e.OperationalError(
+                    f"failed to resolve host {attempt.get('host')!r}: {ex}"
+                )
+                logger.debug("%s", last_exc)
+    
+        if not attempts:
+            assert last_exc
+            # We couldn't resolve anything
+>           raise last_exc
+E           psycopg.OperationalError: failed to resolve host 'ep-muddy-voice-aozlceqy-pooler.c-2.ap-southeast-1.aws.neon.tech': [Errno 8] nodename nor servname provided, or not known
+
+.venv/lib/python3.14/site-packages/psycopg/_conninfo_attempts.py:55: OperationalError
 =============================== warnings summary ===============================
 .venv/lib/python3.14/site-packages/google/genai/types.py:42
   /Users/akshaykumar/code/ktq2/.venv/lib/python3.14/site-packages/google/genai/types.py:42: DeprecationWarning: '_UnionGenericAlias' is deprecated and slated for removal in Python 3.17
@@ -28,9 +186,7 @@ tests/test_vendor_intake.py::test_api_submit_vendor_response_empty_payload
   /Users/akshaykumar/code/ktq2/.venv/lib/python3.14/site-packages/fastapi/routing.py:360: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
     return await dependant.call(**values)
 
-tests/test_vendor_intake.py::test_api_submit_vendor_response_text_body
-  /Users/akshaykumar/code/ktq2/backend/app/vendor/service.py:101: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    received_at=received_at or datetime.utcnow(),
-
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================= 13 passed, 3 warnings in 18.32s ========================
+=========================== short test summary info ============================
+FAILED tests/test_vendor_intake.py::test_api_submit_vendor_response_text_body
+=================== 1 failed, 13 passed, 2 warnings in 2.71s ===================

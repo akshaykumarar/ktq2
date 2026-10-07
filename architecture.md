@@ -156,8 +156,9 @@ flowchart TD
 
     subgraph ExtractionReconciliation["4. Extraction & Reconciliation"]
         E1["Provider-Agnostic LLM Vision / Structured Extraction"]
-        E2["Multi-Document Conflict Reconciliation"]
+        E2["Multi-Document Conflict Reconciliation & Body Text Parsing"]
         E3["Pydantic Strict Validation & Single Retry on Failure"]
+        E4["Deterministic Signature & Multi-Tier Extractor (Fallback)"]
     end
 
     subgraph Matching["5. RFx Line Item Matching"]

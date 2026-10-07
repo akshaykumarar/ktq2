@@ -245,6 +245,26 @@ def test_preprocessing_text_and_email() -> None:
     assert "vendor@pack.com" in prep.parsed_text
 
 
+def test_deterministic_text_extractor_email_signature() -> None:
+    """Test extracting vendor details and items from email body quotation and signature."""
+    from backend.app.vendor.extract import deterministic_text_extractor
+    
+    body = (
+        "Hi,Thank you for your response. In response to your previous quotation, please find our quoted prices below: "
+        "1. Carton Box: ₹1,000 for 50 pieces and ₹5,000 for 300 pieces. "
+        "2. BOPP Tape: ₹400 per dozen. "
+        "3. Stretch Film: 5m stretch film at ₹300 per box (50 pieces), and 10m stretch film at ₹600 per box (35 pieces). "
+        "Please let us know if you need any further details or clarification regarding the above quotation. "
+        "Best regards, Rajesh Kumar Shree Packaging Solutions Sales Manager +91 98765 43210 sales@shreepackagingsolutions.com Bengaluru, Karnataka"
+    )
+    res = deterministic_text_extractor(body, "email_body.txt")
+    assert res.vendor_info.email == "sales@shreepackagingsolutions.com"
+    assert "Shree Packaging Solutions" in (res.vendor_info.name or "")
+    assert "+91 98765 43210" in (res.vendor_info.phone or "")
+    assert "Bengaluru" in (res.vendor_info.address or "")
+    assert len(res.line_items) >= 3
+
+
 # ---------------------------------------------------------------------------
 # 5. API Endpoint Tests
 # ---------------------------------------------------------------------------
@@ -255,8 +275,25 @@ def test_api_submit_vendor_response_empty_payload(test_client: TestClient) -> No
     assert resp.status_code == 422
 
 
-def test_api_submit_vendor_response_text_body(test_client: TestClient) -> None:
+def test_api_submit_vendor_response_text_body(test_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test POST /api/vendor-responses accepts body_text and returns 202 Accepted."""
+    from backend.app.vendor.models import VendorResponseSubmitPreview, ResponseStatus
+    from backend.app.vendor.service import VendorResponseService
+
+    def mock_submit(self, *args, **kwargs):
+        return VendorResponseSubmitPreview(
+            response_id=1,
+            status=ResponseStatus.RECEIVED,
+            message="Quotation received.",
+            is_duplicate=False,
+            rfx_resolution_preview={"rfx_id": 1, "version": 1},
+        )
+
+    async def mock_pipeline(self, response_id: int):
+        pass
+
+    monkeypatch.setattr(VendorResponseService, "submit_vendor_response", mock_submit)
+    monkeypatch.setattr(VendorResponseService, "run_pipeline", mock_pipeline)
     resp = test_client.post(
         "/api/vendor-responses",
         data={
@@ -272,3 +309,6 @@ def test_api_submit_vendor_response_text_body(test_client: TestClient) -> None:
     assert "response_id" in data
     assert data["status"] in ("received", "preprocessing", "done", "needs_review")
     assert data["rfx_resolution_preview"]["version"] >= 1
+
+
+

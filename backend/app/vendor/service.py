@@ -198,6 +198,18 @@ class VendorResponseService:
             stage_start = time.time()
 
             extracted_doc_results: list[DocumentExtractionResult] = []
+
+            # Extract from body_text if provided
+            if resp_data.get("body_text"):
+                body_ext = await self.extractor.extract_document(
+                    response_id=response_id,
+                    document_id=None,
+                    filename="email_body.txt",
+                    doc_role="email_body",
+                    parsed_text=resp_data["body_text"],
+                )
+                extracted_doc_results.append(body_ext)
+
             for doc, prep in doc_results:
                 if prep.status == "done" and prep.parsed_text:
                     ext_res = await self.extractor.extract_document(

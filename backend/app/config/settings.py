@@ -1,17 +1,19 @@
-"""Configuration models and loader for multi-agent system."""
-
 from pathlib import Path
 from typing import Any
 import yaml
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env with override so .env file updates always take precedence
+load_dotenv(override=True)
 
 
 class LLMConfig(BaseModel):
     """Configuration for an LLM provider and model parameters."""
 
     provider: str = Field(default="openai", description="Model provider: openai, anthropic, gemini/google, ollama, test")
-    model: str = Field(default="gpt-5", description="Model identifier string")
+    model: str = Field(default="gpt-4o", description="Model identifier string")
     temperature: float = Field(default=0.2, description="Sampling temperature")
     max_tokens: int = Field(default=2500, description="Maximum tokens for completion")
 
@@ -85,6 +87,7 @@ def load_config(config_dir: Path | str | None = None) -> AppConfig:
     Returns:
         AppConfig populated with loaded configurations.
     """
+    load_dotenv(override=True)
     base_dir = Path(config_dir) if config_dir else find_config_dir()
     llms_file = base_dir / "llms.yaml"
     agents_file = base_dir / "agents.yaml"

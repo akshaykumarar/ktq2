@@ -33,7 +33,15 @@ logger = logging.getLogger(__name__)
 
 def deterministic_text_extractor(parsed_text: str, filename: str) -> DocumentExtractionResult:
     """Robust fallback extractor when running offline or in unit tests."""
-    lines = parsed_text.splitlines()
+    raw_lines = parsed_text.splitlines()
+    lines: list[str] = []
+    for rl in raw_lines:
+        subparts = re.split(r"(?<=[;.\n\r:])\s+(?=\d+[\.\)]\s+)|(?<=[;.\n\r])\s+(?=(?:Best regards|Regards|Thanks & Regards|Sincerely))", rl)
+        for sp in subparts:
+            sp_clean = sp.strip()
+            if sp_clean:
+                lines.append(sp_clean)
+
     vendor_info = ExtractedVendorInfo()
     line_items: list[ExtractedLineItem] = []
     terms: list[ExtractedCommercialTerm] = []
@@ -45,15 +53,42 @@ def deterministic_text_extractor(parsed_text: str, filename: str) -> DocumentExt
             match = re.search(r"(?:from|vendor|supplier):\s*([^<\n\r]+)", line, re.IGNORECASE)
             if match and not vendor_info.name:
                 vendor_info.name = match.group(1).strip()
+
         email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", line)
         if email_match and not vendor_info.email:
             vendor_info.email = email_match.group(0)
+            if not vendor_info.name:
+                domain_name = email_match.group(0).split("@")[-1].split(".")[0]
+                if domain_name.lower() not in ("gmail", "yahoo", "outlook", "hotmail", "icloud"):
+                    parts = re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\d|\W|$)|\d+", domain_name)
+                    if parts:
+                        vendor_info.name = " ".join(p.capitalize() for p in parts)
+
+        phone_match = re.search(r"(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,5}\)?[-.\s]?\d{3,5}[-.\s]?\d{3,5}", line)
+        if phone_match and not vendor_info.phone:
+            p_val = phone_match.group(0).strip()
+            if len(re.sub(r"\D", "", p_val)) >= 8:
+                vendor_info.phone = p_val
+
         gst_match = re.search(r"\b\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}\b", line)
         if gst_match:
             vendor_info.gstin = gst_match.group(0)
+
         rfx_ref_match = re.search(r"(?:rfx|rfq|rfi)[\s#:-]*(\d+)", line, re.IGNORECASE)
         if rfx_ref_match:
             vendor_info.rfx_reference_found = rfx_ref_match.group(1)
+
+        # Detect address / city / state
+        if not vendor_info.address:
+            addr_match = re.search(r"\b(?:Bengaluru|Bangalore|Mumbai|Delhi|Chennai|Hyderabad|Pune|Ahmedabad|Kolkata|Karnataka|Maharashtra|Tamil Nadu|Gujarat|Haryana|Uttar Pradesh|India)\b[^\n\r]*", line, re.IGNORECASE)
+            if addr_match:
+                vendor_info.address = addr_match.group(0).strip()
+
+        # Detect explicit company name patterns in signature (e.g. "Shree Packaging Solutions")
+        if not vendor_info.name or len(vendor_info.name.split()) == 1:
+            co_match = re.search(r"\b([A-Z][A-Za-z0-9\s&]+(?:Packaging|Solutions|Enterprises|Industries|Pvt Ltd|Suppliers|Traders|Products|Cartons|Boxes))\b", line)
+            if co_match:
+                vendor_info.name = co_match.group(1).strip()
 
     # Detect commercial terms
     for line in lines:
@@ -238,44 +273,65 @@ def deterministic_text_extractor(parsed_text: str, filename: str) -> DocumentExt
         if coords_match:
             continue
 
-        # 3. Inline line item pattern e.g. "1. Corrugated Box 600x400x300 mm: Rs 43.20 per piece (Qty: 5000 pcs)"
+        # 3. Inline line item pattern e.g. "1. Carton Box: ₹1,000 for 50 pieces and ₹5,000 for 300 pieces"
         has_item_kw = any(k in l_clean.lower() for k in ["box", "carton", "film", "tape", "bubble", "pallet", "stretch", "packaging"])
         is_numbered = bool(re.match(r"^(?:line\s*\d+|item\s*\d*|\d+[\.\)])\s*", l_clean, re.IGNORECASE))
-        has_price_mention = any(w in l_clean.lower() for w in ["rs", "rate", "@", "$", "inr", "price"])
+        has_price_mention = any(w in l_clean.lower() for w in ["rs", "rate", "@", "$", "inr", "price", "₹"])
 
         if (has_item_kw or is_numbered) and has_price_mention and ":" in l_clean and not any(t in l_clean.lower() for t in ["gst", "payment", "commercial", "footnote"]):
             flush_current_item(f"Line {idx}")
-            price_match = re.search(r"(?:unit price|rate|price|cost|@|rs\.?|inr|\$)\s*[:=]?\s*([0-9,]+(?:\.[0-9]+)?)", l_clean, re.IGNORECASE)
-            qty_match = re.search(r"(?:quantity|qty|volume|moq)\s*[:=]?\s*([0-9,]+(?:\.[0-9]+)?)", l_clean, re.IGNORECASE)
-
-            p_val = float(price_match.group(1).replace(",", "")) if price_match else None
-            q_val = float(qty_match.group(1).replace(",", "")) if qty_match else None
-
-            unit = "pcs"
-            if "per 100" in l_clean.lower():
-                unit = "per 100"
-            elif "per 1000" in l_clean.lower():
-                unit = "per 1000"
-            elif "roll" in l_clean.lower():
-                unit = "roll"
-            elif "kg" in l_clean.lower():
-                unit = "kg"
-
-            curr = "USD" if ("$" in l_clean or "usd" in l_clean.lower()) else "INR"
             desc_part = re.sub(r"^(?:line\s*\d+|item\s*\d*|\d+[\.\)])\s*[:\.]?\s*", "", l_clean, flags=re.IGNORECASE).split(":")[0].strip()
+            price_clause = l_clean.split(":", 1)[1].strip()
 
-            line_items.append(ExtractedLineItem(
-                vendor_line_no=str(len(line_items) + 1),
-                raw_description=desc_part,
-                raw_qty=q_val,
-                raw_price=p_val,
-                raw_unit=unit,
-                raw_currency=curr,
-                source_snippet=l_clean,
-                source_location=f"Line {idx}",
-                extraction_confidence=0.95,
-                extraction_reason="Parsed inline quotation specification and price",
-            ))
+            curr = "USD" if ("$" in price_clause or "usd" in price_clause.lower()) else "INR"
+
+            # Check for sub-clauses joined by "and" or "," (e.g. "₹1,000 for 50 pieces and ₹5,000 for 300 pieces" or "5m at ₹300 per box...")
+            sub_clauses = [s.strip() for s in re.split(r",?\s+and\s+|,;\s*", price_clause) if s.strip() and any(c in s.lower() for c in ["rs", "rate", "@", "$", "inr", "price", "₹"])]
+            if not sub_clauses:
+                sub_clauses = [price_clause]
+
+            for sc_idx, sc in enumerate(sub_clauses):
+                price_m = re.search(r"(?:unit price|rate|price|cost|@|rs\.?|inr|\$|₹)\s*[:=]?\s*([0-9,]+(?:\.[0-9]+)?)", sc, re.IGNORECASE)
+                p_val = float(price_m.group(1).replace(",", "")) if price_m else None
+
+                qty_m = re.search(r"(?:for|quantity|qty|volume|moq|\()\s*[:=]?\s*([0-9,]+(?:\.[0-9]+)?)\s*(?:pieces|pcs|dozen|box|boxes|rolls|roll|kg|sqm)?", sc, re.IGNORECASE)
+                q_val = float(qty_m.group(1).replace(",", "")) if qty_m else None
+
+                unit = "pcs"
+                if "per dozen" in sc.lower() or "dozen" in sc.lower():
+                    unit = "dozen"
+                elif "per 100" in sc.lower():
+                    unit = "per 100"
+                elif "per 1000" in sc.lower():
+                    unit = "per 1000"
+                elif "box" in sc.lower():
+                    unit = "box"
+                elif "roll" in sc.lower():
+                    unit = "roll"
+                elif "kg" in sc.lower():
+                    unit = "kg"
+                elif "sqm" in sc.lower():
+                    unit = "sqm"
+
+                item_desc = desc_part
+                spec_m = re.search(r"(\d+\s*(?:m|meter|gauge|micron|inch|cm|ply))\s+([a-zA-Z\s]+)", sc, re.IGNORECASE)
+                if spec_m:
+                    item_desc = f"{spec_m.group(1)} {desc_part}".strip()
+                elif len(sub_clauses) > 1 and q_val:
+                    item_desc = f"{desc_part} ({int(q_val)} pcs tier)"
+
+                line_items.append(ExtractedLineItem(
+                    vendor_line_no=str(len(line_items) + 1),
+                    raw_description=item_desc,
+                    raw_qty=q_val,
+                    raw_price=p_val,
+                    raw_unit=unit,
+                    raw_currency=curr,
+                    source_snippet=f"{l_clean} -> {sc}",
+                    source_location=f"Line {idx}",
+                    extraction_confidence=0.95,
+                    extraction_reason="Parsed inline quotation specification and price clause",
+                ))
             continue
 
         # 4. Multi-line block accumulator
@@ -292,7 +348,7 @@ def deterministic_text_extractor(parsed_text: str, filename: str) -> DocumentExt
                 current_qty = float(qty_match.group(1).replace(",", ""))
                 current_snippet.append(l_clean)
 
-            price_match = re.search(r"(?:unit price|rate|price|cost|@|rs\.?|inr|\$)\s*[:=]?\s*([0-9,]+(?:\.[0-9]+)?)", l_clean, re.IGNORECASE)
+            price_match = re.search(r"(?:unit price|rate|price|cost|@|rs\.?|inr|\$|₹)\s*[:=]?\s*([0-9,]+(?:\.[0-9]+)?)", l_clean, re.IGNORECASE)
             if price_match:
                 current_price = float(price_match.group(1).replace(",", ""))
                 current_snippet.append(l_clean)

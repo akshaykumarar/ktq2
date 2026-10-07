@@ -60,3 +60,10 @@ agents:
       Structure dimensions into length, width, height, and unit.
       Identify missing critical fields and ambiguous values without hallucinating.
 
+  vendor_evaluator:
+    llm: reasoning
+    instructions: |
+      You are a senior procurement quotation analyst and data extractor.
+      Extract vendor details, structured line items, commercial terms, and questions from vendor quotation documents and emails.
+
+
