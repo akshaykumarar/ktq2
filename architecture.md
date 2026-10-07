@@ -1,35 +1,67 @@
 # System Architecture
 
 ## Overview
-The chatbot application is a standalone Vue 3 / Vuetify client-side application designed for RFX procurement interactions.
+The application is a configurable multi-agent chatbot system for procurement workflows, integrating the existing Vue 3 / Vuetify client-side application with a FastAPI + PydanticAI multi-agent backend.
 
-## Component Hierarchy & Workflow
+## Multi-Agent Hierarchy & Workflow
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User
     participant Frontend as Chatbot UI (index.html)
-    participant Webhook as Make.com Webhook
-    participant Agent as Make AI Agent Scenario
-    
-    User->>Frontend: Selects Option / Enters Message
-    Frontend->>Webhook: POST { message, conversation_id: "<timestamp>" }
-    Webhook->>Agent: Passes message & conversation_id
-    Agent->>Agent: Processes Procurement Co-Pilot instructions
-    Agent-->>Webhook: Returns { reply_message: "..." }
-    Webhook-->>Frontend: 200 OK JSON { reply_message: "..." }
-    Frontend->>User: Renders reply_message in chat window
+    participant FastAPI as FastAPI (/api/chat)
+    participant Master as Master Agent
+    participant Specialist as Specialist Agent (RFX / Vendor / Status)
+    participant Tools as Mock Tools
+    participant Webhook as Make.com Webhook (Vendor Flow)
+
+    alt RFX / General Procurement Interaction
+        User->>Frontend: Enters "Create an RFX for 200 laptops"
+        Frontend->>FastAPI: POST /api/chat { message, conversation_id }
+        FastAPI->>Master: Invokes Master Agent (intent analysis)
+        Master->>Specialist: Delegates to RFX Specialist Agent
+        Specialist->>Tools: Calls create_rfx() / get_rfx()
+        Tools-->>Specialist: Returns structured RFX record
+        Specialist-->>Master: Formats RFX response
+        Master-->>FastAPI: Returns reply & agent="rfx"
+        FastAPI-->>Frontend: 200 OK { message, agent, conversation_id }
+        Frontend->>User: Renders response in chat window
+    else Preserved Vendor Flow
+        User->>Frontend: Selects "Check Vendor Response"
+        Frontend->>Webhook: POST { message, conversation_id } + x-make-apikey
+        Webhook-->>Frontend: 200 OK { reply_message }
+        Frontend->>User: Renders vendor reply in chat window
+    end
 ```
 
-## Key Modules
-1. **Welcome Screen & Workflow Selection (`chatbot/index.html`)**:
-   - Initial screen with "Create an RFX" and "Check Vendor response" cards.
-   - Text input box is hidden until an initial option is clicked.
-2. **Make.com Webhook Integration**:
-   - `useMessageStore.conversationId` initializes to a unique timestamp (`Date.now().toString()`) on page load and on `messageStore.init()` (new conversation).
-   - In `createCompletion()`, messages are posted directly to the Make webhook with `{ message, conversation_id }`.
-   - Attaches `x-make-apikey: aerchain3` (or configured key) and `x-mak-api-key` headers.
-   - Parses `reply_message` (with fallback to `message`, `response`, `content`, or raw text) and appends it to the chat transcript.
-3. **Settings & Configuration (`chatbot/config.json`)**:
-   - Webhook URL, API key (`aerchain3`), and mode are loaded on startup with `.env` and default state fallbacks.
+## Core Modules & Design Decisions
+
+### 1. Unified Backend (`backend/app/main.py`)
+- Built on **FastAPI** with lifespan context for startup initialization of all agents.
+- CORS middleware enabled for seamless local development and multi-port frontend execution.
+- Static file serving mounted at `/ui` to serve `chatbot/index.html` directly from the backend server.
+- Health check route at `/api/health`.
+
+### 2. Provider Abstraction (`backend/app/providers/factory.py`)
+- Decouples PydanticAI models from specific cloud SDKs.
+- Supports **OpenAI**, **Anthropic**, **Gemini/Google**, **Ollama**, and **TestModel**.
+- Graceful offline fallback: if API credentials are not supplied or network is blocked, falls back to mock execution without crashing.
+
+### 3. Agent Factory & Decoupled Configuration (`config/llms.yaml`, `config/agents.yaml`)
+- `config/llms.yaml` defines LLM parameters (`temperature`, `max_tokens`, `provider`, `model`).
+- `config/agents.yaml` defines agent roles and maps each to an LLM preset.
+- Switching an agent's underlying model is done purely via YAML without editing Python code.
+- Dynamic registry (`AgentRegistry`) in `backend/app/agents/factory.py` manages agent lifecycle.
+
+### 4. Specialist Agents & Mock Tools
+- **Master Agent** (`backend/app/agents/master.py`): Intent classification and delegation tools (`delegate_to_rfx`, `delegate_to_vendor`, `delegate_to_status`).
+- **RFX Agent** (`backend/app/agents/rfx.py`): Tools `create_rfx()`, `get_rfx()`.
+- **Vendor Agent** (`backend/app/agents/vendor.py`): Tools `search_vendors()`, `get_vendor_status()`.
+- **Status Agent** (`backend/app/agents/status.py`): Tools `get_rfx_status()`, `get_vendor_status()`.
+- Mock tools in `backend/app/tools/` are cleanly marked and isolated to allow direct swapping with live databases, ERP APIs, or Make.com scenarios.
+
+### 5. Frontend Integration & Vendor Flow Preservation
+- Reuses existing Vue 3 / Vuetify frontend without rebuilding.
+- Routes RFX, procurement creation, and general conversation to `POST /api/chat`.
+- Vendor flow ("Check Vendor response") continues using `vendorWebhookUrl` (`https://hook.eu1.make.com/...`) with `x-make-apikey: aerchain3` headers, preserving the existing vendor workflow unchanged.

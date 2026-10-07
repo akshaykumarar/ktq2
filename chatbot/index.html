@@ -1992,7 +1992,8 @@
                 const useChatbotStore = defineStore("chatbotStore", {
                     state: () => ({
                         apiKey: "aerchain3",
-                        url: "https://hook.eu1.make.com/ah791mkhp7r10xwsoljltui2jaymc5xr",
+                        url: "http://localhost:8000/api/chat",
+                        vendorWebhookUrl: "https://hook.eu1.make.com/ah791mkhp7r10xwsoljltui2jaymc5xr",
                         path: "",
                         model: "Qwen/Qwen3-32B",
                         authHeader: "x-make-apikey",
@@ -2082,7 +2083,12 @@
                                 conversation_id: messageStore.conversationId || Date.now().toString()
                             };
 
-                            const targetUrl = chatbotStore.url + (chatbotStore.path ? chatbotStore.path : '');
+                            const isVendorFlow = messageText.toLowerCase().includes('check vendor response');
+                            let targetUrl = chatbotStore.url + (chatbotStore.path ? chatbotStore.path : '');
+                            if (isVendorFlow && chatbotStore.vendorWebhookUrl) {
+                                targetUrl = chatbotStore.vendorWebhookUrl;
+                            }
+
                             const response = await fetch(targetUrl, {
                                 method: chatbotStore.method || "POST",
                                 headers: headers,
@@ -2107,9 +2113,11 @@
 
                             const rawText = await response.text();
                             let botReply = '';
+                            let respondingAgent = '';
                             try {
                                 const data = JSON.parse(rawText);
                                 botReply = data.reply_message || data.message || data.response || data.content || (typeof data === 'string' ? data : JSON.stringify(data, null, 2));
+                                respondingAgent = data.agent || '';
                             } catch (e) {
                                 botReply = rawText;
                             }
@@ -2117,6 +2125,7 @@
                             messageStore.conversation.push({
                                 content: botReply,
                                 role: "assistant",
+                                agent: respondingAgent,
                             });
                         } catch (error) {
                             snackbarStore.showErrorMessage(error.message);
@@ -2485,8 +2494,11 @@
                         chatbotStore.apiKey = 'aerchain3';
                     }
                     if (!chatbotStore.url || chatbotStore.url.includes('api2.aiql.com')) {
-                        chatbotStore.url = 'https://hook.eu1.make.com/ah791mkhp7r10xwsoljltui2jaymc5xr';
+                        chatbotStore.url = 'http://localhost:8000/api/chat';
                         chatbotStore.mode = 'webhook';
+                    }
+                    if (!chatbotStore.vendorWebhookUrl) {
+                        chatbotStore.vendorWebhookUrl = 'https://hook.eu1.make.com/ah791mkhp7r10xwsoljltui2jaymc5xr';
                     }
                 };
 

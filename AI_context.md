@@ -1,16 +1,28 @@
 ## Current State
-- Removed "AI Query Layout" heading, external links, and lottie branding from the initial screen.
-- Hid the settings gear icon (`mdi-cog`) and its speed dial from the frontend UI.
-- Configured initial state to display 2 interactive action cards ("Create an RFX" and "Check Vendor response") with hidden text input until chosen.
-- Configured Make.com webhook into [`chatbot/index.html`](file:///Users/akshaykumar/code/ktq2/chatbot/index.html) and [`chatbot/config.json`](file:///Users/akshaykumar/code/ktq2/chatbot/config.json):
-  - Sends `{ message, conversation_id }` as JSON payload.
-  - Automatically manages `conversation_id` using timestamp per session (persisted throughout the conversation and renewed on "New Conversation" or page refresh).
-  - Automatically attaches `x-make-apikey: aerchain3` and `x-mak-api-key: aerchain3` headers.
-  - Handles response parsing for `reply_message` (with fallback to `message`, `response`, `content`, or raw text).
-  - Configured webhook URL and `apiKey: "aerchain3"` in [`chatbot/config.json`](file:///Users/akshaykumar/code/ktq2/chatbot/config.json) with `.env` and default fallback.
+- Transformed the codebase into a configurable multi-agent chatbot system with Python, FastAPI, and PydanticAI.
+- Built hierarchical agent architecture:
+  - **Master Agent** (`backend/app/agents/master.py`): Understands user intent and delegates to specialists.
+  - **RFX Agent** (`backend/app/agents/rfx.py`): Creates and manages RFXs using mock tools (`create_rfx`, `get_rfx`).
+  - **Vendor Agent** (`backend/app/agents/vendor.py`): Finds and evaluates suppliers (`search_vendors`, `get_vendor_status`).
+  - **Status Agent** (`backend/app/agents/status.py`): Inspects RFX and vendor fulfillment status (`get_rfx_status`, `get_vendor_status`).
+- Created dynamic agent factory (`backend/app/agents/factory.py`) reading `config/llms.yaml` and `config/agents.yaml`. Changing an agent's model requires only changing `agents.yaml`.
+- Implemented multi-provider abstraction (`backend/app/providers/factory.py`) supporting OpenAI, Anthropic, Gemini/Google, Ollama, and offline TestModel fallback.
+- Implemented FastAPI endpoint `POST /api/chat` with `{ message, conversation_id }` -> `{ message, agent, conversation_id }`.
+- Mounted static UI at `/ui` and enabled CORS in `backend/app/main.py`.
+- Connected existing Chat UI (`chatbot/index.html` & `chatbot/config.json`) to `POST /api/chat`.
+- Preserved existing Vendor flow ("Check Vendor response") to communicate directly with its dedicated webhook (`vendorWebhookUrl`).
+- Comprehensive pytest suite passing 19 tests in `backend/tests/` with test logs preserved in `artifacts/logs/test_run.log`.
 
 ## Key Files
-- [`chatbot/index.html`](file:///Users/akshaykumar/code/ktq2/chatbot/index.html): Main application template, Vue 3 setup, Vuetify components, Pinia stores, Make.com webhook communication logic with `x-make-apikey` authentication, and workflow dispatchers.
-- [`chatbot/config.json`](file:///Users/akshaykumar/code/ktq2/chatbot/config.json): Chatbot settings with Make.com webhook URL, API key (`aerchain3`), and mode.
-- [`architecture.md`](file:///Users/akshaykumar/code/ktq2/architecture.md): Sequence diagram and architectural modules.
-- [`README.md`](file:///Users/akshaykumar/code/ktq2/README.md): Usage guide and webhook payload/response specifications.
+- `config/llms.yaml`: LLM configuration presets (provider, model, temperature, max_tokens).
+- `config/agents.yaml`: Agent definitions mapping each agent to LLM presets and system instructions.
+- `.env.example`: Secrets template (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OLLAMA_BASE_URL`).
+- `backend/app/main.py`: FastAPI application entrypoint with lifespan, CORS, and UI mounting.
+- `backend/app/api/chat.py`: `/api/chat` request and response handling.
+- `backend/app/agents/`: Independent agent implementations (`master.py`, `rfx.py`, `vendor.py`, `status.py`, `factory.py`).
+- `backend/app/providers/factory.py`: Provider abstraction factory.
+- `backend/app/tools/`: Mock implementations for RFX, vendor, and status tools.
+- `chatbot/index.html`: Preserved Vue 3 / Vuetify chat interface.
+- `chatbot/config.json`: Endpoint and vendor webhook configuration.
+- `artifacts/plan_multiagent_chat.md`: Phased implementation plan.
+- `artifacts/logs/test_run.log`: Traceable test logs.

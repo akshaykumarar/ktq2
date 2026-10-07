@@ -1,73 +1,152 @@
-# RFX Assistant & Procurement Chatbot
+# Configurable Multi-Agent Procurement Assistant & Chatbot
 
-An AI-powered assistant for RFX workflows (Request for Proposal / Request for Quotation) and Vendor Response evaluation.
+A configurable multi-agent procurement product powered by **FastAPI** and **PydanticAI**, connected to the existing **AI-QL Chat UI** frontend.
 
-## Features
-- **Clean Welcome Interface**: Displays 2 primary workflow options upon launching:
-  1. **Create an RFX**: Guided drafting and formulation of new RFX requirements.
-  2. **Check Vendor Response**: Automated review, analysis, and comparison of vendor submissions.
-- **Config-Driven Architecture**: Chatbot settings (model, API endpoint, headers, parameters) are configured via [`chatbot/config.json`](file:///Users/akshaykumar/code/ktq2/chatbot/config.json).
-- **Distraction-Free UI**: The text input area is hidden on initial launch until a workflow option is selected, and settings gear icons are removed from the client interface.
+## Architecture
 
-## Running Locally
+```text
+AI-QL Chat UI → FastAPI POST /api/chat → Master Agent → Specialist Agent → Mock Tools
+```
 
-To run the chatbot locally with any static HTTP server:
+- **Master Agent**: Understands user intent and delegates tasks to the appropriate specialist agent.
+- **RFX Agent**: Specializes in creating, drafting, and managing RFXs with tools (`create_rfx`, `get_rfx`).
+- **Vendor Agent**: Specializes in supplier discovery and vendor evaluations (`search_vendors`, `get_vendor_status`).
+- **Status Agent**: Specializes in real-time tracking of RFX progression and vendor responses (`get_rfx_status`, `get_vendor_status`).
+- **Preserved Vendor Flow**: Existing vendor webhook evaluation flow remains completely intact and supported.
+
+## Quickstart & Setup
+
+### 1. Prerequisites
+- Python 3.10+ (tested with Python 3.14)
+- Virtual environment (`.venv`)
+
+### 2. Installation
 
 ```bash
-# Using Python
-cd chatbot
-python3 -m http.server 8080
+# Create virtual environment if not existing
+python3 -m venv .venv
+source .venv/bin/activate
 
-# Or using npx serve
-npx serve chatbot
+# Install requirements
+pip install fastapi uvicorn "pydantic>=2.10" pyyaml python-dotenv httpx pytest pydantic-ai
 ```
 
-Then open `http://localhost:8080` in your browser.
+### 3. Environment Secrets
 
-## Configuration & Webhook Integration
+Copy `.env.example` to `.env` and fill in secrets as needed:
 
-The chatbot is configured to interact with a **Make.com scenario** via webhook.
+```bash
+cp .env.example .env
+```
 
-### Webhook Specification
+`.env` contains provider secrets:
+```dotenv
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+GOOGLE_API_KEY=
+OLLAMA_BASE_URL=http://localhost:11434
+```
 
-- **Endpoint**: Configured in [`chatbot/config.json`](file:///Users/akshaykumar/code/ktq2/chatbot/config.json) (e.g., `https://hook.eu1.make.com/...`).
-- **Method**: `POST`
-- **Headers**:
-  ```http
-  Content-Type: application/json
-  x-make-apikey: <API_KEY> (or configured via CHATBOTAUTH in .env / apiKey in config.json)
-  x-mak-api-key: <API_KEY>
-  ```
-- **Environment & Config Settings**:
-  - `CHATBOTAUTH` in [`.env`](file:///Users/akshaykumar/code/ktq2/.env) or `"apiKey"` in [`chatbot/config.json`](file:///Users/akshaykumar/code/ktq2/chatbot/config.json) sets the API key.
-  - `CHATBOTURL` in [`.env`](file:///Users/akshaykumar/code/ktq2/.env) or `"url"` in [`chatbot/config.json`](file:///Users/akshaykumar/code/ktq2/chatbot/config.json) sets the webhook URL.
-- **Request Payload**:
-  ```json
-  {
-    "message": "User message text",
-    "conversation_id": "1728283456789"
-  }
-  ```
-  *The `conversation_id` is a timestamp generated on session launch and maintained throughout all turns of that conversation until the user creates a new session or reloads the page.*
+> **Note**: If API keys are omitted or offline, the system automatically falls back to safe mock tool execution for instant end-to-end demonstrations without crashing.
 
-- **Webhook Response Format**:
-  The Make scenario should return a `200 OK` JSON response containing `reply_message`:
-  ```json
-  {
-    "reply_message": "Agent response text / markdown"
-  }
-  ```
+### 4. Running the Application
 
-### Sample `chatbot/config.json`:
+Start the unified FastAPI backend and UI server:
 
+```bash
+# From repository root
+.venv/bin/uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Then visit:
+- **Chat UI**: [http://localhost:8000/ui/](http://localhost:8000/ui/) (or [http://localhost:8000/](http://localhost:8000/))
+- **Interactive API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Health Check**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
+
+Alternatively, the frontend in `chatbot/` can also be served via any static HTTP server (e.g. `python3 -m http.server 8080`) thanks to CORS enablement.
+
+## Configuration
+
+All models, parameters, and agent system instructions are decoupled from Python code:
+
+### `config/llms.yaml`
+Define model presets, temperature, max tokens, and provider:
+```yaml
+llms:
+  reasoning:
+    provider: openai
+    model: gpt-5
+    temperature: 0.1
+    max_tokens: 4000
+
+  fast:
+    provider: openai
+    model: gpt-5-mini
+    temperature: 0.2
+    max_tokens: 2500
+```
+Supported providers: `openai`, `anthropic`, `google` (Gemini), `ollama`, and `test`/`mock`.
+
+### `config/agents.yaml`
+Map agents to LLM presets and customize their system instructions:
+```yaml
+agents:
+  master:
+    llm: reasoning
+    instructions: |
+      You are the Procurement Assistant.
+      Understand the user's request and delegate it
+      to the appropriate specialist agent.
+      Do not perform specialist work yourself.
+
+  rfx:
+    llm: reasoning
+    instructions: |
+      You are an RFX specialist.
+      Help users create and manage procurement RFXs.
+
+  vendor:
+    llm: fast
+    instructions: |
+      You are a Vendor specialist.
+      Help users find vendors and check vendor status.
+
+  status:
+    llm: fast
+    instructions: |
+      You are a Procurement Status specialist.
+      Help users check RFX and vendor status.
+```
+
+Changing an agent's model requires **only editing `config/agents.yaml`** (no code modifications needed).
+
+## API Endpoints
+
+### `POST /api/chat`
+
+**Request:**
 ```json
 {
-  "chatbotStore": {
-    "url": "https://hook.eu1.make.com/ah791mkhp7r10xwsoljltui2jaymc5xr",
-    "apiKey": "aerchain3",
-    "authHeader": "x-make-apikey",
-    "mode": "webhook",
-    "contentType": "application/json"
-  }
+  "message": "Create an RFX for 200 laptops",
+  "conversation_id": "session-123"
 }
 ```
+
+**Response:**
+```json
+{
+  "message": "I have created a new RFX for you:\n\n- **RFX ID**: `RFX-A1B2C3`\n- **Title**: Create an RFX for 200 laptops\n- **Quantity**: 200\n- **Status**: Draft\n...",
+  "agent": "rfx",
+  "conversation_id": "session-123"
+}
+```
+
+## Running Tests
+
+Run the full pytest suite:
+
+```bash
+.venv/bin/pytest backend/tests -v
+```
+
+Test logs are output to [`artifacts/logs/test_run.log`](file:///Users/akshaykumar/code/ktq2/artifacts/logs/test_run.log).
