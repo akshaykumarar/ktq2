@@ -194,12 +194,61 @@ flowchart TD
 
 ---
 
+---
+
+## Step 3: Decision Analyst & Award Optimization Architecture
+
+```mermaid
+flowchart TD
+    subgraph NaturalLanguage["1. Buyer Interaction & Natural Language"]
+        Q1["Buyer Question: POST /api/analyst/ask"]
+        Q2["Intent Routing & Guardrails"]
+    end
+
+    subgraph DecisionTools["2. Deterministic Tool Layer (No LLM Math)"]
+        T1["ask_data: Semantic MDL to SQL Engine"]
+        T2["run_sql: Guarded Read-Only SELECT with Limits & Timeout"]
+        T3["award_optimizer: Multi-Criteria Split / Cap Solver"]
+        T4["trust_report: Reliability, Coverage & Risk Profiler"]
+        T5["make_chart: Chart.js Spec Generator"]
+        T6["export_file: Multi-Sheet XLSX with Caveats Sheet"]
+        T7["Assumptions Manager: Session What-If Parameters"]
+    end
+
+    subgraph Governance["3. Hallucination & State Guardrails"]
+        G1["Number Post-Check Scanner (Ground truth verification)"]
+        G2["Comparability Guardrail (Coverage disparity flags)"]
+        G3["State Discloser (REVIEW/MISSING disclosure)"]
+        G4["Quality Gate (Knockout questionnaire validation)"]
+    end
+
+    subgraph PersistenceAudit["4. Persistence & Observability"]
+        DB1["ktq.analyst_traces (Telemetry & Step Latencies)"]
+        DB2["ktq.analyst_feedback (Ratings & SQL Corrections)"]
+        DB3["ktq.award_scenarios (Stored Scenarios)"]
+        DB4["ktq.analyst_audit_log (Immutable Award Finalization)"]
+    end
+
+    Q1 --> Q2
+    Q2 --> T1 & T2 & T3 & T4 & T5 & T6 & T7
+    T1 & T2 & T3 & T4 & T5 & T6 & T7 --> G1 & G2 & G3 & G4
+    G1 & G2 & G3 & G4 --> DB1 & DB2 & DB3 & DB4
+```
+
+### Deterministic Principles
+1. **LLM Understands & Narrates; Python & PostgreSQL Compute**: Every calculation, ranking, sum, and allocation comes from deterministic tools.
+2. **Comparability First**: Overall totals are never compared without checking and stating line item coverage.
+3. **Traceability Post-Check**: All figures in generated text are verified against tool outputs; ungrounded numbers automatically downgrade confidence.
+4. **Governed Finalization**: Scenarios relying on REVIEW prices require explicit buyer checkbox sign-off before committing to the immutable audit log.
+
+---
+
 ## Running Tests
 
 Run the full pytest suite:
 
 ```bash
-PYTHONPATH=. .venv/bin/pytest tests/ -v
+PYTHONPATH=. .venv/bin/pytest tests/ backend/tests/ -v
 ```
 
-Test logs are output to [`artifacts/logs/test_full.log`](file:///Users/akshaykumar/code/ktq2/artifacts/logs/test_full.log).
+Test logs are output to [`artifacts/logs/test_full_suite.log`](file:///Users/akshaykumar/code/ktq2/artifacts/logs/test_full_suite.log).

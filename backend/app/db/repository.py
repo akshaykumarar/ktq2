@@ -430,7 +430,7 @@ class RFIRepository:
                                     quantity, unit, material, dimensions,
                                     specifications, target_price, currency,
                                     required_date, created_at
-                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
                                 """,
                                 (
                                     rfi_id,

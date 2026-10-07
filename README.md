@@ -177,21 +177,102 @@ curl -X POST http://localhost:8000/api/vendor-responses \
 
 ---
 
-## Configuration
+---
 
-Agent and model configurations are decoupled from Python code:
-- `config/llms.yaml`: LLM presets (`reasoning`, `fast`).
-- `config/agents.yaml`: Agent definitions (`master`, `rfx`, `vendor`, `status`, `rfi_parser`).
+## Step 3: Natural Language Analysis, Decision Support & Award Optimization
+
+Step 3 equips buyers with natural language analysis, side-by-side comparison grids, trust & risk scoring, deterministic award optimization, Chart.js visual analytics, and export packs (XLSX).
+
+### REST Endpoints
+
+1. **`POST /api/analyst/ask`**: Natural language Q&A returning structured JSON response contract:
+   - Request: `{ "rfx_id": 6, "session_id": "sess_1", "question": "Split the award: cheapest per line" }`
+   - Response: `{ answer_text, tables, charts, exports, caveats, how_i_got_this, confidence, suggested_followups, trace_id }`
+2. **`GET /api/analyst/sessions/{id}`**: Conversation history and telemetry traces.
+3. **`POST /api/analyst/feedback`**: Submit rating, comments, and corrected SQL for any trace.
+4. **`GET /api/rfx/{id}/comparison`**: Side-by-side comparison matrix (items x vendors: prices, state, flags, crops, coverage row, spend totals).
+5. **`GET /api/rfx/{id}/trust`**: Comprehensive trust & risk profile (0-100 score, % coverage, CONFIDENT/REVIEW/MISSING quotes, money at risk).
+6. **`POST /api/rfx/{id}/award/scenarios`**: Create / run deterministic allocation scenario.
+7. **`GET /api/rfx/{id}/award/scenarios/{sid}`**: Fetch saved scenario.
+8. **`POST /api/rfx/{id}/award/scenarios/{sid}/finalize`**: Finalizes scenario to audit log. Blocks if REVIEW items are present without explicit buyer sign-off.
+9. **`GET /api/exports/{id}`**: Download multi-tab Excel workbooks with mandatory *Assumptions & Caveats* sheet.
+
+### cURL Examples
+
+#### 1. Ask a Decision Question:
+```bash
+curl -X POST http://localhost:8000/api/analyst/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rfx_id": 6,
+    "session_id": "buyer_session_1",
+    "question": "Split the award: cheapest per line, but only among vendors who cleared the quality questionnaire"
+  }'
+```
+
+#### 2. Fetch Comparison Grid:
+```bash
+curl -X GET http://localhost:8000/api/rfx/6/comparison
+```
+
+#### 3. Run Award Scenario (Max 60% Share):
+```bash
+curl -X POST http://localhost:8000/api/rfx/6/award/scenarios \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Split with 60% Max Share",
+    "constraints": {
+      "strategy": "multi_vendor_split",
+      "max_share_per_vendor_pct": 60.0,
+      "require_knockout_pass": true,
+      "include_review_prices": true
+    }
+  }'
+```
+
+#### 4. Finalize Award Scenario with Flag Acceptance:
+```bash
+curl -X POST http://localhost:8000/api/rfx/6/award/scenarios/1/finalize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accepted_review_flags": [
+      {"vendor_id": 39, "item_id": 8, "reason": "Verified price manually via vendor email"}
+    ],
+    "buyer_name": "lead_procurement@company.com"
+  }'
+```
 
 ---
 
-## Running Tests
+## Tuning Guide & Customization Knobs
 
-Run the full pytest suite:
+All analytical knobs are externalized in config files (ordered by tuning impact):
 
+1. **Semantic Model Descriptions (`config/wren_semantic_model.yaml` & `config/wren_mdl.json`)**:
+   - *Impact*: **Highest**. Explaining column semantics (e.g. `effective_price_inr`, `state`, `review_status`) directly guides SQL generation accuracy.
+   - *Deployment*: Run `python scripts/deploy_wren_model.py`.
+2. **Few-shot Question-to-SQL Examples (`config/wren_examples.yaml`)**:
+   - *Impact*: **Very High**. 20+ seed pairs covering joins, aggregations, knockouts, and ranking.
+   - *Feedback Sync*: Run `python scripts/export_feedback_to_examples.py` to convert rated buyer corrections into new examples.
+3. **Analyst Orchestrator System Prompt (`config/prompts/analyst_system_v1.txt`)**:
+   - *Impact*: **High**. Enforces comparability-first, numbers verification, and structured markdown narration.
+4. **Guardrail & Threshold Knobs (`config/analyst_config.yaml`)**:
+   - *Impact*: **Medium**. Configures allowed view allowlists, statement timeout (`5000ms`), max tool steps, trust penalties, and default what-if assumptions (FX rates, freight).
+5. **Model Stage Switcher (`config/llms.yaml` & `config/analyst_config.yaml`)**:
+   - *Impact*: **Medium**. Seamlessly switch providers (`openai`, `anthropic`, `google`, `ollama`) across pipeline stages.
+
+---
+
+## Running Benchmarks & Tests
+
+### Run 33-Question Decision Analyst Benchmark:
 ```bash
-PYTHONPATH=. .venv/bin/pytest tests/ -v
+PYTHONPATH=. .venv/bin/python scripts/eval_analyst.py
 ```
+Outputs pass/fail matrix and logs trace details to `artifacts/logs/eval_analyst.log`.
 
-Test logs are output to [`artifacts/logs/test_full.log`](file:///Users/akshaykumar/code/ktq2/artifacts/logs/test_full.log).
+### Run Full Test Suite (69 Tests):
+```bash
+PYTHONPATH=. .venv/bin/pytest tests/ backend/tests/ -v
+```
 

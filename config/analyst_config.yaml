@@ -1,0 +1,55 @@
+# Analyst Configuration & Tuning Knobs
+version: "1.0.0"
+
+orchestrator:
+  model_stage: "default" # references llms.yaml entry
+  max_tool_steps: 8
+  default_review_treatment: "flagged_usable" # "flagged_usable" | "strict_exclude" | "buyer_confirm"
+  row_limit: 100
+  query_timeout_seconds: 5.0
+  statement_timeout_ms: 5000
+
+sql_guard:
+  allowed_tables_and_views:
+    - "ktq.v_rfx_comparison"
+    - "ktq.v_vendor_coverage"
+    - "ktq.v_open_flags"
+    - "ktq.v_response_items_current"
+    - "ktq.rfx"
+    - "ktq.rfx_items"
+    - "ktq.rfx_questions"
+    - "ktq.response_answers"
+    - "ktq.response_terms"
+    - "ktq.vendors"
+    - "ktq.vendor_responses"
+    - "ktq.item_crops"
+    - "v_rfx_comparison"
+    - "v_vendor_coverage"
+    - "v_open_flags"
+    - "v_response_items_current"
+    - "rfx"
+    - "rfx_items"
+    - "rfx_questions"
+    - "response_answers"
+    - "response_terms"
+    - "vendors"
+    - "vendor_responses"
+    - "item_crops"
+  max_limit: 500
+  default_limit: 100
+
+trust_thresholds:
+  critical_flag_penalty: 25.0
+  warning_flag_penalty: 10.0
+  review_price_penalty: 15.0
+  missing_price_penalty: 30.0
+  knockout_fail_penalty: 50.0
+
+assumptions_defaults:
+  currency_fx_rates:
+    USD: 84.0
+    EUR: 91.5
+    GBP: 108.0
+    INR: 1.0
+  freight_included_default: true
+  gst_rate_default: 0.18

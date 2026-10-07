@@ -1,0 +1,14 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0 -- /Users/akshaykumar/code/ktq2/.venv/bin/python3.14
+cachedir: .pytest_cache
+rootdir: /Users/akshaykumar/code/ktq2
+plugins: logfire-5.1.1, platformdirs-4.12.3, anyio-4.15.1
+collecting ... collected 5 items
+
+tests/test_award_optimizer.py::test_cheapest_per_line_allocation PASSED  [ 20%]
+tests/test_award_optimizer.py::test_single_vendor_allocation PASSED      [ 40%]
+tests/test_award_optimizer.py::test_max_share_cap_constraint PASSED      [ 60%]
+tests/test_award_optimizer.py::test_what_if_overrides PASSED             [ 80%]
+tests/test_award_optimizer.py::test_review_items_disclosure PASSED       [100%]
+
+============================== 5 passed in 4.00s ===============================

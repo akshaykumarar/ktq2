@@ -13,8 +13,8 @@ def test_load_config_success() -> None:
     assert "reasoning" in config.llms
     assert "fast" in config.llms
     assert config.llms["reasoning"].provider == "openai"
-    assert config.llms["reasoning"].model == "gpt-5"
-    assert config.llms["fast"].model == "gpt-5-mini"
+    assert config.llms["reasoning"].model == "gpt-4o"
+    assert config.llms["fast"].model == "gpt-4o-mini"
 
     # Validate Agents
     assert "master" in config.agents

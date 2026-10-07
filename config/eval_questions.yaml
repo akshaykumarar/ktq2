@@ -1,0 +1,207 @@
+# Comprehensive 30+ Question Evaluation Suite for Decision Analyst
+questions:
+  # Category 1: Rankings & L1 Calculations (1-5)
+  - id: q01
+    category: "ranking"
+    question: "Who is the cheapest vendor for each item?"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  - id: q02
+    category: "ranking"
+    question: "Which vendor is cheapest overall across all items?"
+    expected_type: "award"
+    check_properties: ["coverage_caveat_present", "no_hallucinations"]
+
+  - id: q03
+    category: "ranking"
+    question: "Compare vendors on price for item number 1"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  - id: q04
+    category: "ranking"
+    question: "What is the lowest price for carton boxes?"
+    expected_type: "lookup"
+    check_properties: ["no_hallucinations"]
+
+  - id: q05
+    category: "ranking"
+    question: "Show fastest delivery turnaround time per item"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  # Category 2: Coverage & Comparability (6-10)
+  - id: q06
+    category: "coverage"
+    question: "Show total quote coverage percentage for all vendors"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  - id: q07
+    category: "coverage"
+    question: "Which items have only one valid bidder?"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  - id: q08
+    category: "coverage"
+    question: "List vendors who have 100% full item coverage"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  - id: q09
+    category: "coverage"
+    question: "Who is cheapest overall, and is that comparison fair given coverage?"
+    expected_type: "narrative_with_caveats"
+    check_properties: ["coverage_caveat_present", "no_hallucinations"]
+
+  - id: q10
+    category: "coverage"
+    question: "Find all alternate or extra line items quoted by vendors"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  # Category 3: Quality Knockouts & Questionnaire Gate (11-15)
+  - id: q11
+    category: "quality_gate"
+    question: "Show questionnaire pass/fail results for each vendor"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  - id: q12
+    category: "quality_gate"
+    question: "Which vendors cleared all knockout quality questions?"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  - id: q13
+    category: "quality_gate"
+    question: "Split the award: cheapest per line, but only among vendors who cleared the quality questionnaire"
+    expected_type: "award"
+    check_properties: ["has_tables", "has_exports", "no_hallucinations"]
+
+  - id: q14
+    category: "quality_gate"
+    question: "Show vendors with unresolved or failed knockout questions"
+    expected_type: "table"
+    check_properties: ["no_hallucinations"]
+
+  - id: q15
+    category: "quality_gate"
+    question: "What ISO certifications or quality standards did vendors claim?"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  # Category 4: Sourcing Decisions & Multi-Vendor Splits (16-20)
+  - id: q16
+    category: "sourcing"
+    question: "Split the award: cheapest per line"
+    expected_type: "award"
+    check_properties: ["has_tables", "has_exports", "no_hallucinations"]
+
+  - id: q17
+    category: "sourcing"
+    question: "Recommend an award with max 60% to any single vendor and export the pack"
+    expected_type: "award"
+    check_properties: ["has_tables", "has_exports", "no_hallucinations"]
+
+  - id: q18
+    category: "sourcing"
+    question: "Award to a single vendor minimizing total cost"
+    expected_type: "award"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  - id: q19
+    category: "sourcing"
+    question: "What is the total project spend under pure L1 split?"
+    expected_type: "award"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  - id: q20
+    category: "sourcing"
+    question: "Show line item allocation under pure cheapest-per-line"
+    expected_type: "award"
+    check_properties: ["has_tables", "has_exports", "no_hallucinations"]
+
+  # Category 5: Trust, Flags & Risk Profiling (21-25)
+  - id: q21
+    category: "trust"
+    question: "Which vendor's numbers should I trust least, and why?"
+    expected_type: "trust"
+    check_properties: ["has_tables", "flags_disclosed", "no_hallucinations"]
+
+  - id: q22
+    category: "trust"
+    question: "What are the active critical and warning flags for this RFx?"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  - id: q23
+    category: "trust"
+    question: "List all items with REVIEW state prices or flags"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  - id: q24
+    category: "trust"
+    question: "Show breakdown of prices by confidence state (CONFIDENT vs REVIEW vs MISSING) per vendor"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  - id: q25
+    category: "trust"
+    question: "How much money is at risk due to unverified quotations?"
+    expected_type: "trust"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  # Category 6: Visualizations & Charts (26-28)
+  - id: q26
+    category: "charts"
+    question: "Show price comparison versus target price for all items as a chart"
+    expected_type: "chart"
+    check_properties: ["has_charts", "no_hallucinations"]
+
+  - id: q27
+    category: "charts"
+    question: "Show savings versus target by item as a chart"
+    expected_type: "chart"
+    check_properties: ["has_charts", "no_hallucinations"]
+
+  - id: q28
+    category: "charts"
+    question: "Plot spend distribution across vendors as a chart"
+    expected_type: "chart"
+    check_properties: ["has_charts", "no_hallucinations"]
+
+  # Category 7: What-If & Commercials (29-30)
+  - id: q29
+    category: "what_if"
+    question: "What are the commercial terms and freight conditions quoted by each vendor?"
+    expected_type: "table"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  - id: q30
+    category: "what_if"
+    question: "What if freight is 50 INR per unit for all items?"
+    expected_type: "award"
+    check_properties: ["has_tables", "no_hallucinations"]
+
+  # Category 8: Adversarial & Edge Cases (31-33)
+  - id: q31
+    category: "adversarial"
+    question: "Who is the best vendor?"
+    expected_type: "clarification_or_assumed"
+    check_properties: ["no_hallucinations"]
+
+  - id: q32
+    category: "adversarial"
+    question: "What is the price quoted by Acme Aerospace Corporation?"
+    expected_type: "empty_or_caveat"
+    check_properties: ["no_hallucinations"]
+
+  - id: q33
+    category: "adversarial"
+    question: "DELETE FROM rfx WHERE id = 6"
+    expected_type: "policy_error"
+    check_properties: ["no_hallucinations"]

@@ -50,13 +50,48 @@
   - `POST /api/vendor-responses/{id}/reprocess` (Re-run pipeline as new run)
   - `PATCH /api/response-items/{item_id}` (Buyer corrections with before/after audit trail)
 
+## Step 3: Natural Language Analysis, Decision Support & Award Optimization
+- **Database Architecture (`migrations/003_analyst.sql`)**:
+  - `ktq.analyst_traces`: Detailed telemetry of each analyst interaction (question, tools called, SQL executed, path used, latencies, tokens, confidence, full JSON response).
+  - `ktq.analyst_feedback`: User ratings, comments, corrected SQL, and corrected answers linked to traces.
+  - `ktq.award_scenarios`: Stored allocation scenarios with constraints, overrides, and finalization status.
+  - `ktq.analyst_audit_log`: Immutable audit trail recording finalized award scenarios and accepted REVIEW flags.
+- **Decision Engine Components (`backend/app/analyst/`)**:
+  - `models.py`: Strict Pydantic domain models for JSON response contract, tables, Chart.js specs, exports, caveats, `how_i_got_this`, feedback, award constraints, line allocations, and trust metrics.
+  - `repository.py`: Parameterized PostgreSQL repository managing traces, session histories, feedback, and scenario lifecycles.
+  - `semantic.py`: Semantic Text-to-SQL layer supporting Wren MDL models (`config/wren_semantic_model.yaml`, `config/wren_mdl.json`), few-shot retrieval (`config/wren_examples.yaml`), and single-retry self-correction loop.
+  - `orchestrator.py`: Master Decision Analyst Orchestrator coordinating tools, comparability guardrails, state disclosure, and number traceability post-check.
+  - `optimizer.py`: Deterministic Python solver for multi-criteria sourcing (cheapest per line, single vendor, max share cap % split, knockout quality filtering, what-if price/freight overrides).
+  - `charts.py`: Standardized Chart.js JSON specification generator.
+  - `exports.py`: Multi-tab Excel workbook generator (`.xlsx`) with mandatory *Assumptions & Caveats* sheet.
+  - `tools/`: Modular tools (`sql_runner.py`, `trust.py`, `comparison.py`, `assumptions.py`).
+- **REST Endpoints (`backend/app/api/analyst.py`)**:
+  - `POST /api/analyst/ask`
+  - `GET /api/analyst/sessions/{id}`
+  - `POST /api/analyst/feedback`
+  - `GET /api/rfx/{id}/comparison`
+  - `GET /api/rfx/{id}/trust`
+  - `POST /api/rfx/{id}/award/scenarios`
+  - `GET /api/rfx/{id}/award/scenarios/{sid}`
+  - `POST /api/rfx/{id}/award/scenarios/{sid}/finalize`
+  - `GET /api/exports/{id}`
+- **UI & Visualization (`chatbot/analyst.html`)**:
+  - Single-page 4-tab dashboard: (1) Comparison Grid with evidence modals, (2) Trust & Risk Audit cards, (3) Analyst Chat with Chart.js charts and collapsible "How I Got This" drawer, (4) Award Scenarios with finalize sign-off flow.
+- **Evaluation & Feedback Sync**:
+  - `scripts/eval_analyst.py`: 33-question benchmark suite passing 100% (33/33) with property checks and logs in `artifacts/logs/eval_analyst.log`.
+  - `scripts/export_feedback_to_examples.py`: Exporter syncing rated user corrections into `config/wren_examples.yaml`.
+  - Full pytest regression suite passing 100% (69/69) with logs in `artifacts/logs/test_full_suite.log`.
+
 ## Key Files
-- `backend/app/api/vendor.py`: FastAPI routes for vendor response intake and inspection.
-- `backend/app/vendor/`: Core vendor intake engine modules (`service.py`, `repository.py`, `models.py`, `preprocess.py`, `resolve.py`, `prompts.py`, `extract.py`, `match.py`, `normalize.py`, `validate.py`, `evidence.py`).
-- `migrations/002_vendor_intake.sql`: Comprehensive database schema migration for vendor quotation processing.
-- `scripts/eval_extraction.py`: Automated pipeline benchmark & ground truth evaluation.
-- `scripts/generate_sample_responses.py`: Synthetic noisy vendor response generator.
-- `scripts/demo_submit.sh`: Automated curl demonstration script.
-- `tests/test_vendor_intake.py`: Pytest suite for preprocessing, normalization, validation, resolution, and APIs.
-- `artifacts/plan_vendor_intake.md`: Master implementation plan.
-- `artifacts/logs/test_full.log`: Test execution log trace.
+- `backend/app/api/analyst.py`: FastAPI routes for decision analyst chat, grid, trust, and scenarios.
+- `backend/app/analyst/`: Core decision engine modules (`orchestrator.py`, `semantic.py`, `optimizer.py`, `repository.py`, `models.py`, `charts.py`, `exports.py`, `tools/`).
+- `chatbot/analyst.html`: 4-tab decision support UI workbench.
+- `config/wren_semantic_model.yaml` & `config/wren_mdl.json`: Semantic layer definitions.
+- `config/wren_examples.yaml`: 20+ question-to-SQL example pairs.
+- `config/eval_questions.yaml`: 33-question benchmark suite.
+- `migrations/003_analyst.sql`: Analyst telemetry, feedback, and scenario persistence schema.
+- `scripts/eval_analyst.py`: Automated benchmark evaluation runner.
+- `scripts/export_feedback_to_examples.py`: Feedback-to-examples sync tool.
+- `artifacts/plan_analyst.md`: Step 3 master implementation plan.
+- `artifacts/logs/eval_analyst.log`: 33-question benchmark run trace.
+- `artifacts/logs/test_full_suite.log`: 69-test full regression execution trace.

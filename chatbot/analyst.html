@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Procurement Decision Analyst & Decision Support</title>
+  <!-- Vuetify & Material Design Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font/css/materialdesignicons.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/vuetify@3.7.11/dist/vuetify.min.css" rel="stylesheet">
+  <!-- Vue 3 & Vuetify -->
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@3.7.11/dist/vuetify.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <!-- Marked for Markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@15.0.6/marked.min.js"></script>
+
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; }
+    .v-application { background: #f4f6f9 !important; }
+    .cell-box { cursor: pointer; transition: transform 0.15s ease; border-radius: 6px; padding: 6px 10px; }
+    .cell-box:hover { transform: scale(1.03); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .state-confident { background-color: #e8f5e9; border: 1px solid #81c784; color: #2e7d32; }
+    .state-review { background-color: #fff3e0; border: 1px solid #ffb74d; color: #e65100; }
+    .state-missing { background-color: #f5f5f5; border: 1px dashed #bdbdbd; color: #9e9e9e; }
+    .l1-badge { font-weight: bold; background: #1b5e20; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; }
+    .how-drawer { background: #fafbfc; border-left: 3px solid #1976d2; padding: 12px; margin-top: 10px; border-radius: 4px; }
+    .chat-bubble-user { background: #e3f2fd; border-radius: 12px 12px 0 12px; padding: 12px 16px; margin-left: auto; max-width: 80%; }
+    .chat-bubble-assistant { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 12px 12px 12px 0; padding: 16px; margin-right: auto; max-width: 90%; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <v-app>
+      <!-- Top App Bar -->
+      <v-app-bar color="indigo-darken-3" density="compact" elevation="2">
+        <v-app-bar-title class="font-weight-bold">
+          <v-icon icon="mdi-chart-timeline-variant-shimmer" class="mr-2"></v-icon>
+          AI Procurement Decision Analyst (Step 3)
+        </v-app-bar-title>
+        <v-spacer></v-spacer>
+        <div class="d-flex align-center mr-4" style="max-width: 250px;">
+          <v-text-field v-model.number="rfxId" label="RFx ID" type="number" density="compact" hide-details variant="solo-filled" @change="loadAllData"></v-text-field>
+        </div>
+        <v-btn variant="text" prepend-icon="mdi-arrow-left" href="/ui">Back to RFI</v-btn>
+      </v-app-bar>
+
+      <!-- Main Container with Tabs -->
+      <v-main>
+        <v-container fluid class="pa-4">
+          <v-card elevation="1">
+            <v-tabs v-model="activeTab" bg-color="indigo-darken-2" slider-color="amber">
+              <v-tab value="chat"><v-icon icon="mdi-message-text" class="mr-1"></v-icon> Analyst Chat</v-tab>
+              <v-tab value="grid"><v-icon icon="mdi-table" class="mr-1"></v-icon> Comparison Grid</v-tab>
+              <v-tab value="trust"><v-icon icon="mdi-shield-check" class="mr-1"></v-icon> Trust & Risk</v-tab>
+              <v-tab value="scenarios"><v-icon icon="mdi-gavel" class="mr-1"></v-icon> Award Scenarios</v-tab>
+            </v-tabs>
+
+            <v-window v-model="activeTab" class="pa-4">
+              <!-- TAB 1: ANALYST CHAT -->
+              <v-window-item value="chat">
+                <v-row>
+                  <v-col cols="12">
+                    <!-- Suggested Chips -->
+                    <div class="mb-3">
+                      <span class="text-caption font-weight-bold text-grey-darken-1 mr-2">QUICK ASKS:</span>
+                      <v-chip v-for="q in quickQuestions" :key="q" size="small" color="indigo" class="mr-2 mb-1" @click="askQuick(q)">
+                        {{ q }}
+                      </v-chip>
+                    </div>
+
+                    <!-- Chat Messages Stream -->
+                    <v-card variant="outlined" style="height: 520px; overflow-y: auto;" class="pa-4 mb-3" ref="chatBox">
+                      <div v-if="chatHistory.length === 0" class="text-center text-grey my-12">
+                        <v-icon icon="mdi-robot" size="48" class="mb-2"></v-icon>
+                        <p class="text-subtitle-1">Ask any question across prices, coverage, flags, quality knockouts, or award splits.</p>
+                      </div>
+
+                      <div v-for="(msg, idx) in chatHistory" :key="idx" class="mb-4">
+                        <!-- User message -->
+                        <div v-if="msg.role === 'user'" class="d-flex mb-2">
+                          <div class="chat-bubble-user elevation-1">
+                            <strong>Buyer:</strong> {{ msg.text }}
+                          </div>
+                        </div>
+
+                        <!-- Assistant response -->
+                        <div v-else class="chat-bubble-assistant elevation-1">
+                          <div class="d-flex align-center justify-space-between mb-2">
+                            <span class="text-subtitle-2 text-indigo font-weight-bold">
+                              <v-icon icon="mdi-sparkles" size="18"></v-icon> Analyst Response
+                            </span>
+                            <v-chip size="x-small" :color="msg.data.confidence === 'high' ? 'green' : 'orange'">
+                              {{ msg.data.confidence.toUpperCase() }} CONFIDENCE
+                            </v-chip>
+                          </div>
+
+                          <!-- Answer text rendered with marked -->
+                          <div class="text-body-2 mb-3" v-html="renderMarkdown(msg.data.answer_text)"></div>
+
+                          <!-- Render Tables -->
+                          <div v-for="(tbl, tIdx) in msg.data.tables" :key="tIdx" class="mb-3">
+                            <div class="text-caption font-weight-bold mb-1">{{ tbl.title }}</div>
+                            <v-table density="compact" class="border">
+                              <thead>
+                                <tr class="bg-grey-lighten-4">
+                                  <th v-for="c in tbl.columns" :key="c" class="text-left font-weight-bold">{{ c }}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr v-for="(r, rIdx) in tbl.rows" :key="rIdx">
+                                  <td v-for="(val, cIdx) in r" :key="cIdx">{{ val }}</td>
+                                </tr>
+                              </tbody>
+                            </v-table>
+                          </div>
+
+                          <!-- Render Chart Canvas -->
+                          <div v-if="msg.data.charts && msg.data.charts.length > 0" class="my-3">
+                            <div v-for="(chart, cIdx) in msg.data.charts" :key="cIdx" style="max-height: 260px; max-width: 600px;">
+                              <canvas :id="'chart_' + idx + '_' + cIdx"></canvas>
+                            </div>
+                          </div>
+
+                          <!-- Export Links -->
+                          <div v-if="msg.data.exports && msg.data.exports.length > 0" class="my-2">
+                            <v-btn v-for="exp in msg.data.exports" :key="exp.url" size="small" color="success" prepend-icon="mdi-file-excel" :href="exp.url" target="_blank" class="mr-2">
+                              Download {{ exp.filename }}
+                            </v-btn>
+                          </div>
+
+                          <!-- Caveats -->
+                          <div v-if="msg.data.caveats && msg.data.caveats.length > 0" class="my-2">
+                            <v-alert v-for="(cav, cIdx) in msg.data.caveats" :key="cIdx" density="compact" :type="cav.severity === 'critical' ? 'error' : (cav.severity === 'warning' ? 'warning' : 'info')" variant="tonal" class="mb-1 text-caption">
+                              {{ cav.text }}
+                            </v-alert>
+                          </div>
+
+                          <!-- Collapsible How I Got This -->
+                          <v-expansion-panels variant="accordion" class="mt-2">
+                            <v-expansion-panel title="🔍 How I Got This (Audit & Steps)">
+                              <v-expansion-panel-text class="text-caption">
+                                <div class="font-weight-bold mb-1">Tools Executed:</div>
+                                <ul>
+                                  <li v-for="(st, sIdx) in msg.data.how_i_got_this.steps" :key="sIdx">
+                                    <code>{{ st.tool }}</code>: {{ st.output_summary }} ({{ st.latency_ms }}ms)
+                                  </li>
+                                </ul>
+                                <div v-if="msg.data.how_i_got_this.sql.length > 0" class="mt-2">
+                                  <div class="font-weight-bold">SQL Queries:</div>
+                                  <pre class="bg-grey-lighten-4 pa-2 rounded" style="overflow-x: auto;"><code>{{ msg.data.how_i_got_this.sql.join('\n\n') }}</code></pre>
+                                </div>
+                              </v-expansion-panel-text>
+                            </v-expansion-panel>
+                          </v-expansion-panels>
+
+                          <!-- Feedback Thumbs -->
+                          <div class="d-flex align-center justify-end mt-2">
+                            <span class="text-caption text-grey mr-2">Was this answer helpful?</span>
+                            <v-btn icon="mdi-thumb-up-outline" size="x-small" variant="text" color="green" @click="openFeedback(msg.data.trace_id, 1)"></v-btn>
+                            <v-btn icon="mdi-thumb-down-outline" size="x-small" variant="text" color="red" @click="openFeedback(msg.data.trace_id, -1)"></v-btn>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div v-if="loadingChat" class="text-center py-4">
+                        <v-progress-circular indeterminate color="indigo"></v-progress-circular>
+                        <span class="text-caption text-grey ml-2">Analyzing quotations & querying semantic database...</span>
+                      </div>
+                    </v-card>
+
+                    <!-- Input Bar -->
+                    <div class="d-flex">
+                      <v-text-field v-model="userQuery" placeholder="Ask anything about the comparison, savings, or award..." variant="outlined" density="comfortable" hide-details @keyup.enter="sendQuery"></v-text-field>
+                      <v-btn color="indigo" class="ml-2" height="48" :loading="loadingChat" @click="sendQuery">
+                        <v-icon icon="mdi-send"></v-icon>
+                      </v-btn>
+                    </div>
+                  </v-col>
+                </v-row>
+              </v-window-item>
+
+              <!-- TAB 2: COMPARISON GRID -->
+              <v-window-item value="grid">
+                <div v-if="gridData" class="overflow-x-auto">
+                  <v-table density="compact" class="border">
+                    <thead>
+                      <tr class="bg-grey-lighten-3">
+                        <th class="text-left font-weight-bold" style="min-width: 220px;">RFx Line Item</th>
+                        <th class="text-center font-weight-bold" style="min-width: 100px;">Target (INR)</th>
+                        <th v-for="v in gridData.vendors" :key="v.vendor_id" class="text-center font-weight-bold" style="min-width: 180px;">
+                          {{ v.vendor_name }}
+                          <div class="text-caption text-grey font-weight-regular">{{ v.coverage_pct }}% Quoted</div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="item in gridData.items" :key="item.id">
+                        <td class="font-weight-medium">
+                          #{{ item.item_number }} - {{ item.description }}
+                          <div class="text-caption text-grey">{{ item.quantity }} {{ item.unit }}</div>
+                        </td>
+                        <td class="text-center text-caption font-weight-bold">
+                          {{ item.target_price ? '₹' + item.target_price : '-' }}
+                        </td>
+                        <td v-for="v in gridData.vendors" :key="v.vendor_id" class="text-center">
+                          <div v-if="gridData.grid[item.id] && gridData.grid[item.id][v.vendor_id]"
+                               :class="['cell-box', 'state-' + (gridData.grid[item.id][v.vendor_id].state || 'confident').toLowerCase()]"
+                               @click="openCellModal(item, v, gridData.grid[item.id][v.vendor_id])">
+                            <div class="d-flex align-center justify-space-between">
+                              <span class="font-weight-bold">₹{{ gridData.grid[item.id][v.vendor_id].effective_price_inr }}</span>
+                              <span v-if="gridData.grid[item.id][v.vendor_id].is_l1" class="l1-badge">L1</span>
+                            </div>
+                            <div class="text-caption">{{ gridData.grid[item.id][v.vendor_id].state }}</div>
+                          </div>
+                          <div v-else class="cell-box state-missing text-caption">NOT QUOTED</div>
+                        </td>
+                      </tr>
+                      <!-- Total Spend Row -->
+                      <tr class="bg-grey-lighten-4 font-weight-bold">
+                        <td>Total Quoted Spend</td>
+                        <td>-</td>
+                        <td v-for="tot in gridData.totals_with_coverage" :key="tot.vendor_id" class="text-center">
+                          <div>₹{{ tot.total_spend_inr.toLocaleString() }}</div>
+                          <div class="text-caption text-grey">{{ tot.coverage_label }}</div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </v-table>
+                </div>
+              </v-window-item>
+
+              <!-- TAB 3: TRUST & RISK -->
+              <v-window-item value="trust">
+                <div v-if="trustData">
+                  <v-alert :type="trustData.overall_confidence === 'high' ? 'success' : (trustData.overall_confidence === 'medium' ? 'warning' : 'error')" variant="tonal" class="mb-4">
+                    <strong>Overall Confidence: {{ trustData.overall_confidence.toUpperCase() }}</strong>
+                    <div class="text-caption" v-for="r in trustData.recommendations" :key="r">• {{ r }}</div>
+                  </v-alert>
+
+                  <v-row>
+                    <v-col v-for="v in trustData.vendors" :key="v.vendor_id" cols="12" md="4">
+                      <v-card variant="outlined" class="pa-3">
+                        <div class="d-flex align-center justify-space-between mb-2">
+                          <span class="font-weight-bold">{{ v.vendor_name }}</span>
+                          <v-chip size="small" :color="v.trust_score >= 80 ? 'green' : (v.trust_score >= 50 ? 'orange' : 'red')">
+                            Trust: {{ v.trust_score }}/100
+                          </v-chip>
+                        </div>
+                        <v-divider class="my-2"></v-divider>
+                        <div class="text-caption">
+                          <div>Coverage: <strong>{{ v.coverage_pct }}%</strong> ({{ v.matched_items }}/{{ v.total_items }} items)</div>
+                          <div>Prices: <strong>{{ v.confident_items }}</strong> Confident / <strong class="text-orange">{{ v.review_items }}</strong> Review</div>
+                          <div>Critical Flags: <strong :class="v.critical_flags_count > 0 ? 'text-red' : ''">{{ v.critical_flags_count }}</strong></div>
+                          <div>Money at Risk: <strong>₹{{ v.money_at_risk_inr.toLocaleString() }}</strong></div>
+                        </div>
+                      </v-card>
+                    </v-col>
+                  </v-row>
+                </div>
+              </v-window-item>
+
+              <!-- TAB 4: AWARD SCENARIOS -->
+              <v-window-item value="scenarios">
+                <v-row>
+                  <v-col cols="12" md="4">
+                    <v-card variant="outlined" class="pa-4">
+                      <div class="text-subtitle-1 font-weight-bold mb-3">Optimization Constraints</div>
+                      <v-select v-model="scenarioForm.strategy" :items="[{title: 'Cheapest Per Line (Split)', value: 'cheapest_per_line'}, {title: 'Single Vendor', value: 'single_vendor'}, {title: 'Multi-Vendor Split (Cap %)', value: 'multi_vendor_split'}]" label="Strategy" density="compact"></v-select>
+                      <v-text-field v-if="scenarioForm.strategy === 'multi_vendor_split'" v-model.number="scenarioForm.max_share_per_vendor_pct" label="Max Share per Vendor (%)" type="number" density="compact"></v-text-field>
+                      <v-switch v-model="scenarioForm.require_knockout_pass" label="Require Knockout Pass" color="indigo" density="compact" hide-details></v-switch>
+                      <v-switch v-model="scenarioForm.include_review_prices" label="Include REVIEW Prices" color="indigo" density="compact" hide-details></v-switch>
+                      <v-text-field v-model.number="scenarioForm.freight_override_per_unit" label="What-If Freight Override (₹/unit)" type="number" density="compact" class="mt-2"></v-text-field>
+                      <v-btn color="indigo" block class="mt-4" :loading="loadingScenario" @click="runScenario">
+                        Run Optimization
+                      </v-btn>
+                    </v-card>
+                  </v-col>
+
+                  <v-col cols="12" md="8">
+                    <div v-if="currentScenario">
+                      <div class="d-flex align-center justify-space-between mb-3">
+                        <span class="text-h6 font-weight-bold">Projected Spend: ₹{{ currentScenario.result.total_project_spend_inr.toLocaleString() }}</span>
+                        <v-btn color="success" prepend-icon="mdi-check-decagram" @click="openFinalizeModal">Finalize Award</v-btn>
+                      </div>
+
+                      <v-table density="compact" class="border mb-4">
+                        <thead>
+                          <tr class="bg-grey-lighten-3">
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Awarded Vendor</th>
+                            <th>Unit Price</th>
+                            <th>Total Spend</th>
+                            <th>State</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="alloc in currentScenario.result.allocations" :key="alloc.item_id">
+                            <td>#{{ alloc.item_number }} - {{ alloc.description }}</td>
+                            <td>{{ alloc.quantity }} {{ alloc.unit }}</td>
+                            <td class="font-weight-bold">{{ alloc.awarded_vendor_name }}</td>
+                            <td>₹{{ alloc.unit_price_inr }}</td>
+                            <td>₹{{ alloc.total_spend_inr.toLocaleString() }}</td>
+                            <td><v-chip size="x-small" :color="alloc.state === 'CONFIDENT' ? 'green' : 'orange'">{{ alloc.state }}</v-chip></td>
+                          </tr>
+                        </tbody>
+                      </v-table>
+                    </div>
+                  </v-col>
+                </v-row>
+              </v-window-item>
+            </v-window>
+          </v-card>
+        </v-container>
+      </v-main>
+
+      <!-- Cell Details & Evidence Modal -->
+      <v-dialog v-model="cellModal" max-width="600px">
+        <v-card v-if="selectedCell">
+          <v-card-title class="bg-indigo text-white">Quotation Line Details</v-card-title>
+          <v-card-text class="pa-4">
+            <div><strong>Item:</strong> {{ selectedCell.item.description }}</div>
+            <div><strong>Vendor:</strong> {{ selectedCell.vendor.vendor_name }}</div>
+            <div><strong>Effective Price:</strong> ₹{{ selectedCell.cell.effective_price_inr }}</div>
+            <div><strong>State:</strong> {{ selectedCell.cell.state }}</div>
+            <div v-if="selectedCell.cell.crop_url" class="mt-3">
+              <div class="font-weight-bold mb-1">Visual Document Evidence:</div>
+              <img :src="selectedCell.cell.crop_url" class="border rounded" style="max-width: 100%;" alt="Evidence Crop">
+            </div>
+          </v-card-text>
+          <v-card-actions><v-spacer></v-spacer><v-btn color="indigo" @click="cellModal = false">Close</v-btn></v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Feedback Modal -->
+      <v-dialog v-model="feedbackModal" max-width="500px">
+        <v-card>
+          <v-card-title>Submit Feedback</v-card-title>
+          <v-card-text>
+            <v-textarea v-model="feedbackForm.comment" label="Comments / Corrections" rows="3"></v-textarea>
+            <v-textarea v-model="feedbackForm.corrected_sql" label="Corrected SQL (optional)" rows="2"></v-textarea>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn @click="feedbackModal = false">Cancel</v-btn>
+            <v-btn color="indigo" @click="sendFeedback">Submit</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Finalize Modal with Flag Acceptance -->
+      <v-dialog v-model="finalizeModal" max-width="650px">
+        <v-card>
+          <v-card-title class="bg-indigo text-white">Finalize Award Scenario</v-card-title>
+          <v-card-text class="pa-4">
+            <p>Confirming final award will record an immutable decision in the audit log.</p>
+            <div v-if="currentScenario && currentScenario.result.has_unresolved_review_items" class="mt-3">
+              <v-alert type="warning" variant="tonal" class="mb-3">
+                <strong>REVIEW Items Requiring Acceptance:</strong>
+                <p class="text-caption">The following awarded items have REVIEW extraction status. You must explicitly accept each item to proceed.</p>
+              </v-alert>
+              <v-checkbox v-for="it in currentScenario.result.review_items_requiring_acceptance" :key="it.item_id" v-model="acceptedFlagsMap[it.item_id]" :label="it.vendor_name + ' (Item #' + it.item_number + ') @ ₹' + it.price" color="indigo" density="compact" hide-details></v-checkbox>
+            </div>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn @click="finalizeModal = false">Cancel</v-btn>
+            <v-btn color="success" :loading="loadingFinalize" @click="submitFinalize">Confirm & Finalize</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+    </v-app>
+  </div>
+
+  <script>
+    const { createApp, ref, onMounted, nextTick } = Vue;
+    const { createVuetify } = Vuetify;
+    const vuetify = createVuetify();
+
+    createApp({
+      setup() {
+        const rfxId = ref(6);
+        const activeTab = ref('chat');
+        const sessionId = ref('buyer_session_' + Math.random().toString(36).substring(7));
+        const userQuery = ref('');
+        const chatHistory = ref([]);
+        const loadingChat = ref(false);
+        const gridData = ref(null);
+        const trustData = ref(null);
+        const cellModal = ref(false);
+        const selectedCell = ref(null);
+        const feedbackModal = ref(false);
+        const feedbackForm = ref({ trace_id: '', rating: 1, comment: '', corrected_sql: '' });
+        const scenarioForm = ref({ strategy: 'cheapest_per_line', max_share_per_vendor_pct: 60, require_knockout_pass: true, include_review_prices: true, freight_override_per_unit: null });
+        const currentScenario = ref(null);
+        const loadingScenario = ref(false);
+        const finalizeModal = ref(false);
+        const loadingFinalize = ref(false);
+        const acceptedFlagsMap = ref({});
+
+        const quickQuestions = [
+          "Who is cheapest vendor for each item?",
+          "Split the award: cheapest per line",
+          "Which vendor's numbers should I trust least, and why?",
+          "Recommend an award with max 60% to any single vendor",
+          "Which items have only one valid bidder?",
+        ];
+
+        function renderMarkdown(txt) {
+          if (!txt) return '';
+          return marked.parse(txt);
+        }
+
+        async function loadGrid() {
+          try {
+            const res = await fetch(`/api/rfx/${rfxId.value}/comparison`);
+            gridData.value = await res.json();
+          } catch(e) { console.error(e); }
+        }
+
+        async function loadTrust() {
+          try {
+            const res = await fetch(`/api/rfx/${rfxId.value}/trust`);
+            trustData.value = await res.json();
+          } catch(e) { console.error(e); }
+        }
+
+        async function loadAllData() {
+          await loadGrid();
+          await loadTrust();
+        }
+
+        function askQuick(q) {
+          userQuery.value = q;
+          sendQuery();
+        }
+
+        async function sendQuery() {
+          const q = userQuery.value.trim();
+          if (!q) return;
+          chatHistory.value.push({ role: 'user', text: q });
+          userQuery.value = '';
+          loadingChat.value = true;
+
+          try {
+            const res = await fetch('/api/analyst/ask', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ rfx_id: rfxId.value, session_id: sessionId.value, question: q, options: { debug: true } })
+            });
+            const data = await res.json();
+            const msgIdx = chatHistory.value.length;
+            chatHistory.value.push({ role: 'assistant', data: data });
+
+            // Render Chart if present
+            if (data.charts && data.charts.length > 0) {
+              await nextTick();
+              data.charts.forEach((chart, cIdx) => {
+                const canvasId = `chart_${msgIdx}_${cIdx}`;
+                const canvas = document.getElementById(canvasId);
+                if (canvas) {
+                  new Chart(canvas, chart.spec);
+                }
+              });
+            }
+          } catch(e) {
+            console.error(e);
+          } finally {
+            loadingChat.value = false;
+          }
+        }
+
+        function openCellModal(item, vendor, cell) {
+          selectedCell.value = { item, vendor, cell };
+          cellModal.value = true;
+        }
+
+        function openFeedback(traceId, rating) {
+          feedbackForm.value = { trace_id: traceId, rating: rating, comment: '', corrected_sql: '' };
+          feedbackModal.value = true;
+        }
+
+        async function sendFeedback() {
+          try {
+            await fetch('/api/analyst/feedback', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(feedbackForm.value)
+            });
+            feedbackModal.value = false;
+          } catch(e) { console.error(e); }
+        }
+
+        async function runScenario() {
+          loadingScenario.value = true;
+          try {
+            const res = await fetch(`/api/rfx/${rfxId.value}/award/scenarios`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title: 'Scenario ' + scenarioForm.value.strategy, constraints: scenarioForm.value })
+            });
+            currentScenario.value = await res.json();
+          } catch(e) { console.error(e); }
+          finally { loadingScenario.value = false; }
+        }
+
+        function openFinalizeModal() {
+          acceptedFlagsMap.value = {};
+          finalizeModal.value = true;
+        }
+
+        async function submitFinalize() {
+          loadingFinalize.value = true;
+          try {
+            const reqItems = currentScenario.value.result.review_items_requiring_acceptance || [];
+            const accepted = reqItems.map(r => ({ vendor_id: r.vendor_id, item_id: r.item_id, reason: 'Accepted by buyer in UI' }));
+            const res = await fetch(`/api/rfx/${rfxId.value}/award/scenarios/${currentScenario.value.scenario_id}/finalize`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ accepted_review_flags: accepted, buyer_name: 'Lead Buyer' })
+            });
+            if (res.ok) {
+              alert('Scenario finalized and saved to audit log!');
+              finalizeModal.value = false;
+            } else {
+              const err = await res.json();
+              alert(err.detail ? JSON.stringify(err.detail) : 'Finalize failed');
+            }
+          } catch(e) { console.error(e); }
+          finally { loadingFinalize.value = false; }
+        }
+
+        onMounted(() => {
+          loadAllData();
+        });
+
+        return {
+          rfxId, activeTab, sessionId, userQuery, chatHistory, loadingChat,
+          gridData, trustData, cellModal, selectedCell, feedbackModal, feedbackForm,
+          scenarioForm, currentScenario, loadingScenario, finalizeModal, loadingFinalize,
+          acceptedFlagsMap, quickQuestions,
+          renderMarkdown, askQuick, sendQuery, openCellModal, openFeedback, sendFeedback,
+          runScenario, openFinalizeModal, submitFinalize, loadAllData
+        };
+      }
+    }).use(vuetify).mount('#app');
+  </script>
+</body>
+</html>

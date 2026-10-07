@@ -1,0 +1,229 @@
+# Few-shot Question-to-SQL Example Pairs for Wren & Semantic Text-to-SQL
+examples:
+  - id: ex_01
+    question: "Who is the cheapest vendor for each item?"
+    sql: >
+      SELECT rfx_item_id, item_number, rfx_description, vendor_name, effective_price_inr, state
+      FROM (
+        SELECT rfx_item_id, item_number, rfx_description, vendor_name, effective_price_inr, state,
+               ROW_NUMBER() OVER (PARTITION BY rfx_item_id ORDER BY effective_price_inr ASC) as rank
+        FROM ktq.v_rfx_comparison
+        WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED'
+      ) sub
+      WHERE rank = 1
+      ORDER BY item_number;
+
+  - id: ex_02
+    question: "Show total coverage percentage and quote counts for all vendors"
+    sql: >
+      SELECT vendor_id, vendor_name, total_rfx_items, matched_items_count, coverage_pct,
+             confident_items_count, review_items_count, missing_items_count
+      FROM ktq.v_vendor_coverage
+      WHERE rfx_id = :rfx_id
+      ORDER BY coverage_pct DESC, vendor_name ASC;
+
+  - id: ex_03
+    question: "Which items have only one valid bidder?"
+    sql: >
+      SELECT rfx_item_id, item_number, rfx_description, COUNT(DISTINCT vendor_id) as bidder_count
+      FROM ktq.v_rfx_comparison
+      WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED'
+      GROUP BY rfx_item_id, item_number, rfx_description
+      HAVING COUNT(DISTINCT vendor_id) = 1
+      ORDER BY item_number;
+
+  - id: ex_04
+    question: "List all items with REVIEW state prices or flags"
+    sql: >
+      SELECT rfx_item_id, item_number, rfx_description, vendor_name, effective_price_inr, state, review_status
+      FROM ktq.v_rfx_comparison
+      WHERE rfx_id = :rfx_id AND state = 'REVIEW'
+      ORDER BY item_number, vendor_name;
+
+  - id: ex_05
+    question: "What are the active critical and warning flags for this RFx?"
+    sql: >
+      SELECT flag_id, vendor_name, code, severity, message, item_id
+      FROM ktq.v_open_flags
+      WHERE rfx_id = :rfx_id
+      ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 ELSE 3 END, flag_id ASC;
+
+  - id: ex_06
+    question: "Show questionnaire pass/fail results for each vendor"
+    sql: >
+      SELECT ra.response_id, COALESCE(v.name, vr.sender_name) as vendor_name,
+             rq.question_text, rq.is_knockout, ra.pass_fail, ra.reason
+      FROM ktq.response_answers ra
+      JOIN ktq.vendor_responses vr ON ra.response_id = vr.id
+      JOIN ktq.rfx_questions rq ON ra.rfx_question_id = rq.id
+      LEFT JOIN ktq.vendors v ON vr.vendor_id = v.id
+      WHERE vr.rfx_id = :rfx_id AND vr.is_current = TRUE
+      ORDER BY vendor_name, rq.id;
+
+  - id: ex_06b
+    question: "What ISO certifications or quality standards did vendors claim?"
+    sql: >
+      SELECT COALESCE(v.name, vr.sender_name) as vendor_name, rq.question_text, ra.answer_text, ra.pass_fail
+      FROM ktq.response_answers ra
+      JOIN ktq.vendor_responses vr ON ra.response_id = vr.id
+      JOIN ktq.rfx_questions rq ON ra.rfx_question_id = rq.id
+      LEFT JOIN ktq.vendors v ON vr.vendor_id = v.id
+      WHERE vr.rfx_id = :rfx_id AND vr.is_current = TRUE
+      ORDER BY vendor_name;
+
+  - id: ex_07
+    question: "Which vendors cleared all knockout quality questions?"
+    sql: >
+      SELECT vr.id as response_id, COALESCE(v.name, vr.sender_name) as vendor_name
+      FROM ktq.vendor_responses vr
+      LEFT JOIN ktq.vendors v ON vr.vendor_id = v.id
+      WHERE vr.rfx_id = :rfx_id AND vr.is_current = TRUE
+        AND NOT EXISTS (
+          SELECT 1 FROM ktq.response_answers ra
+          JOIN ktq.rfx_questions rq ON ra.rfx_question_id = rq.id
+          WHERE ra.response_id = vr.id AND rq.is_knockout = TRUE AND ra.pass_fail != 'pass'
+        );
+
+  - id: ex_08
+    question: "Compare vendors on price for item number 1"
+    sql: >
+      SELECT item_number, rfx_description, vendor_name, effective_price_inr, raw_price, raw_currency, lead_time_days, state
+      FROM ktq.v_rfx_comparison
+      WHERE rfx_id = :rfx_id AND item_number = 1 AND effective_price_inr IS NOT NULL
+      ORDER BY effective_price_inr ASC;
+
+  - id: ex_09
+    question: "What are the commercial terms and freight conditions quoted by each vendor?"
+    sql: >
+      SELECT COALESCE(v.name, vr.sender_name) as vendor_name, rt.term_type, rt.value_text, rt.value_num
+      FROM ktq.response_terms rt
+      JOIN ktq.vendor_responses vr ON rt.response_id = vr.id
+      LEFT JOIN ktq.vendors v ON vr.vendor_id = v.id
+      WHERE vr.rfx_id = :rfx_id AND vr.is_current = TRUE
+      ORDER BY vendor_name, rt.term_type;
+
+  - id: ex_10
+    question: "Show price comparison versus target price for all items"
+    sql: >
+      SELECT item_number, rfx_description, rfx_quantity, rfx_target_price, vendor_name, effective_price_inr,
+             (effective_price_inr - rfx_target_price) as delta_from_target
+      FROM ktq.v_rfx_comparison
+      WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL
+      ORDER BY item_number, effective_price_inr ASC;
+
+  - id: ex_11
+    question: "List vendors who have 100% full item coverage"
+    sql: >
+      SELECT vendor_id, vendor_name, total_rfx_items, matched_items_count, coverage_pct
+      FROM ktq.v_vendor_coverage
+      WHERE rfx_id = :rfx_id AND coverage_pct >= 100.0
+      ORDER BY vendor_name;
+
+  - id: ex_12
+    question: "What is the total spend if awarded to a single vendor on like-for-like items?"
+    sql: >
+      SELECT vendor_name, COUNT(rfx_item_id) as items_quoted,
+             SUM(rfx_quantity * effective_price_inr) as total_spend_inr
+      FROM ktq.v_rfx_comparison
+      WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED'
+      GROUP BY vendor_name
+      ORDER BY total_spend_inr ASC;
+
+  - id: ex_13
+    question: "Find all alternate or extra line items quoted by vendors"
+    sql: >
+      SELECT vendor_name, kind, raw_description, raw_price, raw_currency, normalized_price_inr
+      FROM ktq.v_response_items_current
+      WHERE rfx_id = :rfx_id AND kind IN ('ALTERNATE', 'EXTRA')
+      ORDER BY vendor_name, kind;
+
+  - id: ex_14
+    question: "Show fastest delivery lead time per item"
+    sql: >
+      SELECT item_number, rfx_description, vendor_name, lead_time_days, effective_price_inr
+      FROM (
+        SELECT item_number, rfx_description, vendor_name, lead_time_days, effective_price_inr,
+               ROW_NUMBER() OVER (PARTITION BY rfx_item_id ORDER BY lead_time_days ASC NULLS LAST) as rank
+        FROM ktq.v_rfx_comparison
+        WHERE rfx_id = :rfx_id AND lead_time_days IS NOT NULL
+      ) ranked
+      WHERE rank = 1
+      ORDER BY item_number;
+
+  - id: ex_15
+    question: "Which items have the highest price variance between vendors?"
+    sql: >
+      SELECT item_number, rfx_description,
+             MIN(effective_price_inr) as min_price,
+             MAX(effective_price_inr) as max_price,
+             (MAX(effective_price_inr) - MIN(effective_price_inr)) as price_spread,
+             ROUND(((MAX(effective_price_inr) - MIN(effective_price_inr)) / NULLIF(MIN(effective_price_inr), 0)) * 100, 2) as spread_pct
+      FROM ktq.v_rfx_comparison
+      WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED'
+      GROUP BY rfx_item_id, item_number, rfx_description
+      ORDER BY price_spread DESC;
+
+  - id: ex_16
+    question: "Show vendors with unresolved or failed knockout questions"
+    sql: >
+      SELECT DISTINCT vr.id as response_id, COALESCE(v.name, vr.sender_name) as vendor_name,
+             rq.question_text, ra.pass_fail, ra.reason
+      FROM ktq.response_answers ra
+      JOIN ktq.vendor_responses vr ON ra.response_id = vr.id
+      JOIN ktq.rfx_questions rq ON ra.rfx_question_id = rq.id
+      LEFT JOIN ktq.vendors v ON vr.vendor_id = v.id
+      WHERE vr.rfx_id = :rfx_id AND vr.is_current = TRUE
+        AND rq.is_knockout = TRUE AND ra.pass_fail != 'pass'
+      ORDER BY vendor_name;
+
+  - id: ex_17
+    question: "What is the average unit price across all quoted items?"
+    sql: >
+      SELECT item_number, rfx_description, rfx_quantity,
+             COUNT(vendor_id) as quotes_count,
+             ROUND(AVG(effective_price_inr), 2) as avg_price_inr,
+             MIN(effective_price_inr) as l1_price_inr
+      FROM ktq.v_rfx_comparison
+      WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED'
+      GROUP BY rfx_item_id, item_number, rfx_description, rfx_quantity
+      ORDER BY item_number;
+
+  - id: ex_18
+    question: "List items where the lowest quoted price exceeds the target price"
+    sql: >
+      SELECT item_number, rfx_description, rfx_target_price,
+             MIN(effective_price_inr) as lowest_quote,
+             (MIN(effective_price_inr) - rfx_target_price) as over_target_amount
+      FROM ktq.v_rfx_comparison
+      WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND rfx_target_price IS NOT NULL
+      GROUP BY rfx_item_id, item_number, rfx_description, rfx_target_price
+      HAVING MIN(effective_price_inr) > rfx_target_price
+      ORDER BY over_target_amount DESC;
+
+  - id: ex_19
+    question: "Show breakdown of prices by confidence state (CONFIDENT vs REVIEW vs MISSING) per vendor"
+    sql: >
+      SELECT vendor_name,
+             COUNT(*) FILTER (WHERE state = 'CONFIDENT') as confident_count,
+             COUNT(*) FILTER (WHERE state = 'REVIEW') as review_count,
+             COUNT(*) FILTER (WHERE state = 'MISSING') as missing_count
+      FROM ktq.v_rfx_comparison
+      WHERE rfx_id = :rfx_id
+      GROUP BY vendor_name
+      ORDER BY vendor_name;
+
+  - id: ex_20
+    question: "Show line item allocation under pure cheapest-per-line (L1)"
+    sql: >
+      SELECT item_number, rfx_description, rfx_quantity, vendor_name as l1_vendor,
+             effective_price_inr as l1_unit_price,
+             (rfx_quantity * effective_price_inr) as line_spend_inr,
+             state
+      FROM (
+        SELECT item_number, rfx_description, rfx_quantity, vendor_name, effective_price_inr, state,
+               ROW_NUMBER() OVER (PARTITION BY rfx_item_id ORDER BY effective_price_inr ASC) as rank
+        FROM ktq.v_rfx_comparison
+        WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED'
+      ) ranked
+      WHERE rank = 1
+      ORDER BY item_number;

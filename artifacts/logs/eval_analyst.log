@@ -1,0 +1,339 @@
+=== DECISION ANALYST BENCHMARK RUN: 2026-10-07 20:05:36 ===
+
+[PASS] q01 (ranking): Who is the cheapest vendor for each item?
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 990ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Who is the cheapest vendor for each item?*
+
+Retrieved **3** result records based on verified database queries.
+- **Top Record**: `rfx_item_id: 8` | `item_number:...
+
+------------------------------------------------------------
+
+[PASS] q02 (ranking): Which vendor is cheapest overall across all items?
+  Confidence: medium (Some referenced figures ([166.67]) are formatting approximations.)
+  Latency: 2829ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Which vendor is cheapest overall across all items?*
+
+Retrieved **1** result records based on verified database queries.
+- **Top Record**: `vendor_name: Rajesh Ku...
+
+------------------------------------------------------------
+
+[PASS] q03 (ranking): Compare vendors on price for item number 1
+  Confidence: medium (Some referenced figures ([10.0]) are formatting approximations.)
+  Latency: 984ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Compare vendors on price for item number 1*
+
+Retrieved **10** result records based on verified database queries.
+- **Top Record**: `item_number: 1` | `rfx_descri...
+
+------------------------------------------------------------
+
+[PASS] q04 (ranking): What is the lowest price for carton boxes?
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 3400ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *What is the lowest price for carton boxes?*
+
+Retrieved **1** result records based on verified database queries.
+- **Top Record**: `item_number: 1` | `rfx_descrip...
+
+------------------------------------------------------------
+
+[PASS] q05 (ranking): Show fastest delivery turnaround time per item
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 2982ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Show fastest delivery turnaround time per item*
+
+Retrieved **3** result records based on verified database queries.
+- **Top Record**: `item_number: 1` | `rfx_des...
+
+------------------------------------------------------------
+
+[PASS] q06 (coverage): Show total quote coverage percentage for all vendors
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 3038ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Show total quote coverage percentage for all vendors*
+
+Retrieved **5** result records based on verified database queries.
+- **Top Record**: `vendor_id: 39` | `ve...
+
+------------------------------------------------------------
+
+[PASS] q07 (coverage): Which items have only one valid bidder?
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 970ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Which items have only one valid bidder?*
+
+Retrieved **3** result records based on verified database queries.
+- **Top Record**: `rfx_item_id: 8` | `item_number: 1...
+
+------------------------------------------------------------
+
+[PASS] q08 (coverage): List vendors who have 100% full item coverage
+  Confidence: medium (Some referenced figures ([100.0]) are formatting approximations.)
+  Latency: 1650ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *List vendors who have 100% full item coverage*
+
+Retrieved **5** result records based on verified database queries.
+- **Top Record**: `vendor_id: 39` | `vendor_na...
+
+------------------------------------------------------------
+
+[PASS] q09 (coverage): Who is cheapest overall, and is that comparison fair given coverage?
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 5796ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Who is cheapest overall, and is that comparison fair given coverage?*
+
+Retrieved **1** result records based on verified database queries.
+- **Top Record**: `vend...
+
+------------------------------------------------------------
+
+[PASS] q10 (coverage): Find all alternate or extra line items quoted by vendors
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 1215ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Find all alternate or extra line items quoted by vendors*
+
+Retrieved **4** result records based on verified database queries.
+- **Top Record**: `vendor_name: Raj...
+
+------------------------------------------------------------
+
+[PASS] q11 (quality_gate): Show questionnaire pass/fail results for each vendor
+  Confidence: medium (Some referenced figures ([15.0]) are formatting approximations.)
+  Latency: 951ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Show questionnaire pass/fail results for each vendor*
+
+Retrieved **15** result records based on verified database queries.
+- **Top Record**: `response_id: 41` | ...
+
+------------------------------------------------------------
+
+[PASS] q12 (quality_gate): Which vendors cleared all knockout quality questions?
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 1103ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Which vendors cleared all knockout quality questions?*
+
+Retrieved **5** result records based on verified database queries.
+- **Top Record**: `response_id: 39` | ...
+
+------------------------------------------------------------
+
+[PASS] q13 (quality_gate): Split the award: cheapest per line, but only among vendors who cleared the quality questionnaire
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 1099ms | Tables: 2 | Charts: 0 | Exports: 1
+  Narrative Snippet: ### Recommended Award Allocation
+
+Under the **Multi Vendor Split** strategy, total projected spend is **₹301,966.66**.
+
+- **Allocated Vendors**: Rajesh Kumar Shree Packaging Soluti...
+
+------------------------------------------------------------
+
+[PASS] q14 (quality_gate): Show vendors with unresolved or failed knockout questions
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 1102ms | Tables: 0 | Charts: 0 | Exports: 0
+  Narrative Snippet: No records matched your specific query criteria in the database....
+
+------------------------------------------------------------
+
+[PASS] q15 (quality_gate): What ISO certifications or quality standards did vendors claim?
+  Confidence: medium (Some referenced figures ([9001.0, 2015.0, 15.0]) are formatting approximations.)
+  Latency: 956ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *What ISO certifications or quality standards did vendors claim?*
+
+Retrieved **15** result records based on verified database queries.
+- **Top Record**: `vendor_n...
+
+------------------------------------------------------------
+
+[PASS] q16 (sourcing): Split the award: cheapest per line
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 1076ms | Tables: 2 | Charts: 0 | Exports: 1
+  Narrative Snippet: ### Recommended Award Allocation
+
+Under the **Multi Vendor Split** strategy, total projected spend is **₹301,966.66**.
+
+- **Allocated Vendors**: Rajesh Kumar Shree Packaging Soluti...
+
+------------------------------------------------------------
+
+[PASS] q17 (sourcing): Recommend an award with max 60% to any single vendor and export the pack
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 1062ms | Tables: 2 | Charts: 0 | Exports: 1
+  Narrative Snippet: ### Recommended Award Allocation
+
+Under the **Single Vendor** strategy, total projected spend is **₹301,966.66**.
+
+- **Allocated Vendors**: Rajesh Kumar Shree Packaging Solutions
+-...
+
+------------------------------------------------------------
+
+[PASS] q18 (sourcing): Award to a single vendor minimizing total cost
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 1066ms | Tables: 2 | Charts: 0 | Exports: 1
+  Narrative Snippet: ### Recommended Award Allocation
+
+Under the **Single Vendor** strategy, total projected spend is **₹301,966.66**.
+
+- **Allocated Vendors**: Rajesh Kumar Shree Packaging Solutions
+-...
+
+------------------------------------------------------------
+
+[PASS] q19 (sourcing): What is the total project spend under pure L1 split?
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 1096ms | Tables: 2 | Charts: 0 | Exports: 1
+  Narrative Snippet: ### Recommended Award Allocation
+
+Under the **Multi Vendor Split** strategy, total projected spend is **₹301,966.66**.
+
+- **Allocated Vendors**: Rajesh Kumar Shree Packaging Soluti...
+
+------------------------------------------------------------
+
+[PASS] q20 (sourcing): Show line item allocation under pure cheapest-per-line
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 1084ms | Tables: 2 | Charts: 0 | Exports: 1
+  Narrative Snippet: ### Recommended Award Allocation
+
+Under the **Cheapest Per Line** strategy, total projected spend is **₹301,966.66**.
+
+- **Allocated Vendors**: Rajesh Kumar Shree Packaging Solutio...
+
+------------------------------------------------------------
+
+[PASS] q21 (trust): Which vendor's numbers should I trust least, and why?
+  Confidence: medium (Some referenced figures ([100.0]) are formatting approximations.)
+  Latency: 1094ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Vendor Trust & Reliability Assessment
+
+Overall data confidence is **LOW**.
+
+- **Least Trusted Vendor**: **Rajesh Kumar Shree Packaging Solutions** (Trust Score: **36.0/100**)
+-...
+
+------------------------------------------------------------
+
+[PASS] q22 (trust): What are the active critical and warning flags for this RFx?
+  Confidence: medium (Some referenced figures ([85.0]) are formatting approximations.)
+  Latency: 958ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *What are the active critical and warning flags for this RFx?*
+
+Retrieved **85** result records based on verified database queries.
+- **Top Record**: `flag_id: 79...
+
+------------------------------------------------------------
+
+[PASS] q23 (trust): List all items with REVIEW state prices or flags
+  Confidence: medium (Some referenced figures ([21.0]) are formatting approximations.)
+  Latency: 1115ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *List all items with REVIEW state prices or flags*
+
+Retrieved **21** result records based on verified database queries.
+- **Top Record**: `rfx_item_id: 8` | `item...
+
+------------------------------------------------------------
+
+[PASS] q24 (trust): Show breakdown of prices by confidence state (CONFIDENT vs REVIEW vs MISSING) per vendor
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 973ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Show breakdown of prices by confidence state (CONFIDENT vs REVIEW vs MISSING) per vendor*
+
+Retrieved **1** result records based on verified database queries.
+- *...
+
+------------------------------------------------------------
+
+[PASS] q25 (trust): How much money is at risk due to unverified quotations?
+  Confidence: medium (Some referenced figures ([100.0]) are formatting approximations.)
+  Latency: 1495ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Vendor Trust & Reliability Assessment
+
+Overall data confidence is **LOW**.
+
+- **Least Trusted Vendor**: **Rajesh Kumar Shree Packaging Solutions** (Trust Score: **36.0/100**)
+-...
+
+------------------------------------------------------------
+
+[PASS] q26 (charts): Show price comparison versus target price for all items as a chart
+  Confidence: medium (Some referenced figures ([25.0]) are formatting approximations.)
+  Latency: 3264ms | Tables: 1 | Charts: 1 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Show price comparison versus target price for all items as a chart*
+
+Retrieved **25** result records based on verified database queries.
+- **Top Record**: `item_...
+
+------------------------------------------------------------
+
+[PASS] q27 (charts): Show savings versus target by item as a chart
+  Confidence: medium (Some referenced figures ([25.0]) are formatting approximations.)
+  Latency: 2518ms | Tables: 1 | Charts: 1 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Show savings versus target by item as a chart*
+
+Retrieved **25** result records based on verified database queries.
+- **Top Record**: `item_number: 1` | `rfx_des...
+
+------------------------------------------------------------
+
+[PASS] q28 (charts): Plot spend distribution across vendors as a chart
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 2135ms | Tables: 1 | Charts: 1 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Plot spend distribution across vendors as a chart*
+
+Retrieved **1** result records based on verified database queries.
+- **Top Record**: `vendor_name: Rajesh Kum...
+
+------------------------------------------------------------
+
+[PASS] q29 (what_if): What are the commercial terms and freight conditions quoted by each vendor?
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 1142ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *What are the commercial terms and freight conditions quoted by each vendor?*
+
+Retrieved **15** result records based on verified database queries.
+- **Top Record*...
+
+------------------------------------------------------------
+
+[PASS] q30 (what_if): What if freight is 50 INR per unit for all items?
+  Confidence: medium (Some referenced figures ([25.0, 50.0]) are formatting approximations.)
+  Latency: 2883ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *What if freight is 50 INR per unit for all items?*
+
+Retrieved **25** result records based on verified database queries.
+- **Top Record**: `vendor_name: Rajesh Ku...
+
+------------------------------------------------------------
+
+[PASS] q31 (adversarial): Who is the best vendor?
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 5931ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *Who is the best vendor?*
+
+Retrieved **1** result records based on verified database queries.
+- **Top Record**: `vendor_name: Rajesh Kumar Shree Packaging Solutio...
+
+------------------------------------------------------------
+
+[PASS] q32 (adversarial): What is the price quoted by Acme Aerospace Corporation?
+  Confidence: high (All numbers strictly grounded in deterministic tool outputs.)
+  Latency: 2275ms | Tables: 0 | Charts: 0 | Exports: 0
+  Narrative Snippet: No records matched your specific query criteria in the database....
+
+------------------------------------------------------------
+
+[PASS] q33 (adversarial): DELETE FROM rfx WHERE id = 6
+  Confidence: medium (Some referenced figures ([25.0]) are formatting approximations.)
+  Latency: 1960ms | Tables: 1 | Charts: 0 | Exports: 0
+  Narrative Snippet: ### Analysis for: *DELETE FROM rfx WHERE id = 6*
+
+Retrieved **25** result records based on verified database queries.
+- **Top Record**: `rfx_id: 6` | `rfx_item_id: 8`
+...
+
+------------------------------------------------------------
+

@@ -1,0 +1,236 @@
+# Wren AI Semantic Model Definition for RFx Buyer Decision Support
+version: "1.0.0"
+models:
+  - name: v_rfx_comparison
+    table_name: ktq.v_rfx_comparison
+    description: >
+      Primary comparison grid linking RFx line items to vendor quoted response items.
+      Contains normalized unit prices in INR, effective prices considering buyer overrides,
+      lead time, raw quotes, and data quality states.
+    columns:
+      - name: rfx_id
+        type: integer
+        description: Unique identifier for the RFx / RFI project.
+      - name: rfx_item_id
+        type: integer
+        description: Unique ID of the line item requirement in RFx.
+      - name: item_number
+        type: integer
+        description: 1-based sequential line number of the requirement.
+      - name: rfx_description
+        type: string
+        description: Specification and title of the required packaging item.
+      - name: rfx_quantity
+        type: numeric
+        description: Total quantity requested by the buyer.
+      - name: rfx_unit
+        type: string
+        description: Unit of measurement requested (e.g. pcs, rolls, kgs, boxes).
+      - name: rfx_target_price
+        type: numeric
+        description: Buyer internal target benchmark or budget price per unit in INR.
+      - name: vendor_id
+        type: integer
+        description: Unique ID of the quoting vendor entity.
+      - name: vendor_name
+        type: string
+        description: Business name of the vendor who submitted the quotation.
+      - name: response_id
+        type: integer
+        description: ID of the specific vendor quotation submission.
+      - name: response_item_id
+        type: integer
+        description: Extracted quotation line item record ID.
+      - name: kind
+        type: string
+        description: Matching classification (MATCHED = exact match to RFx item, EXTRA = unsolicited line, ALTERNATE = alternative spec, NOT_QUOTED = explicitly refused).
+      - name: raw_price
+        type: numeric
+        description: Quoted unit price in the vendor's original currency and UOM.
+      - name: raw_unit
+        type: string
+        description: Vendor's quoted UOM (e.g. per 100 pcs, per roll, per kg).
+      - name: raw_currency
+        type: string
+        description: Quoted currency code (INR, USD, EUR).
+      - name: unit_factor
+        type: numeric
+        description: Multiplier used to normalize raw_unit to rfx_unit.
+      - name: normalized_price_inr
+        type: numeric
+        description: Unit price converted to standard RFx unit and INR currency.
+      - name: effective_price_inr
+        type: numeric
+        description: The authoritative unit price in INR to use for all calculations. Incorporates buyer manual overrides when present.
+      - name: lead_time_days
+        type: integer
+        description: Delivery turnaround time in calendar days.
+      - name: state
+        type: string
+        description: >
+          Data extraction confidence state.
+          CONFIDENT = clean, verified extracted value.
+          REVIEW = unverified, ambiguous, or flagged value requiring caution.
+          MISSING = vendor did not quote or could not be extracted.
+      - name: review_status
+        type: string
+        description: Buyer review lifecycle status (pending, approved, rejected, corrected).
+
+  - name: v_vendor_coverage
+    table_name: ktq.v_vendor_coverage
+    description: >
+      Summary of vendor participation, coverage percentage across RFx line items,
+      and pricing distribution. Essential for checking comparability before calculating totals.
+    columns:
+      - name: rfx_id
+        type: integer
+        description: RFx ID.
+      - name: rfx_title
+        type: string
+        description: Title of the RFx.
+      - name: response_id
+        type: integer
+        description: Vendor response ID.
+      - name: vendor_id
+        type: integer
+        description: Vendor ID.
+      - name: vendor_name
+        type: string
+        description: Name of the vendor.
+      - name: response_status
+        type: string
+        description: Status of quotation processing (done, needs_review, failed).
+      - name: total_rfx_items
+        type: integer
+        description: Total count of line items in the RFx.
+      - name: matched_items_count
+        type: integer
+        description: Number of RFx line items quoted by this vendor.
+      - name: coverage_pct
+        type: numeric
+        description: Percentage of RFx items quoted (matched_items_count / total_rfx_items * 100).
+      - name: confident_items_count
+        type: integer
+        description: Number of line items with CONFIDENT extraction state.
+      - name: review_items_count
+        type: integer
+        description: Number of line items with REVIEW extraction state.
+      - name: missing_items_count
+        type: integer
+        description: Number of line items with MISSING state.
+      - name: min_normalized_price_inr
+        type: numeric
+        description: Lowest unit price quoted by this vendor across all items.
+      - name: max_normalized_price_inr
+        type: numeric
+        description: Highest unit price quoted by this vendor across all items.
+      - name: avg_normalized_price_inr
+        type: numeric
+        description: Average unit price quoted by this vendor.
+
+  - name: v_open_flags
+    table_name: ktq.v_open_flags
+    description: >
+      Unresolved validation flags, discrepancies, expired documents, and pricing anomalies
+      affecting trust and risk evaluation.
+    columns:
+      - name: flag_id
+        type: integer
+        description: Flag ID.
+      - name: response_id
+        type: integer
+        description: Response ID.
+      - name: rfx_id
+        type: integer
+        description: RFx ID.
+      - name: vendor_name
+        type: string
+        description: Vendor name.
+      - name: item_id
+        type: integer
+        description: Response item ID if item-specific.
+      - name: code
+        type: string
+        description: Standard error/warning code (e.g. OUTLIER_HIGH, CONFLICTING_DOCS, EXPIRED_DOC).
+      - name: severity
+        type: string
+        description: Severity level (info, warning, critical).
+      - name: message
+        type: string
+        description: Human-readable explanation of why the flag was raised.
+
+  - name: response_answers
+    table_name: ktq.response_answers
+    description: >
+      Vendor answers to qualitative and knockout questionnaire requirements.
+      A vendor 'clears the quality gate' ONLY if every knockout question evaluates to 'pass'.
+    columns:
+      - name: id
+        type: integer
+        description: Answer record ID.
+      - name: response_id
+        type: integer
+        description: Vendor response ID.
+      - name: rfx_question_id
+        type: integer
+        description: Associated RFx question ID.
+      - name: raw_question
+        type: string
+        description: Text of the question asked.
+      - name: answer_text
+        type: string
+        description: Vendor's verbatim or extracted response.
+      - name: pass_fail
+        type: string
+        description: Evaluation outcome (pass, fail, unanswered, needs_review).
+      - name: reason
+        type: string
+        description: Rationale behind the evaluation.
+
+  - name: rfx_questions
+    table_name: ktq.rfx_questions
+    description: Master questionnaire specifications for the RFx.
+    columns:
+      - name: id
+        type: integer
+        description: Question ID.
+      - name: rfx_id
+        type: integer
+        description: RFx ID.
+      - name: question_text
+        type: string
+        description: Prompt text.
+      - name: question_type
+        type: string
+        description: Category (knockout, technical, commercial, quality).
+      - name: is_knockout
+        type: boolean
+        description: Whether failing this question disqualifies the vendor from award.
+
+  - name: response_terms
+    table_name: ktq.response_terms
+    description: Extracted commercial terms including freight, GST, payment milestones, and warranty.
+    columns:
+      - name: id
+        type: integer
+        description: Term ID.
+      - name: response_id
+        type: integer
+        description: Response ID.
+      - name: term_type
+        type: string
+        description: Category (freight, gst, payment_terms, delivery, warranty, discount).
+      - name: value_text
+        type: string
+        description: Textual description.
+      - name: value_num
+        type: numeric
+        description: Numeric rate or percentage if applicable.
+
+rules:
+  - "Always use 'effective_price_inr' for all pricing comparisons and calculations."
+  - "Filter by rfx_id on all queries to maintain strict isolation."
+  - "Exclude MISSING prices from MIN, AVG, and SUM aggregates."
+  - "Always select 'state' and 'review_status' alongside pricing columns to expose uncertainty."
+  - "Never compare total spend across vendors with differing coverage without explicitly flagging coverage differences."
+  - "A vendor clears the questionnaire only if all knockout questions in response_answers have pass_fail = 'pass'."
