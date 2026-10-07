@@ -1,28 +1,32 @@
 ## Current State
-- Transformed the codebase into a configurable multi-agent chatbot system with Python, FastAPI, and PydanticAI.
-- Built hierarchical agent architecture:
-  - **Master Agent** (`backend/app/agents/master.py`): Understands user intent and delegates to specialists.
-  - **RFX Agent** (`backend/app/agents/rfx.py`): Creates and manages RFXs using mock tools (`create_rfx`, `get_rfx`).
-  - **Vendor Agent** (`backend/app/agents/vendor.py`): Finds and evaluates suppliers (`search_vendors`, `get_vendor_status`).
-  - **Status Agent** (`backend/app/agents/status.py`): Inspects RFX and vendor fulfillment status (`get_rfx_status`, `get_vendor_status`).
-- Created dynamic agent factory (`backend/app/agents/factory.py`) reading `config/llms.yaml` and `config/agents.yaml`. Changing an agent's model requires only changing `agents.yaml`.
-- Implemented multi-provider abstraction (`backend/app/providers/factory.py`) supporting OpenAI, Anthropic, Gemini/Google, Ollama, and offline TestModel fallback.
-- Implemented FastAPI endpoint `POST /api/chat` with `{ message, conversation_id }` -> `{ message, agent, conversation_id }`.
-- Mounted static UI at `/ui` and enabled CORS in `backend/app/main.py`.
-- Connected existing Chat UI (`chatbot/index.html` & `chatbot/config.json`) to `POST /api/chat`.
-- Preserved existing Vendor flow ("Check Vendor response") to communicate directly with its dedicated webhook (`vendorWebhookUrl`).
-- Comprehensive pytest suite passing 19 tests in `backend/tests/` with test logs preserved in `artifacts/logs/test_run.log`.
+- Configurable multi-agent chatbot system extended with end-to-end Packaging RFI workflow:
+  - **Text Intake** (`POST /api/rfi/intake`): Natural language parsing of packaging requirements into structured `PackagingRequirement` items.
+  - **Excel Intake** (`POST /api/rfi/intake/excel`): Openpyxl spreadsheet parser handling header variations, row-level validation, and canonical item extraction.
+  - **PydanticAI Packaging Agent** (`backend/app/intake/agent.py`): Extracts typed requirements, dimensions, plies, material, required date, target price, and flags missing/ambiguous fields without hallucination. Configured as `rfi_parser` in `config/agents.yaml`.
+  - **PostgreSQL Source of Truth** (`backend/app/db/`): Uses dynamic `DB_SCHEMA` (default: `ktq`). Parameterized repository (`RFIRepository`) manages `rfx`, `rfx_items`, and `rfx_activity` tables with atomic transactions and memory fallback.
+  - **Database Health Check** (`GET /health/db` & `GET /api/db/health`): Validates connection, verifies dynamic schema existence, and executes test query without credential leakage.
+  - **System Health Check** (`GET /health` & `GET /api/health`): Validates running backend and registered agents.
+  - **RFI Lifecycle APIs** (`backend/app/api/rfi.py`):
+    - `POST /api/rfi`: Direct RFI creation.
+    - `GET /api/rfi/{id}`: Retrieval of RFI and line items.
+    - `PATCH /api/rfi/{id}`: Updating editable fields.
+    - `POST /api/rfi/{id}/trigger`: Transitioning status to `TRIGGERED` and timestamp recording.
+- Preserved existing conversational chat (`POST /api/chat`) and Vendor webhook flow.
+- Preserved WrenAI directory for secondary semantic database querying and analytics.
+- Full pytest test suite passing 34 tests across agents, APIs, DB health, Excel intake, and RFI lifecycle with traceable logs in `artifacts/logs/test_run.log`.
 
 ## Key Files
-- `config/llms.yaml`: LLM configuration presets (provider, model, temperature, max_tokens).
-- `config/agents.yaml`: Agent definitions mapping each agent to LLM presets and system instructions.
-- `.env.example`: Secrets template (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OLLAMA_BASE_URL`).
-- `backend/app/main.py`: FastAPI application entrypoint with lifespan, CORS, and UI mounting.
-- `backend/app/api/chat.py`: `/api/chat` request and response handling.
-- `backend/app/agents/`: Independent agent implementations (`master.py`, `rfx.py`, `vendor.py`, `status.py`, `factory.py`).
-- `backend/app/providers/factory.py`: Provider abstraction factory.
-- `backend/app/tools/`: Mock implementations for RFX, vendor, and status tools.
-- `chatbot/index.html`: Preserved Vue 3 / Vuetify chat interface.
-- `chatbot/config.json`: Endpoint and vendor webhook configuration.
-- `artifacts/plan_multiagent_chat.md`: Phased implementation plan.
-- `artifacts/logs/test_run.log`: Traceable test logs.
+- `migrations/001_rfi.sql`: Idempotent SQL migration updating `rfx` status check constraints and sequences for the configured schema.
+- `backend/app/db/connection.py`: Dynamic schema connection context manager setting `search_path`.
+- `backend/app/db/health.py`: Database health check verifying connectivity, schema existence, and query execution without leaking credentials.
+- `backend/app/db/repository.py`: Parameterized repository for `rfx`, `rfx_items`, and `rfx_activity`.
+- `backend/app/intake/models.py`: Pydantic domain models for packaging requirements, RFI states, and API contracts.
+- `backend/app/intake/agent.py`: PydanticAI requirement extraction agent with deterministic fallback.
+- `backend/app/intake/excel_parser.py`: Spreadsheet parser with tolerant header aliases and row-level validation.
+- `backend/app/intake/validation.py`: Packaging domain validation, traceable defaults, and readiness checking.
+- `backend/app/intake/service.py`: Orchestrator for intake, Excel conversion, and RFI lifecycle transitions.
+- `backend/app/api/rfi.py`: FastAPI routes for text intake, excel intake, RFI CRUD, and triggering.
+- `backend/app/main.py`: FastAPI application mounting routes, `/health`, `/health/db`, and UI.
+- `config/agents.yaml`: Agent definitions including `rfi_parser`.
+- `artifacts/plan_packaging_rfi_workflow.md`: Phased implementation plan.
+- `artifacts/logs/test_run.log`: Test execution log trace.

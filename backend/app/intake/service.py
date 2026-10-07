@@ -1,22 +1,180 @@
-"""Deterministic packaging RFX intake workflow."""
+"""Packaging RFI intake, lifecycle management, and database service."""
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-from backend.app.intake.excel_parser import rows_to_line_items
+from backend.app.config.settings import AppSecrets
+from backend.app.db.repository import RFIRepository
+from backend.app.intake.agent import extract_requirements
+from backend.app.intake.excel_parser import (
+    parse_spreadsheet_bytes,
+    rows_to_line_items,
+    rows_to_packaging_requirements,
+)
 from backend.app.intake.models import (
     AttachmentExtraction,
+    ExcelIntakeResponse,
+    IntakeExtractionResult,
     IntakeResponse,
     PackagingIntakeState,
     PackagingLineItem,
+    PackagingRequirement,
+    RFICreateRequest,
+    RFIStatus,
+    RFIUpdateRequest,
+    TextIntakeRequest,
 )
-from backend.app.intake.validation import find_non_packaging_terms, is_packaging_related
+from backend.app.intake.validation import (
+    check_rfi_readiness,
+    find_non_packaging_terms,
+    is_packaging_related,
+)
 
+logger = logging.getLogger(__name__)
 
+# Session store for conversational multi-turn intake
 _SESSIONS: dict[str, PackagingIntakeState] = {}
+
+
+# ==============================================================================
+# Direct RFI Lifecycle & Intake Services
+# ==============================================================================
+
+
+async def process_text_intake(
+    request: TextIntakeRequest,
+    secrets: AppSecrets,
+    agent: Any | None = None,
+) -> IntakeExtractionResult:
+    """Parse raw text, extract structured packaging requirements, apply defaults, and optionally create an RFI."""
+    result = await extract_requirements(request.text, agent=agent)
+
+    if request.title:
+        result.title = request.title
+
+    # Automatically create RFI if requested and valid
+    if request.create_rfi and result.is_packaging and result.requirements:
+        repo = RFIRepository(secrets)
+        items_payload = [req.model_dump() for req in result.requirements]
+        rfi_payload = {
+            "title": result.title,
+            "category": result.detected_category,
+            "scope": f"Requirements parsed from text input: {request.text[:120]}...",
+            "currency": result.requirements[0].currency if result.requirements else "INR",
+            "status": "ready" if result.ready_for_rfi else "draft",
+            "source": "text_intake",
+        }
+        created = repo.create(rfi_payload, items_payload)
+        result.rfi_id = created["id"]
+        result.message += f" | Created RFI #{created['id']} ({created['status']})"
+
+    return result
+
+
+def process_excel_intake(
+    *,
+    file_name: str,
+    content: bytes,
+    content_type: str | None,
+    secrets: AppSecrets,
+    create_rfi: bool = False,
+    title: str | None = None,
+) -> ExcelIntakeResponse:
+    """Parse spreadsheet bytes, normalize packaging line items, and optionally create an RFI."""
+    extraction = parse_spreadsheet_bytes(
+        file_name=file_name,
+        content=content,
+        content_type=content_type,
+    )
+
+    requirements: list[PackagingRequirement] = []
+    errors = list(extraction.errors)
+
+    if extraction.rows:
+        reqs, issues = rows_to_packaging_requirements(extraction.rows)
+        requirements.extend(reqs)
+        errors.extend(issues)
+
+    is_ready, blockers = check_rfi_readiness(requirements)
+    if not is_ready:
+        errors.extend(blockers)
+
+    rfi_id: int | None = None
+    if create_rfi and requirements:
+        repo = RFIRepository(secrets)
+        items_payload = [req.model_dump() for req in requirements]
+        rfi_payload = {
+            "title": title or f"RFI from {file_name}",
+            "category": requirements[0].category if requirements else "Corrugated packaging",
+            "scope": f"Imported from {file_name} ({len(requirements)} line items)",
+            "currency": requirements[0].currency if requirements else "INR",
+            "status": "ready" if is_ready else "draft",
+            "source": "excel_intake",
+        }
+        created = repo.create(rfi_payload, items_payload)
+        rfi_id = created["id"]
+
+    # Calculate distinct sheets
+    sheets = {r.get("_sheet", "Sheet1") for r in extraction.rows}
+
+    return ExcelIntakeResponse(
+        file_name=file_name,
+        total_sheets=len(sheets) if sheets else 1,
+        rows_parsed=len(extraction.rows),
+        errors=errors,
+        requirements=requirements,
+        ready_for_rfi=is_ready,
+        rfi_id=rfi_id,
+    )
+
+
+def create_rfi(request: RFICreateRequest, secrets: AppSecrets) -> dict[str, Any]:
+    """Create a new RFI in the database with canonical line items."""
+    repo = RFIRepository(secrets)
+    items_data = [req.model_dump() for req in request.requirements]
+    rfi_data = {
+        "title": request.title,
+        "category": request.category,
+        "scope": request.scope,
+        "currency": request.currency,
+        "payment_terms": request.payment_terms,
+        "delivery_terms": request.delivery_terms,
+        "validity_days": request.validity_days,
+        "response_deadline": request.response_deadline,
+        "status": request.status.value if isinstance(request.status, RFIStatus) else request.status,
+        "source": request.source,
+    }
+    return repo.create(rfi_data, items_data)
+
+
+def get_rfi(rfi_id: int, secrets: AppSecrets) -> dict[str, Any] | None:
+    """Retrieve an RFI by ID."""
+    repo = RFIRepository(secrets)
+    return repo.get_by_id(rfi_id)
+
+
+def update_rfi(rfi_id: int, request: RFIUpdateRequest, secrets: AppSecrets) -> dict[str, Any] | None:
+    """Update editable fields of an RFI."""
+    repo = RFIRepository(secrets)
+    updates = request.model_dump(exclude_unset=True)
+    if "status" in updates and isinstance(updates["status"], RFIStatus):
+        updates["status"] = updates["status"].value
+    return repo.update(rfi_id, updates)
+
+
+def trigger_rfi(rfi_id: int, secrets: AppSecrets) -> dict[str, Any]:
+    """Trigger an RFI, moving its state to TRIGGERED."""
+    repo = RFIRepository(secrets)
+    return repo.trigger(rfi_id)
+
+
+# ==============================================================================
+# Conversational Intake Session Support (Chat UI compatibility)
+# ==============================================================================
 
 
 def get_intake_state(conversation_id: str) -> PackagingIntakeState:
@@ -133,7 +291,11 @@ def _merge_text(state: PackagingIntakeState, message: str) -> None:
         state.title = _title_from_message(message)
 
     if not state.delivery_location:
-        location_match = re.search(r"(?:deliver(?:y)?\s+(?:to|at)|warehouse\s+at|location\s*:?)\s+([a-zA-Z0-9 ,.-]+)", message, re.I)
+        location_match = re.search(
+            r"(?:deliver(?:y)?\s+(?:to|at)|warehouse\s+at|location\s*:?)\s+([a-zA-Z0-9 ,.-]+)",
+            message,
+            re.I,
+        )
         if location_match:
             state.delivery_location = location_match.group(1).strip(" .")
 
@@ -283,12 +445,12 @@ def _is_final_approval(message: str) -> bool:
 def _format_line_items_and_terms(state: PackagingIntakeState) -> str:
     line_bits = []
     for item in state.line_items:
+        qty_str = f"{item.quantity or 'TBD'} {item.unit or ''}".strip()
         line_bits.append(
-            "- "
-            f"{item.item_number}. {item.description}"
-            f" | category: {item.packaging_category or 'packaging'}"
-            f" | qty: {item.quantity or 'TBD'} {item.unit or ''}".rstrip()
-            f" | specs: {item.specifications or 'standard warehouse packaging specs'}"
+            f"- {item.item_number}. {item.description} | "
+            f"category: {item.packaging_category or 'packaging'} | "
+            f"qty: {qty_str} | "
+            f"specs: {item.specifications or 'standard warehouse packaging specs'}"
         )
 
     deadline = state.terms.response_deadline.isoformat() if state.terms.response_deadline else "TBD"

@@ -56,6 +56,7 @@ app.include_router(chat_router)
 app.include_router(rfi_router)
 
 
+@app.get("/health", tags=["system"])
 @app.get("/api/health", tags=["system"])
 async def health_check() -> dict:
     """System health check endpoint."""
@@ -67,6 +68,7 @@ async def health_check() -> dict:
     }
 
 
+@app.get("/health/db", tags=["system"])
 @app.get("/api/db/health", tags=["system"])
 async def database_health_check() -> dict:
     """Check configured Postgres connectivity and schema availability."""

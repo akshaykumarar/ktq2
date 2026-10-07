@@ -10,6 +10,7 @@ from backend.app.agents.rfx import create_rfx_agent
 from backend.app.agents.vendor import create_vendor_agent
 from backend.app.agents.status import create_status_agent
 from backend.app.agents.master import create_master_agent
+from backend.app.intake.agent import create_rfi_parser_agent
 
 
 class AgentRegistry:
@@ -72,6 +73,8 @@ class AgentFactory:
                 specialists["vendor"] = create_vendor_agent(model, agent_cfg.instructions)
             elif name == "status":
                 specialists["status"] = create_status_agent(model, agent_cfg.instructions)
+            elif name == "rfi_parser":
+                specialists["rfi_parser"] = create_rfi_parser_agent(model, agent_cfg.instructions)
             else:
                 # Generic specialist fallback allowing easy extension
                 specialists[name] = Agent(model, system_prompt=agent_cfg.instructions)

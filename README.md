@@ -1,18 +1,34 @@
-# Configurable Multi-Agent Procurement Assistant & Chatbot
+# Configurable Multi-Agent Procurement Assistant & Packaging RFI Workflow
 
-A configurable multi-agent procurement product powered by **FastAPI** and **PydanticAI**, connected to the existing **AI-QL Chat UI** frontend.
+A configurable procurement product powered by **FastAPI**, **PydanticAI**, and **PostgreSQL**, connected to the existing **AI-QL Chat UI** frontend and supporting direct end-to-end Packaging RFI procurement workflows.
 
 ## Architecture
 
 ```text
-AI-QL Chat UI → FastAPI POST /api/chat → Master Agent → Specialist Agent → Mock Tools
+User / Warehouse Executive
+    │
+    ├── Plain Text Intake: POST /api/rfi/intake ────────────────┐
+    │                                                           │
+    ├── Excel Spreadsheet: POST /api/rfi/intake/excel ──────────┼──► [PydanticAI / Rule Extractor]
+    │                                                           │          │
+    └── Chat UI Frontend: POST /api/chat ───────────────────────┘          ▼
+                                                                  [Pydantic Validation & Defaults]
+                                                                           │
+                                                                           ▼
+                                                                  [PostgreSQL ktq.rfx / rfx_items]
+                                                                           │
+                                                                  ┌────────┴────────┐
+                                                                  ▼                 ▼
+                                                            PATCH /api/rfi/{id}   POST /api/rfi/{id}/trigger
+                                                            (Edit terms/status)   (DRAFT/READY -> TRIGGERED)
 ```
 
-- **Master Agent**: Understands user intent and delegates tasks to the appropriate specialist agent.
-- **RFX Agent**: Specializes in creating, drafting, and managing RFXs with tools (`create_rfx`, `get_rfx`).
-- **Vendor Agent**: Specializes in supplier discovery and vendor evaluations (`search_vendors`, `get_vendor_status`).
-- **Status Agent**: Specializes in real-time tracking of RFX progression and vendor responses (`get_rfx_status`, `get_vendor_status`).
-- **Preserved Vendor Flow**: Existing vendor webhook evaluation flow remains completely intact and supported.
+- **PydanticAI**: Primary agent & orchestration layer for packaging requirement extraction, classification, and normalization.
+- **WrenAI**: Preserved as secondary intelligence layer for semantic database analytics and natural language business intelligence queries over PostgreSQL.
+- **PostgreSQL**: Source of truth storing RFIs (`ktq.rfx`), line items (`ktq.rfx_items`), and audit history (`ktq.rfx_activity`) under the dynamically configured schema (`DB_SCHEMA`, default `ktq`).
+- **Pydantic Models**: Canonical, type-safe contracts across parsing, AI extraction, REST APIs, and database persistence.
+
+---
 
 ## Quickstart & Setup
 
@@ -23,123 +39,95 @@ AI-QL Chat UI → FastAPI POST /api/chat → Master Agent → Specialist Agent �
 ### 2. Installation
 
 ```bash
-# Create virtual environment if not existing
-python3 -m venv .venv
+# Activate virtual environment
 source .venv/bin/activate
 
 # Install requirements
-pip install fastapi uvicorn "pydantic>=2.10" pyyaml python-dotenv httpx pytest pydantic-ai
+pip install fastapi uvicorn "pydantic>=2.10" pyyaml python-dotenv httpx pytest pydantic-ai "psycopg[binary]" openpyxl
 ```
 
 ### 3. Environment Secrets
 
-Copy `.env.example` to `.env` and fill in secrets as needed:
+Copy `.env.example` to `.env` and configure secrets:
 
 ```bash
 cp .env.example .env
 ```
 
-`.env` contains provider secrets:
+Database & provider settings:
 ```dotenv
 OPENAI_API_KEY=
 ANTHROPIC_API_KEY=
 GOOGLE_API_KEY=
 OLLAMA_BASE_URL=http://localhost:11434
+
+# PostgreSQL Configuration
+POSTGRES_MODE=cloud
+DB_HOST=ep-muddy-voice-aozlceqy-pooler.c-2.ap-southeast-1.aws.neon.tech
+DB_PORT=5432
+DB_NAME=neondb
+DB_USER=neondb_owner
+DB_PASSWORD=your_password
+DB_SSL_MODE=require
+DB_CHANNEL_BINDING=require
+DB_SCHEMA=ktq
+# Alternatively:
+# DATABASE_URL=postgresql://user:password@host:5432/dbname?sslmode=require
 ```
 
-> **Note**: If API keys are omitted or offline, the system automatically falls back to safe mock tool execution for instant end-to-end demonstrations without crashing.
+> **Note**: If database or LLM API keys are offline, the system automatically uses mock and memory fallback mechanisms for instant, uninterrupted test runs and local demos.
 
 ### 4. Running the Application
 
-Start the unified FastAPI backend and UI server:
+Start the unified FastAPI backend:
 
 ```bash
-# From repository root
 .venv/bin/uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Then visit:
-- **Chat UI**: [http://localhost:8000/ui/](http://localhost:8000/ui/) (or [http://localhost:8000/](http://localhost:8000/))
-- **Interactive API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Health Check**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
+- **Chat UI**: [http://localhost:8000/ui/](http://localhost:8000/ui/)
+- **Interactive OpenAPI Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **System Health**: [http://localhost:8000/health](http://localhost:8000/health)
+- **Database Health**: [http://localhost:8000/health/db](http://localhost:8000/health/db)
 
-Alternatively, the frontend in `chatbot/` can also be served via any static HTTP server (e.g. `python3 -m http.server 8080`) thanks to CORS enablement.
+---
+
+## Packaging RFI API Endpoints
+
+### 1. Health Checks
+- `GET /health` (or `/api/health`): Verifies running service and initialized agents.
+- `GET /health/db` (or `/api/db/health`): Verifies PostgreSQL connectivity, schema existence, and query execution without leaking credentials.
+
+### 2. Text Requirement Intake
+- `POST /api/rfi/intake`
+  - Accepts raw text requirements (e.g. `"Need 5000 boxes, 600x400x300 mm, 5 ply kraft, delivery by 30 Nov."`).
+  - Extracts structured items, dimensions, plies, material, required date, and target price.
+  - Identifies missing critical fields without hallucinating them.
+  - Optionally creates an RFI immediately if `create_rfi=true`.
+
+### 3. Excel Spreadsheet Intake
+- `POST /api/rfi/intake/excel` (multipart/form-data)
+  - Accepts `.xlsx` or `.csv` workbooks.
+  - Tolerant header mapping (`qty`, `volume`, `quantity` → `quantity`; `specs`, `notes` → `specifications`).
+  - Captures row-level errors without failing entire file.
+  - Supports multi-sheet extraction.
+
+### 4. RFI Lifecycle & Management
+- `POST /api/rfi`: Direct creation of an RFI with structured requirements.
+- `GET /api/rfi/{id}`: Retrieve RFI metadata, commercial terms, and line items.
+- `PATCH /api/rfi/{id}`: Safely update editable fields (`title`, `terms`, `status`, `validity_days`, `response_deadline`).
+- `POST /api/rfi/{id}/trigger`: Validates readiness, transitions status to `TRIGGERED`, records `triggered_at` timestamp.
+
+---
 
 ## Configuration
 
-All models, parameters, and agent system instructions are decoupled from Python code:
+Agent and model configurations are decoupled from Python code:
+- `config/llms.yaml`: LLM presets (`reasoning`, `fast`).
+- `config/agents.yaml`: Agent definitions (`master`, `rfx`, `vendor`, `status`, `rfi_parser`).
 
-### `config/llms.yaml`
-Define model presets, temperature, max tokens, and provider:
-```yaml
-llms:
-  reasoning:
-    provider: openai
-    model: gpt-5
-    temperature: 0.1
-    max_tokens: 4000
-
-  fast:
-    provider: openai
-    model: gpt-5-mini
-    temperature: 0.2
-    max_tokens: 2500
-```
-Supported providers: `openai`, `anthropic`, `google` (Gemini), `ollama`, and `test`/`mock`.
-
-### `config/agents.yaml`
-Map agents to LLM presets and customize their system instructions:
-```yaml
-agents:
-  master:
-    llm: reasoning
-    instructions: |
-      You are the Procurement Assistant.
-      Understand the user's request and delegate it
-      to the appropriate specialist agent.
-      Do not perform specialist work yourself.
-
-  rfx:
-    llm: reasoning
-    instructions: |
-      You are an RFX specialist.
-      Help users create and manage procurement RFXs.
-
-  vendor:
-    llm: fast
-    instructions: |
-      You are a Vendor specialist.
-      Help users find vendors and check vendor status.
-
-  status:
-    llm: fast
-    instructions: |
-      You are a Procurement Status specialist.
-      Help users check RFX and vendor status.
-```
-
-Changing an agent's model requires **only editing `config/agents.yaml`** (no code modifications needed).
-
-## API Endpoints
-
-### `POST /api/chat`
-
-**Request:**
-```json
-{
-  "message": "Create an RFX for 200 laptops",
-  "conversation_id": "session-123"
-}
-```
-
-**Response:**
-```json
-{
-  "message": "I have created a new RFX for you:\n\n- **RFX ID**: `RFX-A1B2C3`\n- **Title**: Create an RFX for 200 laptops\n- **Quantity**: 200\n- **Status**: Draft\n...",
-  "agent": "rfx",
-  "conversation_id": "session-123"
-}
-```
+---
 
 ## Running Tests
 
