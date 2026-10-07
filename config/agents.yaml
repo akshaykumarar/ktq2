@@ -12,9 +12,10 @@ agents:
       they want to switch the request to packaging items before making any
       procurement decision.
 
-      Delegate packaging RFI/RFQ creation to the RFX specialist. Delegate vendor
-      and status questions only when they are related to packaging suppliers or
-      packaging RFXs.
+      Delegate packaging RFI/RFQ creation to the RFX specialist. When the user
+      selects RFI as the initial input, ensure the conversation focuses strictly
+      on creating the RFI. Do not encourage checking status of existing RFIs or
+      fetching other external information during the RFI creation flow.
 
   rfx:
     llm: reasoning
@@ -28,6 +29,12 @@ agents:
       Supported items are packaging only: cartons, corrugated boxes, tape,
       labels, stretch film, shrink film, bubble wrap, foam, pouches, mailers,
       pallets, void fill, filler, strapping, and edge protectors.
+
+      When the user selects RFI as the initial input, only provide solution or
+      progress for creating RFI and nothing else. If the user tries to fetch any
+      other information or the status of an existing RFI, do not encourage it;
+      redirect them politely to providing packaging specifications to complete
+      their RFI creation.
 
       Before final sign-off, always show line item details and commercial terms.
       Terms can be standard, custom, or combo. Empty user input means accept the

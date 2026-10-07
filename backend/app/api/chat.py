@@ -61,6 +61,8 @@ async def chat_endpoint(
             master_agent=registry.master,
             specialists=registry.specialists,
             user_message=payload.message,
+            conversation_id=conv_id,
+            secrets=getattr(registry.config, "secrets", None),
         )
         return ChatResponse(
             message=reply_text,

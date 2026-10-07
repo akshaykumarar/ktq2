@@ -1,5 +1,12 @@
 ## Current State
 - Configurable multi-agent chatbot system extended with end-to-end Packaging RFI workflow:
+  - **Conversational RFI Chat Workflow (`POST /api/chat`)**:
+    - **Welcome Card Initiation**: UI starter card updated to "Create an RFI".
+    - **Chat Loader**: Added visual response loader bubble in chat stream and input box loading state whenever an outcome is expected (`generating == true`).
+    - **Session State & RFI Focus**: When user selects RFI as initial input, the session enters a dedicated RFI creation workflow (`ChatSessionState` in `backend/app/agents/master.py`).
+    - **Requirement Guidance & Extraction**: If started with "Create an RFI", asks for packaging requirements instead of prematurely creating empty dummy records. When requirements are provided (e.g. 10 corrugated boxes, 300x200x150 mm to Bangalore), extracts dimensions, quantity, delivery date, and location, creates a draft RFI in the repository, and returns a structured line-item breakdown table, commercial terms, and next steps.
+    - **Multi-Line Item Extraction**: Natural language inputs containing multiple packaging requirements (e.g. "1000 corrugated boxes, 300 x 200 x 150 mm, and 300 rolls of brown tape") are segmented into distinct line items, each with individual dimensions, units, quantities, categories, and materials, and persisted as multiple line items in `ktq.rfx_items`.
+    - **Strict Guardrails**: When in RFI creation workflow, only solutions or progress for creating the RFI are provided. Inquiries about existing RFI status (e.g. "What is the status of RFX-101?", "Check vendor response") or external queries (vendor directories, external info) are not encouraged and politely redirected back to completing the RFI creation.
   - **Text Intake** (`POST /api/rfi/intake`): Natural language parsing of packaging requirements into structured `PackagingRequirement` items.
   - **Excel Intake** (`POST /api/rfi/intake/excel`): Openpyxl spreadsheet parser handling header variations, row-level validation, and canonical item extraction.
   - **PydanticAI Packaging Agent** (`backend/app/intake/agent.py`): Extracts typed requirements, dimensions, plies, material, required date, target price, and flags missing/ambiguous fields without hallucination. Configured as `rfi_parser` in `config/agents.yaml`.
@@ -11,11 +18,13 @@
     - `GET /api/rfi/{id}`: Retrieval of RFI and line items.
     - `PATCH /api/rfi/{id}`: Updating editable fields.
     - `POST /api/rfi/{id}/trigger`: Transitioning status to `TRIGGERED` and timestamp recording.
-- Preserved existing conversational chat (`POST /api/chat`) and Vendor webhook flow.
-- Preserved WrenAI directory for secondary semantic database querying and analytics.
-- Full pytest test suite passing 34 tests across agents, APIs, DB health, Excel intake, and RFI lifecycle with traceable logs in `artifacts/logs/test_run.log`.
+- Full pytest test suite passing 37 tests across agents, APIs, DB health, Excel intake, RFI lifecycle, and multi-line item conversational RFI workflow with traceable logs in `artifacts/logs/test_run.log`.
 
 ## Key Files
+- `chatbot/index.html`: AI-QL Vue 3 frontend with "Create an RFI" starter card and active outcome loader indicator.
+- `backend/app/agents/master.py`: Master Agent with session tracking, RFI focus guardrails, and deterministic delegation.
+- `backend/app/agents/rfx.py`: RFX specialist agent with requirement prompting fallback and draft creation.
+- `backend/app/api/chat.py`: FastAPI chat endpoint forwarding conversation IDs and secrets to orchestration.
 - `migrations/001_rfi.sql`: Idempotent SQL migration updating `rfx` status check constraints and sequences for the configured schema.
 - `backend/app/db/connection.py`: Dynamic schema connection context manager setting `search_path`.
 - `backend/app/db/health.py`: Database health check verifying connectivity, schema existence, and query execution without leaking credentials.
@@ -27,6 +36,6 @@
 - `backend/app/intake/service.py`: Orchestrator for intake, Excel conversion, and RFI lifecycle transitions.
 - `backend/app/api/rfi.py`: FastAPI routes for text intake, excel intake, RFI CRUD, and triggering.
 - `backend/app/main.py`: FastAPI application mounting routes, `/health`, `/health/db`, and UI.
-- `config/agents.yaml`: Agent definitions including `rfi_parser`.
-- `artifacts/plan_packaging_rfi_workflow.md`: Phased implementation plan.
+- `config/agents.yaml`: Agent definitions including updated RFI creation workflow instructions.
+- `artifacts/plan_rfi_workflow_fix.md`: Phased implementation plan for chat loader and working RFI workflow.
 - `artifacts/logs/test_run.log`: Test execution log trace.

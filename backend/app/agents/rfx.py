@@ -72,8 +72,20 @@ def create_rfx_agent(model: Model, instructions: str) -> Agent:
 
 def _fallback_rfx_execution(query: str) -> str:
     """Deterministic fallback using mock tools when offline or API call fails."""
-    q_lower = query.lower()
-    if "create" in q_lower or "new" in q_lower or "rfx for" in q_lower or "laptop" in q_lower:
+    q_lower = query.strip().lower()
+    if q_lower in ["create an rfx", "create an rfi", "rfi", "create rfi", "create rfx"]:
+        return (
+            "I will assist you in creating your new **Packaging RFI (Request for Information)**.\n\n"
+            "Please provide your packaging requirement details to proceed:\n"
+            "- **Item & Material**: e.g., Corrugated boxes, BOPP packing tape, stretch film\n"
+            "- **Dimensions / Specifications**: e.g., 300 x 200 x 150 mm (L x W x H), 3-ply/5-ply, GSM\n"
+            "- **Quantity Needed**: e.g., 10 units, 500 boxes\n"
+            "- **Delivery Destination & Date**: e.g., Bangalore by November 15, 2026\n"
+            "- **Target Price / Budget** *(optional)*\n\n"
+            "You can enter your specifications in natural language or paste your line item details."
+        )
+
+    if "create" in q_lower or "new" in q_lower or "rfx for" in q_lower or "laptop" in q_lower or "box" in q_lower:
         qty_match = re.search(r"(\d+)", query)
         qty = int(qty_match.group(1)) if qty_match else 1
         result = create_rfx(title=query, quantity=qty)

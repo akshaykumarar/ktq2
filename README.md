@@ -119,6 +119,14 @@ Then visit:
 - `PATCH /api/rfi/{id}`: Safely update editable fields (`title`, `terms`, `status`, `validity_days`, `response_deadline`).
 - `POST /api/rfi/{id}/trigger`: Validates readiness, transitions status to `TRIGGERED`, records `triggered_at` timestamp.
 
+### 5. Conversational RFI Workflow (`POST /api/chat` & `/ui`)
+- **Chat Outcome Loader**: Chat UI (`/ui`) displays an animated processing loader bubble in the chat view and input area whenever an outcome is expected.
+- **RFI Initial Input Flow**: When selecting "Create an RFI" from the welcome cards or user input, the assistant guides the user to supply packaging details instead of prematurely creating an empty dummy RFX.
+- **Multi-Line Item Extraction**: Seamlessly extracts multiple packaging requirements from a single prompt (e.g. `1000 corrugated boxes, 300 x 200 x 150 mm, and 300 rolls of brown tape`) into multiple distinct line items in `ktq.rfx_items`.
+- **Requirement Extraction**: Parses dimensions (L x W x H), quantity, delivery destination, and delivery date into structured line items, creates draft records in `ktq.rfx`, and outputs the formatted RFI solution and progress.
+- **Strict Guardrails**: When in the RFI creation workflow, only solutions and progress for creating the RFI are provided. Checking existing RFI status or fetching external information (vendor directories, general questions) is politely discouraged and redirected back to RFI creation.
+- **RFI Progression**: Users can review line items, amend terms, or say `"Trigger RFI"` to issue quote requests to qualified suppliers.
+
 ---
 
 ## Configuration

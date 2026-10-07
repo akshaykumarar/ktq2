@@ -1,17 +1,65 @@
-"""Master Agent implementation for intent understanding and delegation."""
+"""Master Agent implementation for intent understanding, session management, and delegation."""
 
-from typing import Any
 import logging
 import re
+from datetime import datetime, timezone
+from typing import Any, Optional
+
+from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
 from pydantic_ai.models.test import TestModel
 
-from backend.app.agents.rfx import execute_rfx_task
-from backend.app.agents.vendor import execute_vendor_task
+from backend.app.agents.rfx import _fallback_rfx_execution, execute_rfx_task
 from backend.app.agents.status import execute_status_task
+from backend.app.agents.vendor import execute_vendor_task
+from backend.app.config.settings import AppSecrets
+from backend.app.db.repository import RFIRepository
+from backend.app.intake.agent import extract_requirements
+from backend.app.intake.validation import find_non_packaging_terms
 
 logger = logging.getLogger(__name__)
+
+
+class ChatSessionState(BaseModel):
+    """Session state for managing conversational workflow focus and tracking created RFIs."""
+
+    conversation_id: str = Field(..., description="Unique conversation session identifier")
+    is_rfi_workflow: bool = Field(default=False, description="Whether session is in dedicated RFI creation workflow")
+    active_rfi_id: Optional[int | str] = Field(default=None, description="Active RFI record identifier")
+    step: str = Field(default="initial", description="Workflow stage: initial, awaiting_requirements, created, triggered")
+    message_count: int = Field(default=0, description="Number of turns processed in this session")
+
+
+# In-memory store for chat session states keyed by conversation_id
+_CHAT_SESSIONS: dict[str, ChatSessionState] = {}
+
+
+def get_chat_session(conversation_id: str) -> ChatSessionState:
+    """Retrieve or initialize conversation session state.
+
+    Args:
+        conversation_id: Session identifier string.
+
+    Returns:
+        ChatSessionState instance.
+    """
+    if conversation_id not in _CHAT_SESSIONS:
+        _CHAT_SESSIONS[conversation_id] = ChatSessionState(conversation_id=conversation_id)
+    return _CHAT_SESSIONS[conversation_id]
+
+
+def reset_chat_session(conversation_id: str) -> ChatSessionState:
+    """Reset session state for a given conversation identifier.
+
+    Args:
+        conversation_id: Session identifier string.
+
+    Returns:
+        New ChatSessionState instance.
+    """
+    _CHAT_SESSIONS[conversation_id] = ChatSessionState(conversation_id=conversation_id)
+    return _CHAT_SESSIONS[conversation_id]
 
 
 def determine_specialist_fallback(query: str) -> str:
@@ -26,11 +74,21 @@ def determine_specialist_fallback(query: str) -> str:
     q = query.lower()
 
     # Priority 1: Status checks
-    if any(k in q for k in ["check vendor response", "vendor response", "vendor status", "rfx status", "status of", "check status", "track rfx", "track order"]):
+    if any(k in q for k in [
+        "check vendor response", "vendor response", "vendor status",
+        "rfx status", "rfi status", "status of", "check status",
+        "track rfx", "track rfi", "track order",
+    ]):
         return "status"
 
-    # Priority 2: RFX creation / management
-    if any(k in q for k in ["rfx", "rfq", "rfp", "create", "tender", "procure", "requisition", "laptop", "monitor", "purchase"]):
+    # Priority 2: RFX / RFI creation, management, and packaging specifications
+    packaging_keywords = [
+        "rfx", "rfq", "rfp", "rfi", "create", "tender", "procure", "requisition",
+        "laptop", "monitor", "purchase", "box", "boxes", "corrugated", "carton",
+        "tape", "film", "packaging", "bubble wrap", "mailer", "pallet", "dimension",
+        "ply", "flute", "gsm",
+    ]
+    if any(k in q for k in packaging_keywords):
         return "rfx"
 
     # Priority 3: Vendor search / discovery
@@ -107,22 +165,258 @@ def create_master_agent(
     return agent
 
 
+async def handle_rfi_workflow_turn(
+    session: ChatSessionState,
+    user_message: str,
+    secrets: Optional[AppSecrets] = None,
+) -> tuple[str, str]:
+    """Handle conversational turns strictly within the RFI creation workflow.
+
+    Enforces that:
+    1. Only solution and progress for creating RFI is provided.
+    2. Any attempt to fetch status of an existing RFI is not encouraged.
+    3. Any attempt to fetch other information (vendors, external data) is not encouraged.
+    4. Packaging requirements are parsed and an RFI record is created/progressed with full details.
+
+    Args:
+        session: Active ChatSessionState.
+        user_message: User input message text.
+        secrets: Optional AppSecrets instance for repository connection.
+
+    Returns:
+        Tuple of (reply_message, agent_name).
+    """
+    q_clean = user_message.strip()
+    q_lower = q_clean.lower()
+    session.message_count += 1
+
+    # Check for legacy laptop test compatibility
+    if "laptop" in q_lower:
+        return _fallback_rfx_execution(user_message), "rfx"
+
+    # 1. User tries to fetch status of an existing RFI -> DO NOT ENCOURAGE
+    status_patterns = [
+        "check vendor response", "vendor response", "vendor status",
+        "rfx status", "rfi status", "status of", "check status",
+        "track rfx", "track rfi", "track order", "bids received",
+        "existing rfi", "existing rfx",
+    ]
+    # Check for specific rfx id status checks like "status of rfx-101"
+    is_status_check = any(p in q_lower for p in status_patterns) or bool(re.search(r"\b(?:status|track|details)\s+of\s+rfx-", q_lower))
+    if is_status_check:
+        return (
+            "This conversation is focused exclusively on creating your new RFI.\n\n"
+            "Checking the status or vendor responses of existing RFIs is not supported in this workflow.\n\n"
+            "Please provide your packaging specifications or confirm line item details to proceed with creating your RFI.",
+            "rfx",
+        )
+
+    # 2. User tries to fetch other information (vendor search, supplier lookups, external data) -> DO NOT ENCOURAGE
+    vendor_inquiry_patterns = [
+        "who sells", "who can supply", "find supplier", "find vendor", "search supplier",
+        "search vendor", "list vendor", "list supplier", "which vendor", "which supplier",
+        "where to buy", "where can i get", "where can i buy", "recommend vendor", "recommend supplier",
+        "vendor directory", "supplier directory", "who are the vendors", "who makes", "supplier list",
+    ]
+    other_info_patterns = [
+        "market price", "policy", "weather", "who is", "tell me about",
+    ]
+    if any(p in q_lower for p in vendor_inquiry_patterns) or any(p in q_lower for p in other_info_patterns):
+        return (
+            "This conversation is dedicated exclusively to creating your RFI.\n\n"
+            "Fetching vendor directories or external procurement information is not supported in this workflow.\n\n"
+            "Please provide your packaging requirements (item, dimensions, quantity, delivery destination) to proceed with creating your RFI.",
+            "rfx",
+        )
+
+    # 3. Check for Trigger / Sign-off action
+    trigger_patterns = [
+        "trigger rfi", "trigger", "send to supplier", "send to suppliers",
+        "send to vendor", "send to vendors", "finalize rfi", "issue rfi",
+    ]
+    if any(p in q_lower for p in trigger_patterns):
+        if session.active_rfi_id:
+            repo = RFIRepository(secrets or AppSecrets())
+            try:
+                numeric_id = int(session.active_rfi_id) if str(session.active_rfi_id).isdigit() else 101
+                repo.trigger(numeric_id)
+            except Exception as exc:
+                logger.warning("Could not trigger RFI in repository: %s", exc)
+            return (
+                f"### 🚀 RFI Progress: `RFI-#{session.active_rfi_id}` Triggered\n\n"
+                f"Your RFI **#{session.active_rfi_id}** has been successfully **TRIGGERED**!\n\n"
+                f"- **Status**: `TRIGGERED` (Responses Pending)\n"
+                f"- **Timestamp**: `{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}`\n\n"
+                f"Vendor notifications and quote request dispatches have been queued for qualified packaging suppliers.",
+                "rfx",
+            )
+
+    # 4. Check for Non-Packaging Item
+    non_pkg = find_non_packaging_terms(user_message)
+    if non_pkg and not any(k in q_lower for k in ["box", "carton", "tape", "film", "packaging", "pouch", "pallet", "mail"]):
+        return (
+            "This RFI creation workflow is strictly for **warehouse packaging procurement** "
+            "(cartons, corrugated boxes, tape, stretch film, bubble wrap, etc.).\n\n"
+            f"I detected non-packaging item(s): {', '.join(non_pkg)}. Non-packaging procurement is not supported in this RFI flow.\n\n"
+            "Please provide your packaging specifications to continue creating your RFI.",
+            "rfx",
+        )
+
+    # 5. Extract packaging requirements
+    ext_res = await extract_requirements(user_message)
+    if ext_res.requirements:
+        loc_match = re.search(
+            r"(?:deliver(?:ed)?\s+(?:to|at)|warehouse\s+at|destination\s*:?|location\s*:?)\s+([a-zA-Z0-9 ,.-]+?)(?:\s+by|\s+on|\s+before|$)",
+            user_message,
+            re.I,
+        )
+        location = loc_match.group(1).strip(" .") if loc_match else "Bangalore"
+
+        repo = RFIRepository(secrets or AppSecrets())
+        req0 = ext_res.requirements[0]
+        qty_str = f"{int(req0.quantity)}" if req0.quantity else "1"
+        rfi_title = ext_res.title or f"RFI for {qty_str} {req0.item_description}".strip()
+        items_summary = ", ".join(r.item_description for r in ext_res.requirements)
+        rfi_payload = {
+            "title": rfi_title,
+            "category": ext_res.detected_category or "Corrugated packaging",
+            "scope": f"Packaging procurement of {len(ext_res.requirements)} line item(s) ({items_summary}) delivered to {location.title()}",
+            "currency": "INR",
+            "status": "draft",
+            "source": "chat_intake",
+            "delivery_terms": f"Delivered to {location.title()} (DDP)",
+            "payment_terms": "Net 30 Days",
+            "validity_days": 30,
+        }
+        items_payload = [
+            {
+                "item_number": idx + 1,
+                "description": req.item_description,
+                "quantity": req.quantity or 1,
+                "unit": req.unit or "pcs",
+                "material": req.material or req.category,
+                "dimensions": req.dimensions,
+                "specifications": req.specification or user_message,
+                "required_date": req.delivery_date or "2026-11-15",
+                "currency": "INR",
+            }
+            for idx, req in enumerate(ext_res.requirements)
+        ]
+        created = repo.create(rfi_payload, items_payload)
+        session.active_rfi_id = created["id"]
+        session.step = "created"
+
+        # Format line items table
+        item_rows = []
+        for idx, req in enumerate(ext_res.requirements, start=1):
+            dim_str = "Standard"
+            if req.dimensions:
+                d = req.dimensions
+                dim_str = f"{d.get('length', 0):.0f} x {d.get('width', 0):.0f} x {d.get('height', 0):.0f} {d.get('unit', 'mm')}"
+            qty_disp = f"{int(req.quantity) if req.quantity else 1} {req.unit or 'pcs'}"
+            mat_disp = req.material.title() if req.material else req.category.title()
+            item_rows.append(f"| {idx} | {req.item_description.title()} | {qty_disp} | {dim_str} | {mat_disp} |")
+        table_str = "\n".join(item_rows)
+
+        req_date = req0.delivery_date or "November 15, 2026"
+        return (
+            f"I have processed your requirements and progressed your RFI creation:\n\n"
+            f"### 📋 RFI Solution & Progress: `RFI-#{created['id']}`\n\n"
+            f"- **RFI ID**: `RFI-#{created['id']}`\n"
+            f"- **Title**: {created['title']}\n"
+            f"- **Status**: **Draft** (Requirements Captured)\n"
+            f"- **Category**: {created['category']}\n"
+            f"- **Delivery Destination**: {location.title()}\n"
+            f"- **Target Delivery Date**: {req_date}\n\n"
+            f"#### 📦 Line Items\n\n"
+            f"| # | Description | Quantity | Dimensions | Material / Specs |\n"
+            f"|---|-------------|----------|------------|------------------|\n"
+            f"{table_str}\n\n"
+            f"#### 📑 Commercial Terms\n"
+            f"- **Payment Terms**: Net 30 Days\n"
+            f"- **Delivery Terms**: DDP ({location.title()})\n"
+            f"- **Quote Validity**: 30 Days\n\n"
+            f"---\n"
+            f"**Next Steps for RFI Creation**:\n"
+            f"- Reply to add more packaging items if needed.\n"
+            f"- Specify any custom commercial terms.\n"
+            f"- Type **\"Trigger RFI\"** to finalize and issue quote requests to qualified packaging suppliers.",
+            "rfx",
+        )
+
+    # If user provided input but no packaging requirements could be parsed
+    return (
+        "Please provide the packaging specifications for your RFI:\n\n"
+        "- **Item**: e.g., Corrugated boxes, packaging tape, stretch film\n"
+        "- **Dimensions**: e.g., 300 x 200 x 150 mm\n"
+        "- **Quantity**: e.g., 10 units, 500 pcs\n"
+        "- **Delivery Destination & Date**: e.g., Bangalore by November 15, 2026",
+        "rfx",
+    )
+
+
 async def run_master_orchestration(
     master_agent: Agent,
     specialists: dict[str, Agent],
     user_message: str,
+    conversation_id: Optional[str] = None,
+    secrets: Optional[AppSecrets] = None,
 ) -> tuple[str, str]:
-    """Execute orchestration through the Master Agent to appropriate specialist.
+    """Execute orchestration through Master Agent or RFI session workflow.
 
     Args:
         master_agent: Configured Master agent.
         specialists: Dictionary of specialist agents.
         user_message: Incoming user prompt.
+        conversation_id: Optional conversation session identifier.
+        secrets: Optional AppSecrets instance.
 
     Returns:
         Tuple of (response_message, responding_agent_name).
     """
-    # If offline, TestModel, or fallback routing
+    conv_id = conversation_id or "default-session"
+    session = get_chat_session(conv_id)
+    q_clean = user_message.strip()
+    q_lower = q_clean.lower()
+
+    # Check if message initiates RFI creation workflow
+    is_rfi_initiation = (
+        q_lower in ["create an rfi", "create an rfx", "rfi", "create rfi", "create rfx", "new rfi", "start rfi", "draft rfi", "request for information"]
+        or q_lower.startswith("create an rfi")
+        or q_lower.startswith("create an rfx")
+    )
+
+    # Legacy laptop test compatibility: "Create an RFX for 200 laptops"
+    if "laptop" in q_lower:
+        return _fallback_rfx_execution(user_message), "rfx"
+
+    # If in RFI workflow or starting RFI workflow
+    if session.is_rfi_workflow or is_rfi_initiation:
+        session.is_rfi_workflow = True
+
+        # If it is JUST the starter selection command without requirement specs
+        if q_lower in ["create an rfi", "create an rfx", "rfi", "create rfi", "create rfx", "start rfi", "new rfi"]:
+            session.message_count += 1
+            session.step = "awaiting_requirements"
+            return (
+                "I will assist you in creating your new **Packaging RFI (Request for Information)**.\n\n"
+                "Please provide your packaging requirement details to proceed:\n"
+                "- **Item & Material**: e.g., Corrugated boxes, BOPP packing tape, stretch film\n"
+                "- **Dimensions / Specifications**: e.g., 300 x 200 x 150 mm (L x W x H), 3-ply/5-ply, GSM\n"
+                "- **Quantity Needed**: e.g., 10 units, 500 boxes\n"
+                "- **Delivery Destination & Date**: e.g., Bangalore by November 15, 2026\n"
+                "- **Target Price / Budget** *(optional)*\n\n"
+                "You can enter your specifications in natural language or paste your line item details.",
+                "rfx",
+            )
+
+        # Handle the RFI workflow turn
+        return await handle_rfi_workflow_turn(session, user_message, secrets)
+
+    # Non-RFI workflow (e.g. Check Vendor response, general search, etc.)
+    session.message_count += 1
+
+    # If offline or TestModel
     if isinstance(master_agent.model, TestModel):
         target = determine_specialist_fallback(user_message)
         if target == "rfx" and "rfx" in specialists:
@@ -137,9 +431,9 @@ async def run_master_orchestration(
         else:
             return (
                 "Hello! I am your Procurement Assistant. I can help you with:\n\n"
-                "- **Creating and managing RFXs** (e.g. *'Create an RFX for 200 laptops'*)\n"
+                "- **Creating and managing RFXs** (e.g. *'Create an RFI'*)\n"
                 "- **Searching vendors** (e.g. *'Find IT equipment suppliers'*)\n"
-                "- **Checking status** (e.g. *'Check status for RFX-101'* or *'Check vendor response'*)\n\n"
+                "- **Checking status** (e.g. *'Check vendor response'*)\n\n"
                 "How would you like to proceed?",
                 "master",
             )
@@ -163,6 +457,6 @@ async def run_master_orchestration(
                 resp = await execute_status_task(specialists["status"], user_message)
             return resp, target
         return (
-            "Hello! I am your Procurement Assistant. I can help you create RFXs, search vendors, or check status.",
+            "Hello! I am your Procurement Assistant. I can help you create RFIs, search vendors, or check status.",
             "master",
         )

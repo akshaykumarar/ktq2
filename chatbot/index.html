@@ -356,14 +356,14 @@
                     <v-col cols="12" md="5" sm="6">
                         <v-card class="welcome-card pa-6 h-100 d-flex flex-column justify-space-between rounded-xl elevation-1"
                                 hover
-                                @click="selectOption('Create an RFX')">
+                                @click="selectOption('Create an RFI')">
                             <div>
                                 <v-avatar color="primary" variant="tonal" size="56" class="mb-4">
                                     <v-icon size="30" color="primary">mdi-file-document-plus-outline</v-icon>
                                 </v-avatar>
-                                <div class="text-h6 font-weight-bold mb-2 text-primary">Create an RFX</div>
+                                <div class="text-h6 font-weight-bold mb-2 text-primary">Create an RFI</div>
                                 <div class="text-body-2 text-medium-emphasis mb-4">
-                                    Draft requirements, define evaluation criteria, and generate new RFQ/RFP requests.
+                                    Draft packaging requirements, define line item specifications, and generate new RFI requests.
                                 </div>
                             </div>
                             <v-btn color="primary" variant="tonal" rounded="lg" block class="mt-2 font-weight-bold">
@@ -397,6 +397,20 @@
             <v-container v-show="messageStore.conversation.length > 0" class="chat-bot">
                 <tuui-chat-box :messages="messageStore.conversation" :size="settingStore.avatarSize"
                     :language="languageStore.getLocale"></tuui-chat-box>
+                <!-- Outcome Loader -->
+                <div v-if="messageStore.generating" class="px-2 py-4 chat-message">
+                    <div class="message align-center">
+                        <v-avatar :size="settingStore.avatarSize" class="mt-1 mr-3 mr-lg-6" color="teal">
+                            <v-icon color="white">mdi-lightning-bolt-circle</v-icon>
+                        </v-avatar>
+                        <v-card class="pa-4 d-flex align-center rounded-xl" elevation="1" color="#f8fafc" min-width="260" border>
+                            <v-progress-circular indeterminate color="primary" size="22" width="3" class="mr-3"></v-progress-circular>
+                            <span class="text-body-2 font-weight-medium text-primary">
+                                Assistant is processing your request...
+                            </span>
+                        </v-card>
+                    </div>
+                </div>
                 <div class="fill-area"></div>
             </v-container>
             <div class="input-area" v-show="messageStore.conversation.length > 0">
@@ -405,7 +419,7 @@
                         <v-row>
                             <v-textarea class="input-box" dirty color="primary" type="text" variant="solo" counter
                                 clearable @keydown="messageStore.handleKeydown" v-model="messageStore.userMessage"
-                                :label="" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
+                                :loading="messageStore.generating" :label="" @focus="settingStore.setInputRow(2,0)" @blur="settingStore.setInputRow(1,150)"
                                 :rows="settingStore.inputRow" auto-grow max-rows="15">
                                 <template v-slot:prepend-inner>
                                     <v-container>
@@ -1795,7 +1809,14 @@
 
                         },
                         startInference: async function () {
+                            this.generating = true;
                             this.clear();
+                            try {
+                                const chatBot = document.querySelector(".chat-bot");
+                                if (chatBot) {
+                                    window.scrollTo({ top: chatBot.scrollHeight + 120, behavior: "smooth" });
+                                }
+                            } catch (e) {}
                             await createCompletion(this.conversation);
                             await this.postToolCall()
                         },
