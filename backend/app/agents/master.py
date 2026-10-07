@@ -29,6 +29,7 @@ class ChatSessionState(BaseModel):
     active_rfi_id: Optional[int | str] = Field(default=None, description="Active RFI record identifier")
     step: str = Field(default="initial", description="Workflow stage: initial, awaiting_requirements, created, triggered")
     message_count: int = Field(default=0, description="Number of turns processed in this session")
+    pending_confirmation: Optional[dict[str, Any]] = Field(default=None, description="Pending confirmation action or duplicate check")
 
 
 # In-memory store for chat session states keyed by conversation_id
@@ -229,6 +230,63 @@ async def handle_rfi_workflow_turn(
             "rfx",
         )
 
+    repo = RFIRepository(secrets or AppSecrets())
+
+    # Helper function to format RFI summary card
+    def _format_rfi_card(rfi_record: dict[str, Any], intro_msg: str = "I have processed your requirements and progressed your RFI creation:") -> str:
+        rfi_id = rfi_record["id"]
+        title = rfi_record.get("title", f"RFI-#{rfi_id}")
+        status = rfi_record.get("status", "draft").title()
+        category = rfi_record.get("category", "Packaging & Dispatch Supplies")
+        deliv_terms = rfi_record.get("delivery_terms") or "DDP (Bangalore)"
+        deliv_dest = "Bangalore"
+        m = re.search(r"\(([^)]+)\)", deliv_terms)
+        if m:
+            deliv_dest = m.group(1)
+
+        items = rfi_record.get("items", [])
+        item_rows = []
+        target_date = "November 15, 2026"
+        for idx, it in enumerate(items, start=1):
+            dim_str = "Standard"
+            d = it.get("dimensions") or {}
+            if isinstance(d, dict) and d.get("length"):
+                dim_str = f"{d.get('length', 0):.0f} x {d.get('width', 0):.0f} x {d.get('height', 0):.0f} {d.get('unit', 'mm')}"
+            qty_val = it.get("quantity")
+            qty_disp = f"{int(qty_val) if qty_val and float(qty_val).is_integer() else qty_val} {it.get('unit', 'pcs')}"
+            mat_disp = (it.get("material") or "Standard").title()
+            desc_disp = str(it.get("description", f"Item {idx}")).title()
+            item_rows.append(f"| {idx} | {desc_disp} | {qty_disp} | {dim_str} | {mat_disp} |")
+            if it.get("required_date"):
+                target_date = it.get("required_date")
+
+        table_str = "\n".join(item_rows) if item_rows else "| - | No line items | - | - | - |"
+
+        return (
+            f"{intro_msg}\n\n"
+            f"### 📋 RFI Solution & Progress: `RFI-#{rfi_id}`\n\n"
+            f"- **RFI ID**: `RFI-#{rfi_id}`\n"
+            f"- **Title**: {title}\n"
+            f"- **Status**: **{status}** (Requirements Captured)\n"
+            f"- **Category**: {category}\n"
+            f"- **Delivery Destination**: {deliv_dest}\n"
+            f"- **Target Delivery Date**: {target_date}\n\n"
+            f"#### 📦 Line Items\n\n"
+            f"| # | Description | Quantity | Dimensions | Material / Specs |\n"
+            f"|---|-------------|----------|------------|------------------|\n"
+            f"{table_str}\n\n"
+            f"#### 📑 Commercial Terms\n"
+            f"- **Payment Terms**: {rfi_record.get('payment_terms', 'Net 30 Days')}\n"
+            f"- **Delivery Terms**: {deliv_terms}\n"
+            f"- **Quote Validity**: {rfi_record.get('validity_days', 30)} Days\n\n"
+            f"---\n"
+            f"**Next Steps for RFI Creation**:\n"
+            f"- Reply to add more packaging items or modify quantities.\n"
+            f"- Type **\"Remove item [number/name]\"** to remove an item.\n"
+            f"- Specify any custom commercial terms.\n"
+            f"- Type **\"Trigger RFI\"** to finalize and issue quote requests to qualified packaging suppliers."
+        )
+
     # 3. Check for Trigger / Sign-off action
     trigger_patterns = [
         "trigger rfi", "trigger", "send to supplier", "send to suppliers",
@@ -236,7 +294,6 @@ async def handle_rfi_workflow_turn(
     ]
     if any(p in q_lower for p in trigger_patterns):
         if session.active_rfi_id:
-            repo = RFIRepository(secrets or AppSecrets())
             try:
                 numeric_id = int(session.active_rfi_id) if str(session.active_rfi_id).isdigit() else 101
                 repo.trigger(numeric_id)
@@ -251,7 +308,34 @@ async def handle_rfi_workflow_turn(
                 "rfx",
             )
 
-    # 4. Check for Non-Packaging Item
+    # 4. Check for Pending Confirmation (e.g. Duplicate Item Confirmation)
+    if session.pending_confirmation:
+        pending = session.pending_confirmation
+        act = pending.get("action")
+        # Check user confirmation: yes, add, proceed, confirm, update
+        if any(w in q_lower for w in ["yes", "proceed", "confirm", "add anyway", "add it", "ok", "okay", "sure", "update"]):
+            session.pending_confirmation = None
+            if act == "add_items":
+                rfi_id = int(session.active_rfi_id) if str(session.active_rfi_id).isdigit() else 101
+                items_to_add = pending.get("items", [])
+                updated_rfi = repo.add_items(rfi_id, items_to_add)
+                return _format_rfi_card(updated_rfi, intro_msg="Confirmed! I have added the item(s) to your active RFI:"), "rfx"
+        elif any(w in q_lower for w in ["no", "cancel", "skip", "don't", "dont"]):
+            session.pending_confirmation = None
+            rfi_id = int(session.active_rfi_id) if str(session.active_rfi_id).isdigit() else 101
+            current_rfi = repo.get_by_id(rfi_id)
+            return _format_rfi_card(current_rfi, intro_msg="Understood. The duplicate item was not added. Here is your current active RFI:"), "rfx"
+
+    # 5. Check for Remove / Delete item command
+    remove_match = re.search(r"(?:remove|delete|drop)\s+(?:item\s+)?([a-zA-Z0-9\s-]+)", q_lower)
+    if remove_match and session.active_rfi_id:
+        target_identifier = remove_match.group(1).strip()
+        rfi_id = int(session.active_rfi_id) if str(session.active_rfi_id).isdigit() else 101
+        updated = repo.remove_item(rfi_id, target_identifier)
+        if updated:
+            return _format_rfi_card(updated, intro_msg=f"I have removed '{target_identifier}' from your active RFI:"), "rfx"
+
+    # 6. Check for Non-Packaging Item
     non_pkg = find_non_packaging_terms(user_message)
     if non_pkg and not any(k in q_lower for k in ["box", "carton", "tape", "film", "packaging", "pouch", "pallet", "mail"]):
         return (
@@ -262,7 +346,7 @@ async def handle_rfi_workflow_turn(
             "rfx",
         )
 
-    # 5. Extract packaging requirements
+    # 7. Extract packaging requirements
     ext_res = await extract_requirements(user_message)
     if ext_res.requirements:
         loc_match = re.search(
@@ -272,7 +356,63 @@ async def handle_rfi_workflow_turn(
         )
         location = loc_match.group(1).strip(" .") if loc_match else "Bangalore"
 
-        repo = RFIRepository(secrets or AppSecrets())
+        # Check if we already have an active RFI in this session
+        if session.active_rfi_id:
+            rfi_id = int(session.active_rfi_id) if str(session.active_rfi_id).isdigit() else 101
+            existing_rfi = repo.get_by_id(rfi_id)
+            if existing_rfi:
+                existing_items = existing_rfi.get("items", [])
+                
+                # Check for duplicates against existing items
+                duplicate_found = None
+                for new_req in ext_res.requirements:
+                    new_desc = new_req.item_description.lower().strip()
+                    for existing_item in existing_items:
+                        ex_desc = str(existing_item.get("description", "")).lower().strip()
+                        if new_desc in ex_desc or ex_desc in new_desc:
+                            duplicate_found = (existing_item, new_req)
+                            break
+                    if duplicate_found:
+                        break
+
+                new_items_payload = [
+                    {
+                        "item_number": len(existing_items) + idx + 1,
+                        "description": req.item_description,
+                        "quantity": req.quantity or 1,
+                        "unit": req.unit or "pcs",
+                        "material": req.material or req.category,
+                        "dimensions": req.dimensions,
+                        "specifications": req.specification or user_message,
+                        "required_date": req.delivery_date or "2026-11-15",
+                        "currency": "INR",
+                    }
+                    for idx, req in enumerate(ext_res.requirements)
+                ]
+
+                # If duplicate detected, request user confirmation before adding/modifying
+                if duplicate_found:
+                    ex_item, incoming_req = duplicate_found
+                    session.pending_confirmation = {
+                        "action": "add_items",
+                        "items": new_items_payload,
+                        "duplicate_item": ex_item,
+                    }
+                    ex_qty = f"{int(ex_item.get('quantity')) if ex_item.get('quantity') else 1} {ex_item.get('unit', 'pcs')}"
+                    new_qty = f"{int(incoming_req.quantity) if incoming_req.quantity else 1} {incoming_req.unit or 'pcs'}"
+                    return (
+                        f"⚠️ **Duplicate Item Detected**:\n\n"
+                        f"Your active RFI already contains **{ex_item.get('description')}** ({ex_qty}).\n"
+                        f"You requested to add **{incoming_req.item_description}** ({new_qty}).\n\n"
+                        f"Would you like to add this item to your RFI? (Reply **Yes** to confirm and add, or **No** to skip).",
+                        "rfx",
+                    )
+
+                # No duplicate: append directly to existing active RFI
+                updated_rfi = repo.add_items(rfi_id, new_items_payload)
+                return _format_rfi_card(updated_rfi, intro_msg=f"I have added {len(ext_res.requirements)} item(s) to your active RFI:"), "rfx"
+
+        # No active RFI yet: create the new RFI draft
         req0 = ext_res.requirements[0]
         qty_str = f"{int(req0.quantity)}" if req0.quantity else "1"
         rfi_title = ext_res.title or f"RFI for {qty_str} {req0.item_description}".strip()
@@ -306,43 +446,7 @@ async def handle_rfi_workflow_turn(
         session.active_rfi_id = created["id"]
         session.step = "created"
 
-        # Format line items table
-        item_rows = []
-        for idx, req in enumerate(ext_res.requirements, start=1):
-            dim_str = "Standard"
-            if req.dimensions:
-                d = req.dimensions
-                dim_str = f"{d.get('length', 0):.0f} x {d.get('width', 0):.0f} x {d.get('height', 0):.0f} {d.get('unit', 'mm')}"
-            qty_disp = f"{int(req.quantity) if req.quantity else 1} {req.unit or 'pcs'}"
-            mat_disp = req.material.title() if req.material else req.category.title()
-            item_rows.append(f"| {idx} | {req.item_description.title()} | {qty_disp} | {dim_str} | {mat_disp} |")
-        table_str = "\n".join(item_rows)
-
-        req_date = req0.delivery_date or "November 15, 2026"
-        return (
-            f"I have processed your requirements and progressed your RFI creation:\n\n"
-            f"### 📋 RFI Solution & Progress: `RFI-#{created['id']}`\n\n"
-            f"- **RFI ID**: `RFI-#{created['id']}`\n"
-            f"- **Title**: {created['title']}\n"
-            f"- **Status**: **Draft** (Requirements Captured)\n"
-            f"- **Category**: {created['category']}\n"
-            f"- **Delivery Destination**: {location.title()}\n"
-            f"- **Target Delivery Date**: {req_date}\n\n"
-            f"#### 📦 Line Items\n\n"
-            f"| # | Description | Quantity | Dimensions | Material / Specs |\n"
-            f"|---|-------------|----------|------------|------------------|\n"
-            f"{table_str}\n\n"
-            f"#### 📑 Commercial Terms\n"
-            f"- **Payment Terms**: Net 30 Days\n"
-            f"- **Delivery Terms**: DDP ({location.title()})\n"
-            f"- **Quote Validity**: 30 Days\n\n"
-            f"---\n"
-            f"**Next Steps for RFI Creation**:\n"
-            f"- Reply to add more packaging items if needed.\n"
-            f"- Specify any custom commercial terms.\n"
-            f"- Type **\"Trigger RFI\"** to finalize and issue quote requests to qualified packaging suppliers.",
-            "rfx",
-        )
+        return _format_rfi_card(created), "rfx"
 
     # If user provided input but no packaging requirements could be parsed
     return (

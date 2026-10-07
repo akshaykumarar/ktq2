@@ -2,17 +2,17 @@
 platform darwin -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0
 rootdir: /Users/akshaykumar/code/ktq2
 plugins: logfire-5.1.1, platformdirs-4.12.3, anyio-4.15.1
-collected 38 items
+collected 39 items
 
 backend/tests/test_agents.py ...                                         [  7%]
-backend/tests/test_api.py ..                                             [ 13%]
+backend/tests/test_api.py ..                                             [ 12%]
 backend/tests/test_chat_rfi_workflow.py ....                             [ 23%]
-backend/tests/test_config.py ....                                        [ 34%]
-backend/tests/test_db_health.py .....                                    [ 47%]
-backend/tests/test_excel_intake.py ....                                  [ 57%]
-backend/tests/test_providers.py .....                                    [ 71%]
+backend/tests/test_config.py ....                                        [ 33%]
+backend/tests/test_db_health.py .....                                    [ 46%]
+backend/tests/test_excel_intake.py ....                                  [ 56%]
+backend/tests/test_providers.py ......                                   [ 71%]
 backend/tests/test_rfi_lifecycle.py ..                                   [ 76%]
-backend/tests/test_text_intake.py ....                                   [ 86%]
+backend/tests/test_text_intake.py ....                                   [ 87%]
 backend/tests/test_tools.py .....                                        [100%]
 
 =============================== warnings summary ===============================
@@ -21,4 +21,4 @@ backend/tests/test_tools.py .....                                        [100%]
     VersionedUnionType = Union[builtin_types.UnionType, _UnionGenericAlias]
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================== 38 passed, 1 warning in 2.61s =========================
+======================== 39 passed, 1 warning in 3.00s =========================

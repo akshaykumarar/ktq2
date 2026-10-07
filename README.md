@@ -75,7 +75,7 @@ DB_SCHEMA=ktq
 # DATABASE_URL=postgresql://user:password@host:5432/dbname?sslmode=require
 ```
 
-> **Note**: If database or LLM API keys are offline, the system automatically uses mock and memory fallback mechanisms for instant, uninterrupted test runs and local demos.
+> **Note**: Missing LLM API keys raise an explicit `ValueError` by default to ensure credentials are properly configured. For offline testing or unit tests, mock models can be explicitly configured via `provider: "test"` or `fallback_to_mock=True`. Database operations continue to support in-memory fallback for local test runs when PostgreSQL is unconfigured.
 
 ### 4. Running the Application
 
@@ -122,10 +122,16 @@ Then visit:
 ### 5. Conversational RFI Workflow (`POST /api/chat` & `/ui`)
 - **Chat Outcome Loader**: Chat UI (`/ui`) displays an animated processing loader bubble in the chat view and input area whenever an outcome is expected.
 - **RFI Initial Input Flow**: When selecting "Create an RFI" from the welcome cards or user input, the assistant guides the user to supply packaging details instead of prematurely creating an empty dummy RFX.
-- **Multi-Line Item Extraction**: Seamlessly extracts multiple packaging requirements from a single prompt (e.g. `1000 corrugated boxes, 300 x 200 x 150 mm, and 300 rolls of brown tape`) into multiple distinct line items in `ktq.rfx_items`.
-- **Requirement Extraction**: Parses dimensions (L x W x H), quantity, delivery destination, and delivery date into structured line items, creates draft records in `ktq.rfx`, and outputs the formatted RFI solution and progress.
+- **Single Active RFI Continuity**: Sessions track and operate continuously on a single active draft RFI. Subsequent additions update and append to the active draft rather than spawning fragmented separate RFIs.
+- **Dynamic Item Modification**: Users can add items incrementally or remove specific items by number or name (e.g., `remove item 2`, `remove brown tape`) with automated line-item re-indexing.
+- **Duplicate Detection & Confirmation**: If an incoming requirement matches an item already in the draft, the assistant flags the duplicate and prompts the user for explicit confirmation before proceeding.
+- **Advanced Natural Language Parsing**: Robustly parses compound requirements:
+  - Metric & imperial cube box dimensions (`50inch cube boxes 300` -> 300 boxes of 50x50x50 inch).
+  - Film roll length and thickness specifications (`5m stretch films 1000 pcs` -> 1000 pcs of 5m stretch film).
+  - Weight units (`bubble wrap 50kg` -> 50 kg).
+  - Multi-item boundary segmentation separating items even without standard conjunctions.
 - **Strict Guardrails**: When in the RFI creation workflow, only solutions and progress for creating the RFI are provided. Checking existing RFI status or fetching external information (vendor directories, general questions) is politely discouraged and redirected back to RFI creation.
-- **RFI Progression**: Users can review line items, amend terms, or say `"Trigger RFI"` to issue quote requests to qualified suppliers.
+- **RFI Progression**: Users can review line items, amend terms, or say `"Trigger RFI"` to finalize and issue quote requests to qualified suppliers.
 
 ---
 

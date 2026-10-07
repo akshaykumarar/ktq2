@@ -73,10 +73,13 @@ flowchart TD
   - `GET /health/db` and `GET /api/db/health`: Safe PostgreSQL connection, dynamic schema presence, and query verification without exposing credentials.
 
 ### 2. Conversational RFI Workflow & Guardrails (`backend/app/agents/master.py`)
-- **Session Management (`ChatSessionState`)**: Tracks conversation mode (`is_rfi_workflow`), active RFI ID, and message turn count per `conversation_id`.
-- **RFI Initial Input Flow**:
-  - Starter command (`Create an RFI`) guides the user on required packaging details (item, dimensions, quantity, delivery location/date) without prematurely creating dummy 1-unit records.
-  - Requirement intake (`"10 corrugated boxes, 300 x 200 x 150 mm..."`) extracts structured line items, creates draft records via `RFIRepository`, and outputs line item tables with commercial terms.
+- **Session Management (`ChatSessionState`)**: Tracks conversation mode (`is_rfi_workflow`), active draft RFI ID (`active_rfi_id`), pending confirmation state (`pending_confirmation`), and message turn count per `conversation_id`.
+- **Single RFI Draft Lifecycle**:
+  - Starter command (`Create an RFI`) guides requirement intake without prematurely creating records.
+  - Initial requirement intake creates the active RFI draft record and persists it to `RFIRepository`.
+  - Subsequent inputs work on the **same active RFI** rather than creating new RFI records.
+  - Items can be added incrementally or removed via explicit command (`remove item [id/name]`).
+  - **Duplicate Detection & Confirmation**: If an incoming line item matches an existing item in the draft, the workflow prompts for explicit confirmation before adding or updating.
 - **Strict Guardrails**:
   - Inquiries for status of existing RFIs (e.g. `What is the status of RFX-101?`, `Check vendor response`) are discouraged and redirected to completing RFI creation.
   - External inquiries (vendor lookups, directory searches, general questions) are discouraged and redirected to RFI creation.
@@ -93,7 +96,12 @@ flowchart TD
   - `ktq.rfx_items`: Normalized line items (`item_number`, `description`, `quantity`, `unit`, `material`, `dimensions`, `specifications`, `target_price`, `currency`, `required_date`).
   - `ktq.rfx_activity`: Audit log (`rfx_id`, `activity_type`, `description`, `performed_by`, `created_at`).
 
-### 4. PydanticAI Agent & Deterministic Extractor (`backend/app/intake/agent.py`)
+### 4. LLM Provider Factory (`backend/app/providers/factory.py`)
+- `create_model()` instantiates `PydanticAI` models (`OpenAIChatModel`, `AnthropicModel`, `GoogleModel`, `OllamaModel`).
+- **Strict Credential Validation**: Default `fallback_to_mock=False` ensures missing API keys raise an explicit `ValueError` rather than silently returning mock models in production.
+- Explicit mock/test models (`provider: "test"` or `fallback_to_mock=True`) are preserved for unit testing.
+
+### 5. PydanticAI Agent & Deterministic Extractor (`backend/app/intake/agent.py`)
 - PydanticAI `rfi_parser` configured via `config/agents.yaml`.
 - Produces strict `IntakeExtractionResult` and `PackagingRequirement` models rather than free-form text.
 - **Multi-Line Item Support**: Robustly segments multi-item compound requirements (e.g., `1000 corrugated boxes, 300 x 200 x 150 mm, and 300 rolls of brown tape`) into multiple typed `PackagingRequirement` line items with independent dimensions, units, and materials.

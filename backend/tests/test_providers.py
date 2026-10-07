@@ -12,11 +12,19 @@ from backend.app.providers.factory import create_model
 
 
 def test_create_model_fallback_to_mock() -> None:
-    """Test that missing API keys gracefully fall back to TestModel when configured."""
+    """Test that missing API keys gracefully fall back to TestModel when fallback_to_mock=True."""
     secrets = AppSecrets(OPENAI_API_KEY=None, ANTHROPIC_API_KEY=None, GOOGLE_API_KEY=None)
     llm_conf = LLMConfig(provider="openai", model="gpt-5")
     model = create_model(llm_conf, secrets, fallback_to_mock=True)
     assert isinstance(model, TestModel)
+
+
+def test_create_model_missing_key_raises_error() -> None:
+    """Test that missing API keys raise ValueError by default when fallback_to_mock=False."""
+    secrets = AppSecrets(OPENAI_API_KEY=None, ANTHROPIC_API_KEY=None, GOOGLE_API_KEY=None)
+    llm_conf = LLMConfig(provider="openai", model="gpt-5")
+    with pytest.raises(ValueError, match="OPENAI_API_KEY is required"):
+        create_model(llm_conf, secrets)
 
 
 def test_create_model_explicit_test_provider() -> None:

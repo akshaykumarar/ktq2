@@ -73,21 +73,74 @@ def _parse_single_packaging_clause(
     if date_match:
         delivery_date = date_match.group(1).strip()
 
-    text_for_qty = clean_clause
+    text_working = clean_clause
     if date_match:
-        text_for_qty = text_for_qty[:date_match.start()] + text_for_qty[date_match.end():]
-    text_for_qty = re.sub(
+        text_working = text_working[:date_match.start()] + text_working[date_match.end():]
+    text_working = re.sub(
         r"\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b",
         " ",
-        text_for_qty,
+        text_working,
         flags=re.I,
     )
 
-    # 2. Quantity & unit
+    # 2. Dimensions & Special Shapes
+    dimensions: dict[str, Any] = {}
+    dim_match = re.search(
+        r"(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)\s*(mm|cm|inch|inches|in|m)?",
+        clean_clause,
+        re.I,
+    )
+    if dim_match:
+        dim_unit = dim_match.group(4) or "mm"
+        dimensions = {
+            "length": float(dim_match.group(1)),
+            "width": float(dim_match.group(2)),
+            "height": float(dim_match.group(3)),
+            "unit": dim_unit.lower(),
+        }
+
+    # Cube box dimensions (e.g. 50inch cube boxes 300, 30cm cube carton)
+    cube_match = re.search(
+        r"(\d+(?:\.\d+)?)\s*(inch|inches|in|\"|mm|cm|m)?\s*cube\b",
+        clean_clause,
+        re.I,
+    )
+    if cube_match and not dimensions:
+        cube_val = float(cube_match.group(1))
+        cube_u = (cube_match.group(2) or "inch").replace('"', 'inch').lower()
+        dimensions = {
+            "length": cube_val,
+            "width": cube_val,
+            "height": cube_val,
+            "unit": cube_u,
+        }
+
+    # Extract film specs like "5m", "50 micron", "23 gauge" from clause
+    film_spec_str: str | None = None
+    film_spec_match = re.search(
+        r"\b(\d+(?:\.\d+)?)\s*(m|meter|meters|mtr|micron|microns|gauge)\s+(stretch\s+film[s]?|shrink\s+film[s]?|film[s]?)\b",
+        text_working,
+        re.I,
+    )
+    if film_spec_match:
+        film_spec_str = f"{film_spec_match.group(1)}{film_spec_match.group(2)}"
+
+    # 3. Quantity & unit extraction
     quantity: float | None = None
     unit = "pcs"
+    unit_patterns = r"boxes|cartons|pcs|pieces|rolls|bags|pouches|sheets|pallets|units|mailers|kg|kgs|kilograms?|packs?|mtr|meters?"
+
+    text_for_qty = text_working
+    # If cube dimension matched, mask it out of text_for_qty so it doesn't get confused as quantity
+    if cube_match:
+        text_for_qty = text_for_qty[:cube_match.start()] + " cube " + text_for_qty[cube_match.end():]
+
+    # If film spec matched, mask it out of text_for_qty
+    if film_spec_match:
+        text_for_qty = text_for_qty[:film_spec_match.start()] + " " + film_spec_match.group(3) + " " + text_for_qty[film_spec_match.end():]
+
     qty_match = re.search(
-        r"(?:need|require|order|buy|procure|want)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(boxes|cartons|pcs|pieces|rolls|bags|pouches|sheets|pallets|units|mailers)?(?:\s+of)?",
+        rf"(?:need|require|order|buy|procure|want)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*({unit_patterns})?(?:\s+of)?",
         text_for_qty,
         re.I,
     )
@@ -101,21 +154,21 @@ def _parse_single_packaging_clause(
             except ValueError:
                 pass
 
-    # 3. Dimensions
-    dimensions: dict[str, Any] = {}
-    dim_match = re.search(
-        r"(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)\s*(mm|cm|inch|inches|m)?",
-        clean_clause,
-        re.I,
-    )
-    if dim_match:
-        dim_unit = dim_match.group(4) or "mm"
-        dimensions = {
-            "length": float(dim_match.group(1)),
-            "width": float(dim_match.group(2)),
-            "height": float(dim_match.group(3)),
-            "unit": dim_unit.lower(),
-        }
+    # Trailing quantity check (e.g. "50inch cube boxes 300", "bubble wrap 50kg")
+    trailing_qty = re.search(rf"\b(?:({unit_patterns})\s+)?(\d+(?:,\d+)*(?:\.\d+)?)\s*({unit_patterns})?\s*$", text_for_qty, re.I)
+    if trailing_qty:
+        t_val = trailing_qty.group(2).replace(",", "")
+        t_unit = trailing_qty.group(1) or trailing_qty.group(3)
+        # If no quantity found, or previous quantity was overridden by spec
+        if quantity is None or (cube_match and quantity == float(cube_match.group(1))):
+            try:
+                quantity = float(t_val)
+                if t_unit:
+                    unit = t_unit.lower()
+            except ValueError:
+                pass
+        elif t_unit and unit == "pcs":
+            unit = t_unit.lower()
 
     # 4. Ply
     ply: str | None = None
@@ -123,34 +176,7 @@ def _parse_single_packaging_clause(
     if ply_match:
         ply = f"{ply_match.group(1)}-ply"
 
-    # 5. Material
-    material: str | None = None
-    for mat_pattern in [
-        r"(virgin\s+kraft|kraft\s*finish|kraft\s*paper|kraft)",
-        r"(polyethylene|bubble\s*wrap|bopp|pvc|duplex|shrink\s*film|stretch\s*film|lldpe)",
-        r"(brown\s*tape|packing\s*tape|adhesive\s*tape)",
-        r"(corrugated)",
-    ]:
-        mat_match = re.search(mat_pattern, clean_clause, re.I)
-        if mat_match:
-            material = mat_match.group(1).strip()
-            break
-
-    # 6. Target price
-    target_price = default_target_price
-    currency = default_currency
-    price_match = re.search(
-        r"(?:target\s+price|budget|price|cost|rate)\s*(?:of|:)?\s*(?:INR|USD|Rs\.?|₹|\$)?\s*(\d+(?:,\d+)*(?:\.\d+)?)",
-        clean_clause,
-        re.I,
-    )
-    if price_match:
-        try:
-            target_price = float(price_match.group(1).replace(",", ""))
-        except ValueError:
-            pass
-
-    # 7. Category
+    # 5. Category
     category = "Corrugated packaging"
     lowered = clean_clause.lower()
     if any(k in lowered for k in ["tape", "adhesive", "bopp"]):
@@ -166,25 +192,74 @@ def _parse_single_packaging_clause(
     elif any(k in lowered for k in ["pallet"]):
         category = "Pallets"
 
-    # 8. Description
-    desc_match = re.search(
-        r"(?:need|require|procure|buy|want)?\s*(?:\d+[\s,]*)?(?:(?:boxes|cartons|pcs|pieces|rolls|bags|pouches|sheets|pallets|units|mailers)\s+of\s+)?([a-zA-Z\s]+(?:boxes|cartons|tape|film|rolls|pouches|pallets|mailers|wrap))",
+    # 6. Material
+    material: str | None = None
+    if "bubble wrap" in lowered or "bubblewrap" in lowered:
+        material = "Bubble Wrap"
+    elif "stretch film" in lowered or "stretchfilm" in lowered:
+        material = "Stretch Film"
+    elif "transparent tape" in lowered or "clear tape" in lowered:
+        material = "Transparent BOPP Tape"
+    elif "brown tape" in lowered:
+        material = "Brown BOPP Tape"
+    else:
+        for mat_pattern in [
+            r"(virgin\s+kraft|kraft\s*finish|kraft\s*paper|kraft)",
+            r"(polyethylene|bopp|pvc|duplex|shrink\s*film|lldpe)",
+            r"(brown\s*tape|packing\s*tape|adhesive\s*tape)",
+            r"(corrugated)",
+        ]:
+            mat_match = re.search(mat_pattern, clean_clause, re.I)
+            if mat_match:
+                material = mat_match.group(1).strip()
+                break
+
+    # 7. Target price
+    target_price = default_target_price
+    currency = default_currency
+    price_match = re.search(
+        r"(?:target\s+price|budget|price|cost|rate)\s*(?:of|:)?\s*(?:INR|USD|Rs\.?|₹|\$)?\s*(\d+(?:,\d+)*(?:\.\d+)?)",
         clean_clause,
         re.I,
     )
-    if desc_match:
-        item_description = desc_match.group(1).strip()
-    else:
-        item_description = re.sub(r"^(?:need|require|order|buy|procure|want|\d+|\s|,)+", "", clean_clause, flags=re.I).strip()
-        if not item_description:
-            item_description = clean_clause[:60].strip()
+    if price_match:
+        try:
+            target_price = float(price_match.group(1).replace(",", ""))
+        except ValueError:
+            pass
 
-    # Clean description from leading unit prefix
-    item_description = re.sub(r"^(?:boxes|cartons|pcs|pieces|rolls|bags|pouches|sheets|pallets|units|mailers)\s+of\s+", "", item_description, flags=re.I).strip()
+    # 8. Description
+    cleaned_desc = text_for_qty
+    # Remove leading desire verbs
+    cleaned_desc = re.sub(
+        r"^(?:i\s+want\s+(?:a\s+)?|we\s+need\s+|need\s+|require\s+|order\s+|buy\s+|procure\s+)+",
+        "",
+        cleaned_desc.strip(),
+        flags=re.I,
+    ).strip()
 
-    # Strip dimension pattern from description if accidentally matched
+    # Strip dimension pattern if present
     if dim_match:
-        item_description = re.sub(r"\s*,?\s*\d+\s*[xX*×]\s*\d+\s*[xX*×]\s*\d+\s*(?:mm|cm|inch|m)?", "", item_description, flags=re.I).strip(" ,.")
+        cleaned_desc = re.sub(r"\s*,?\s*\d+\s*[xX*×]\s*\d+\s*[xX*×]\s*\d+\s*(?:mm|cm|inch|inches|in|m)?", "", cleaned_desc, flags=re.I).strip(" ,.")
+
+    # Remove trailing/leading quantity from description
+    cleaned_desc = re.sub(rf"\s+\d+(?:,\d+)*(?:\.\d+)?\s*(?:{unit_patterns})?\s*$", "", cleaned_desc, flags=re.I).strip()
+    cleaned_desc = re.sub(rf"^\d+(?:,\d+)*(?:\.\d+)?\s*(?:{unit_patterns})?\s*(?:of\s+)?", "", cleaned_desc, flags=re.I).strip()
+    cleaned_desc = re.sub(rf"\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:{unit_patterns})\b", "", cleaned_desc, flags=re.I).strip()
+
+    # Reconstruct canonical descriptor
+    if film_spec_str and film_spec_str.lower() not in cleaned_desc.lower():
+        cleaned_desc = f"{film_spec_str} {cleaned_desc}".strip()
+    if cube_match and "cube" not in cleaned_desc.lower():
+        cleaned_desc = f"Cube {cleaned_desc}".strip()
+
+    # Canonical singularization for display
+    cleaned_desc = re.sub(r"\btapes\b", "tape", cleaned_desc, flags=re.I)
+    cleaned_desc = re.sub(r"\bfilms\b", "film", cleaned_desc, flags=re.I)
+    item_description = re.sub(r"\s+", " ", cleaned_desc).strip(" ,.")
+
+    if not item_description:
+        item_description = clean_clause[:60].strip()
 
     if not material:
         material = "Corrugated" if category == "Corrugated packaging" else (item_description.title() if "tape" in item_description.lower() else category)
@@ -263,9 +338,9 @@ def deterministic_extract_packaging(text: str) -> IntakeExtractionResult:
         if date_kw:
             items_text = items_text[:date_kw.start()].strip(" ,.")
 
-    # 3. Split on multi-item delimiters: ';', newlines, ', and ', ' and ', or commas preceding new quantities
+    # 3. Split on multi-item delimiters: ';', newlines, ', and ', ' and ', or commas preceding new packaging items / quantities
     clauses = re.split(
-        r"(?:;\s*|\n+|\s*,\s*and\s+|\s+and\s+|\s*,\s*(?=\d+\s*(?:boxes|cartons|rolls|pcs|pieces|pouches|sheets|pallets|units|bags|mailers|[a-zA-Z]+\s+tape|[a-zA-Z]+\s+film|[a-zA-Z]+\s+boxes)))",
+        r"(?:;\s*|\n+|\s*,\s*and\s+|\s+and\s+|\s*,\s*(?=(?:\d+\s*(?:inch|inches|in|m|mm|cm|\")|\d+\s*(?:boxes|cartons|rolls|pcs|pieces|pouches|sheets|pallets|units|bags|mailers|kg|kgs)?\s*)?[a-zA-Z\s]*(?:boxes?|cartons?|tape|tapes|film|films|bubble\s*wrap|wrap|mailer|pouches?|pallet|bag|bags)))",
         items_text,
         flags=re.I,
     )

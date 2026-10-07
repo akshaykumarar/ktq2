@@ -1,6 +1,7 @@
 """Tests for conversational Packaging RFI creation workflow in Chat API."""
 
 import asyncio
+import re
 import pytest
 from httpx import AsyncClient, ASGITransport
 from pydantic_ai.models.test import TestModel
@@ -168,4 +169,108 @@ def test_multi_line_items_rfi_chat_flow() -> None:
                 assert "Bangalore" in msg
 
     asyncio.run(_test())
+
+
+def test_user_scenario_single_rfi_add_remove_and_duplicates() -> None:
+    """Test the exact scenario reported by the user:
+    1. Multi-item input: 'i want a 5m stretch films 1000 pcs, 50inch cube boxes 300 and brown tapes 200 pcs, and transparent tapes 200 pcs, bubble wrap 50kg'
+       - Correctly extracts:
+         - 5m stretch film, 1000 pcs
+         - 50 inch cube boxes, 300 boxes / pcs, dimensions 50x50x50 inch
+         - brown tape, 200 pcs
+         - transparent tape, 200 pcs
+         - bubble wrap, 50 kg
+       - Creates initial draft (e.g. RFI-#1001)
+    2. Adding a duplicate item (e.g. 'bubble wrap 50kg')
+       - System flags duplicate item and asks for confirmation
+       - Replying 'Yes' adds it to the SAME RFI
+    3. Removing an item (e.g. 'remove item 3' or 'remove brown tape')
+       - Item is removed from the SAME RFI and remaining items are re-indexed
+    """
+    async def _test() -> None:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with app.router.lifespan_context(app):
+                app.state.agent_registry.master.model = TestModel()
+                for s in app.state.agent_registry.specialists.values():
+                    s.model = TestModel()
+
+                session_id = "test-user-scenario-single-rfi"
+                reset_chat_session(session_id)
+
+                # Turn 1: Select Create an RFI
+                await client.post("/api/chat", json={
+                    "message": "Create an RFI",
+                    "conversation_id": session_id,
+                })
+
+                # Turn 2: Exact user query
+                user_prompt = "i want a 5m stretch films 1000 pcs, 50inch cube boxes 300 and brown tapes 200 pcs, and transparent tapes 200 pcs, bubble wrap 50kg"
+                resp1 = await client.post("/api/chat", json={
+                    "message": user_prompt,
+                    "conversation_id": session_id,
+                })
+                assert resp1.status_code == 200
+                data1 = resp1.json()
+                msg1 = data1["message"]
+
+                # Extract initial RFI ID
+                rfi_id_match = re.search(r"RFI-#(\d+)", msg1)
+                assert rfi_id_match is not None
+                initial_rfi_id = rfi_id_match.group(1)
+
+                # Verify line items parsed accurately
+                assert "5m Stretch Film" in msg1 or "5m stretch film" in msg1.lower()
+                assert "1000 pcs" in msg1
+                assert "Cube Boxes" in msg1 or "cube boxes" in msg1.lower()
+                assert "300 boxes" in msg1 or "300 pcs" in msg1
+                assert "50 x 50 x 50 inch" in msg1
+                assert "Brown Tape" in msg1 or "brown tape" in msg1.lower()
+                assert "Transparent Tape" in msg1 or "transparent tape" in msg1.lower()
+                assert "Bubble Wrap" in msg1 or "bubble wrap" in msg1.lower()
+                assert "50 kg" in msg1
+
+                # Turn 3: User inputs duplicate item -> Duplicate confirmation triggered
+                resp2 = await client.post("/api/chat", json={
+                    "message": "bubble wrap 50kg",
+                    "conversation_id": session_id,
+                })
+                assert resp2.status_code == 200
+                data2 = resp2.json()
+                msg2 = data2["message"]
+                assert "Duplicate Item Detected" in msg2
+                assert "bubble wrap" in msg2.lower()
+                assert "Reply **Yes**" in msg2
+
+                # Turn 4: User confirms addition
+                resp3 = await client.post("/api/chat", json={
+                    "message": "Yes, please add it",
+                    "conversation_id": session_id,
+                })
+                assert resp3.status_code == 200
+                data3 = resp3.json()
+                msg3 = data3["message"]
+
+                # Must still be the SAME RFI ID!
+                assert f"RFI-#{initial_rfi_id}" in msg3
+                assert "| 6 |" in msg3  # 5 items + 1 added = 6 items
+
+                # Turn 5: User removes an item ('remove item 3')
+                resp4 = await client.post("/api/chat", json={
+                    "message": "remove item 3",
+                    "conversation_id": session_id,
+                })
+                assert resp4.status_code == 200
+                data4 = resp4.json()
+                msg4 = data4["message"]
+
+                # Must still be the SAME RFI ID!
+                assert f"RFI-#{initial_rfi_id}" in msg4
+                assert "removed '3'" in msg4 or "removed" in msg4.lower()
+                # Total items reduced to 5
+                assert "| 5 |" in msg4
+                assert "| 6 |" not in msg4
+
+    asyncio.run(_test())
+
 

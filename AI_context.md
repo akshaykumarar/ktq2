@@ -3,14 +3,15 @@
   - **Conversational RFI Chat Workflow (`POST /api/chat`)**:
     - **Welcome Card Initiation**: UI starter card updated to "Create an RFI".
     - **Chat Loader**: Added visual response loader bubble in chat stream and input box loading state whenever an outcome is expected (`generating == true`).
-    - **Session State & RFI Focus**: When user selects RFI as initial input, the session enters a dedicated RFI creation workflow (`ChatSessionState` in `backend/app/agents/master.py`).
-    - **Requirement Guidance & Extraction**: If started with "Create an RFI", asks for packaging requirements instead of prematurely creating empty dummy records. When requirements are provided (e.g. 10 corrugated boxes, 300x200x150 mm to Bangalore), extracts dimensions, quantity, delivery date, and location, creates a draft RFI in the repository, and returns a structured line-item breakdown table, commercial terms, and next steps.
-    - **Multi-Line Item Extraction**: Natural language inputs containing multiple packaging requirements (e.g. "1000 corrugated boxes, 300 x 200 x 150 mm, and 300 rolls of brown tape") are segmented into distinct line items, each with individual dimensions, units, quantities, categories, and materials, and persisted as multiple line items in `ktq.rfx_items`.
+    - **Single Active RFI Continuity**: Sessions now persistently track and operate on a single active draft RFI (`ChatSessionState.active_rfi_id`). Subsequent user inputs add items to the active draft rather than creating fragmented new RFIs.
+    - **Add & Remove Items Dynamically**: Users can add items incrementally or remove specific items by index/name (e.g. "remove item 2", "remove brown tape") with automatic line-item re-indexing.
+    - **Duplicate Detection & User Confirmation**: When an incoming item resembles an existing line item in the active draft, the agent flags the duplicate and prompts the user for explicit confirmation before adding or updating.
+    - **Advanced Natural Language Packaging Extraction**: Refined extraction for compound and domain-specific clauses, including cube boxes (`50inch cube boxes 300` -> 300 boxes of 50x50x50 inch), stretch film length specs (`5m stretch films 1000 pcs` -> 1000 pcs of 5m stretch film), weight units (`50kg` bubble wrap), and robust item boundary segmentation.
     - **Strict Guardrails**: When in RFI creation workflow, only solutions or progress for creating the RFI are provided. Inquiries about existing RFI status (e.g. "What is the status of RFX-101?", "Check vendor response") or external queries (vendor directories, external info) are not encouraged and politely redirected back to completing the RFI creation.
   - **Text Intake** (`POST /api/rfi/intake`): Natural language parsing of packaging requirements into structured `PackagingRequirement` items.
   - **Excel Intake** (`POST /api/rfi/intake/excel`): Openpyxl spreadsheet parser handling header variations, row-level validation, and canonical item extraction.
   - **PydanticAI Packaging Agent** (`backend/app/intake/agent.py`): Extracts typed requirements, dimensions, plies, material, required date, target price, and flags missing/ambiguous fields without hallucination. Configured as `rfi_parser` in `config/agents.yaml`.
-  - **PostgreSQL Source of Truth** (`backend/app/db/`): Uses dynamic `DB_SCHEMA` (default: `ktq`). Parameterized repository (`RFIRepository`) manages `rfx`, `rfx_items`, and `rfx_activity` tables with atomic transactions and memory fallback.
+  - **PostgreSQL Source of Truth** (`backend/app/db/`): Uses dynamic `DB_SCHEMA` (default: `ktq`). Parameterized repository (`RFIRepository`) manages `rfx`, `rfx_items`, and `rfx_activity` tables with atomic transactions, item add/remove methods, and memory fallback.
   - **Database Health Check** (`GET /health/db` & `GET /api/db/health`): Validates connection, verifies dynamic schema existence, and executes test query without credential leakage.
   - **System Health Check** (`GET /health` & `GET /api/health`): Validates running backend and registered agents.
   - **RFI Lifecycle APIs** (`backend/app/api/rfi.py`):
@@ -18,7 +19,8 @@
     - `GET /api/rfi/{id}`: Retrieval of RFI and line items.
     - `PATCH /api/rfi/{id}`: Updating editable fields.
     - `POST /api/rfi/{id}/trigger`: Transitioning status to `TRIGGERED` and timestamp recording.
-- Full pytest test suite passing 37 tests across agents, APIs, DB health, Excel intake, RFI lifecycle, and multi-line item conversational RFI workflow with traceable logs in `artifacts/logs/test_run.log`.
+  - **Strict LLM Model Creation (`backend/app/providers/factory.py`)**: `create_model()` enforces strict provider credential validation (`fallback_to_mock=False` by default), raising an explicit `ValueError` when API keys are omitted. Explicit mock models (`provider="test"` or `fallback_to_mock=True`) remain supported for unit testing.
+- Full pytest test suite passing 39 tests across agents, APIs, DB health, Excel intake, RFI lifecycle, providers, and single-RFI multi-item conversational workflow with traceable logs in `artifacts/logs/test_remove_fallback.log`.
 
 ## Key Files
 - `chatbot/index.html`: AI-QL Vue 3 frontend with "Create an RFI" starter card and active outcome loader indicator.

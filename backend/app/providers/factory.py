@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 def create_model(
     llm_config: LLMConfig,
     secrets: AppSecrets,
-    fallback_to_mock: bool = True,
+    fallback_to_mock: bool = False,
 ) -> Model:
     """Create a PydanticAI Model instance configured for the specified provider.
 

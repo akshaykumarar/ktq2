@@ -395,3 +395,169 @@ class RFIRepository:
             return _MEMORY_RFIS[rfi_id]
 
         raise ValueError(f"RFI {rfi_id} not found.")
+
+    def add_items(self, rfi_id: int, new_items: list[dict[str, Any]]) -> dict[str, Any]:
+        """Append line items to an existing RFI."""
+        existing = self.get_by_id(rfi_id)
+        if not existing:
+            raise ValueError(f"RFI {rfi_id} not found.")
+
+        now = datetime.now(timezone.utc)
+        start_idx = len(existing.get("items", [])) + 1
+        currency = existing.get("currency") or "INR"
+
+        if self.secrets.db_configured:
+            try:
+                with get_db_connection(self.secrets) as conn:
+                    with conn.cursor() as cur:
+                        for offset, item in enumerate(new_items):
+                            item_num = item.get("item_number", start_idx + offset)
+                            item_code = item.get("item_code")
+                            desc = item.get("description") or f"Item {item_num}"
+                            qty = item.get("quantity") or 1
+                            unit = item.get("unit") or "pcs"
+                            material = item.get("material")
+                            dimensions = json.dumps(item.get("dimensions") or {})
+                            specs = item.get("specifications")
+                            target_price = item.get("target_price")
+                            item_curr = item.get("currency") or currency
+                            req_date = item.get("required_date")
+
+                            cur.execute(
+                                """
+                                INSERT INTO rfx_items (
+                                    rfx_id, item_number, item_code, description,
+                                    quantity, unit, material, dimensions,
+                                    specifications, target_price, currency,
+                                    required_date, created_at
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                                """,
+                                (
+                                    rfi_id,
+                                    item_num,
+                                    item_code,
+                                    desc,
+                                    qty,
+                                    unit,
+                                    material,
+                                    dimensions,
+                                    specs,
+                                    target_price,
+                                    item_curr,
+                                    req_date,
+                                    now,
+                                ),
+                            )
+
+                        cur.execute(
+                            """
+                            INSERT INTO rfx_activity (rfx_id, activity_type, description, performed_by, created_at)
+                            VALUES (%s, %s, %s, %s, %s);
+                            """,
+                            (rfi_id, "items_added", f"Added {len(new_items)} item(s)", "system", now),
+                        )
+                        conn.commit()
+                        return self.get_by_id(rfi_id) or existing
+            except Exception as exc:
+                logger.warning("Database add_items failed, using memory fallback: %s", exc)
+
+        if rfi_id in _MEMORY_RFIS:
+            record = _MEMORY_RFIS[rfi_id]
+            for offset, it in enumerate(new_items):
+                item_idx = start_idx + offset
+                record["items"].append(
+                    {
+                        "id": len(record["items"]) + 1,
+                        "rfx_id": rfi_id,
+                        "item_number": it.get("item_number", item_idx),
+                        "item_code": it.get("item_code"),
+                        "description": it.get("description", f"Item {item_idx}"),
+                        "quantity": it.get("quantity", 1),
+                        "unit": it.get("unit", "pcs"),
+                        "material": it.get("material"),
+                        "dimensions": it.get("dimensions") or {},
+                        "specifications": it.get("specifications"),
+                        "target_price": it.get("target_price"),
+                        "currency": it.get("currency", currency),
+                        "required_date": str(it.get("required_date")) if it.get("required_date") else None,
+                        "created_at": now.isoformat(),
+                    }
+                )
+            record["updated_at"] = now.isoformat()
+            return record
+
+        return existing
+
+    def remove_item(self, rfi_id: int, item_identifier: str | int) -> dict[str, Any] | None:
+        """Remove a line item by item_number (int) or partial description (str)."""
+        existing = self.get_by_id(rfi_id)
+        if not existing:
+            raise ValueError(f"RFI {rfi_id} not found.")
+
+        now = datetime.now(timezone.utc)
+        target_num: int | None = None
+        if isinstance(item_identifier, int) or (isinstance(item_identifier, str) and item_identifier.isdigit()):
+            target_num = int(item_identifier)
+
+        if self.secrets.db_configured:
+            try:
+                with get_db_connection(self.secrets) as conn:
+                    with conn.cursor() as cur:
+                        if target_num is not None:
+                            cur.execute("DELETE FROM rfx_items WHERE rfx_id = %s AND item_number = %s RETURNING id;", (rfi_id, target_num))
+                        else:
+                            cur.execute(
+                                "DELETE FROM rfx_items WHERE rfx_id = %s AND LOWER(description) LIKE %s RETURNING id;",
+                                (rfi_id, f"%{str(item_identifier).lower()}%"),
+                            )
+                        deleted = cur.fetchall()
+                        if deleted:
+                            # Re-index remaining items
+                            cur.execute(
+                                """
+                                WITH numbered AS (
+                                    SELECT id, ROW_NUMBER() OVER (ORDER BY item_number ASC) as new_num
+                                    FROM rfx_items
+                                    WHERE rfx_id = %s
+                                )
+                                UPDATE rfx_items
+                                SET item_number = numbered.new_num
+                                FROM numbered
+                                WHERE rfx_items.id = numbered.id;
+                                """,
+                                (rfi_id,),
+                            )
+                            cur.execute(
+                                """
+                                INSERT INTO rfx_activity (rfx_id, activity_type, description, performed_by, created_at)
+                                VALUES (%s, %s, %s, %s, %s);
+                                """,
+                                (rfi_id, "item_removed", f"Removed item: {item_identifier}", "system", now),
+                            )
+                            conn.commit()
+                            return self.get_by_id(rfi_id)
+            except Exception as exc:
+                logger.warning("Database remove_item failed, using memory fallback: %s", exc)
+
+        if rfi_id in _MEMORY_RFIS:
+            record = _MEMORY_RFIS[rfi_id]
+            original_items = record.get("items", [])
+            new_items = []
+            for it in original_items:
+                match = False
+                if target_num is not None:
+                    match = (it.get("item_number") == target_num)
+                else:
+                    match = (str(item_identifier).lower() in str(it.get("description", "")).lower())
+                if not match:
+                    new_items.append(it)
+
+            # Re-index remaining items
+            for idx, it in enumerate(new_items, start=1):
+                it["item_number"] = idx
+
+            record["items"] = new_items
+            record["updated_at"] = now.isoformat()
+            return record
+
+        return existing
