@@ -109,12 +109,12 @@ flowchart TD
 - Deterministic regex fallback guarantees 100% test reliability and offline execution without requiring live API keys.
 - **No Hallucination**: Missing quantities, dimensions, prices, or dates are flagged explicitly rather than invented.
 
-### 5. Excel Intake Parser (`backend/app/intake/excel_parser.py`)
+### 6. Excel Intake Parser (`backend/app/intake/excel_parser.py`)
 - Reads `.xlsx` via `openpyxl` and `.csv` via standard library.
 - Flexible header alias dictionary handles variations (`qty`, `volume`, `quantity` → `quantity`; `specs`, `notes` → `specifications`).
 - Captures row-level errors and skips blank or malformed lines without failing the entire file.
 
-### 6. RFI Lifecycle & REST API (`backend/app/api/rfi.py`)
+### 7. RFI Lifecycle & REST API (`backend/app/api/rfi.py`)
 - Lifecycle states: `DRAFT` → `READY` → `TRIGGERED` → `RESPONSES_PENDING` → `COMPLETED`.
 - `POST /api/rfi/intake`: Text requirements intake.
 - `POST /api/rfi/intake/excel`: Spreadsheet requirement upload.
@@ -123,8 +123,12 @@ flowchart TD
 - `PATCH /api/rfi/{id}`: Safe updates to permitted fields.
 - `POST /api/rfi/{id}/trigger`: Validates readiness, transitions status to `TRIGGERED`, records `triggered_at`.
 
-### 7. WrenAI Role & Intelligence Layer
----
+### 8. Semantic Analytics & Decision Intelligence Layer (`backend/app/analyst/`)
+- **Semantic Modeling**: Defines domain models and column descriptions (`config/wren_semantic_model.yaml`, `config/wren_mdl.json`).
+- **Few-Shot Retrieval**: Matches relevant procurement question-to-SQL examples (`config/wren_examples.yaml`).
+- **Self-Correction Loop**: Single-retry execution recovery feedback loop correcting syntax/column errors.
+- **Decision Engine**: Coordinates deterministic optimization, risk auditing, chart generation, and multi-sheet XLSX export packs.
+
 
 ## Step 2: Vendor Quotation Intake & Extraction Architecture
 

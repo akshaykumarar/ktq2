@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 import re
 from typing import Any
-import yaml
-from pathlib import Path
 
 from backend.app.config.settings import AppSecrets
 from backend.app.db.connection import get_db_connection
@@ -182,7 +180,7 @@ def run_sql(
                         "error": None,
                     }
     except Exception as e:
-        logger.warning(f"SQL execution error for query [{validated_sql}]: {e}")
+        logger.warning("SQL execution error for query [%s]: %s", validated_sql, e)
         return {
             "sql": validated_sql,
             "columns": [],

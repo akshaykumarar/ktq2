@@ -1,4 +1,8 @@
-"""Unit tests for Step 3 Decision Analyst core tools (CP2)."""
+"""Unit tests for Step 3 Decision Analyst core tools (CP2).
+
+Tests that query the database (sql_runner, trust, comparison) are marked
+``requires_db`` and are skipped when no live PostgreSQL connection is present.
+"""
 
 import pytest
 from backend.app.analyst.tools.sql_runner import run_sql, validate_sql_query, SQLSecurityError
@@ -7,6 +11,7 @@ from backend.app.analyst.tools.comparison import get_comparison_grid
 from backend.app.analyst.tools.assumptions import get_assumptions, set_assumption, reset_assumptions
 
 
+@pytest.mark.requires_db
 def test_sql_runner_valid_query():
     """Verify safe SELECT queries are parsed and executed properly."""
     sql = "SELECT item_number, rfx_description, vendor_name, effective_price_inr FROM ktq.v_rfx_comparison WHERE rfx_id = :rfx_id"
@@ -32,6 +37,7 @@ def test_sql_runner_blocks_destructive_commands():
             validate_sql_query(bad_sql)
 
 
+@pytest.mark.requires_db
 def test_trust_report_computation():
     """Verify trust and risk profiling computes scores, money at risk, and flags."""
     trust = compute_trust_report(rfx_id=6)
@@ -44,6 +50,7 @@ def test_trust_report_computation():
         assert v.knockouts_status in ("passed", "failed", "unresolved", "no_questions")
 
 
+@pytest.mark.requires_db
 def test_comparison_grid_matrix():
     """Verify side-by-side grid returns items, vendors, and cell mappings."""
     grid_data = get_comparison_grid(rfx_id=6)

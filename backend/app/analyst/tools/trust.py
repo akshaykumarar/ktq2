@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-import psycopg
 from psycopg.rows import dict_row
 
 from backend.app.config.settings import AppSecrets

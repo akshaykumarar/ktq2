@@ -1,10 +1,15 @@
-"""Unit tests for CP3 Deterministic Award Optimizer."""
+"""Unit tests for CP3 Deterministic Award Optimizer.
+
+All tests require a live PostgreSQL connection (reads from vendor quotation views).
+They are automatically skipped when the database is unavailable (see conftest.py).
+"""
 
 import pytest
 from backend.app.analyst.models import AwardConstraints
 from backend.app.analyst.optimizer import optimize_award
 
 
+@pytest.mark.requires_db
 def test_cheapest_per_line_allocation():
     """Verify unconstrained cheapest-per-line (L1) allocation."""
     result = optimize_award(rfx_id=6, constraints=AwardConstraints(strategy="cheapest_per_line"))
@@ -16,6 +21,7 @@ def test_cheapest_per_line_allocation():
     assert len(result.vendor_totals) > 0
 
 
+@pytest.mark.requires_db
 def test_single_vendor_allocation():
     """Verify single vendor award finds a vendor quoting all items."""
     result = optimize_award(rfx_id=6, constraints=AwardConstraints(strategy="single_vendor"))
@@ -25,6 +31,7 @@ def test_single_vendor_allocation():
     assert result.vendor_totals[0].share_of_spend_pct == 100.0
 
 
+@pytest.mark.requires_db
 def test_max_share_cap_constraint():
     """Verify max share per vendor splits volume when threshold is constrained."""
     result = optimize_award(
@@ -40,10 +47,11 @@ def test_max_share_cap_constraint():
         assert vt.total_spend_inr <= result.total_project_spend_inr
 
 
+@pytest.mark.requires_db
 def test_what_if_overrides():
     """Verify what-if freight and price overrides adjust allocation and totals."""
     baseline = optimize_award(rfx_id=6, constraints=AwardConstraints(strategy="cheapest_per_line"))
-    
+
     # Add freight 50 INR per unit
     freight_result = optimize_award(
         rfx_id=6,
@@ -55,6 +63,7 @@ def test_what_if_overrides():
     assert freight_result.total_project_spend_inr > baseline.total_project_spend_inr
 
 
+@pytest.mark.requires_db
 def test_review_items_disclosure():
     """Verify REVIEW state items are flagged for acceptance if awarded."""
     result = optimize_award(rfx_id=6, constraints=AwardConstraints(strategy="cheapest_per_line"))

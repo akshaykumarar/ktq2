@@ -135,7 +135,7 @@ class SemanticDataEngine:
             clean_sql = clean_sql.strip().rstrip(";")
             return clean_sql, path_used
         except Exception as e:
-            logger.warning(f"LLM SQL generation error: {e}. Using deterministic query builder fallback.")
+            logger.warning("LLM SQL generation error: %s. Using deterministic query builder fallback.", e)
             # Fallback to smart query based on intent
             q_low = question.lower()
             if "coverage" in q_low or "quote count" in q_low:
@@ -185,7 +185,7 @@ class SemanticDataEngine:
 
         # Retry once if execution failed with a SQL syntax or column error
         if result.get("error"):
-            logger.info(f"Query failed with error: {result['error']}. Retrying with error feedback.")
+            logger.info("Query failed with error: %s. Retrying with error feedback.", result["error"])
             retry_prompt = (
                 f"The previous SQL query failed:\n{sql}\n\n"
                 f"Error message from PostgreSQL:\n{result['error']}\n\n"
@@ -208,7 +208,7 @@ class SemanticDataEngine:
                     retry_result["path_used"] = path_used
                     return retry_result
             except Exception as e:
-                logger.warning(f"Retry attempt failed: {e}")
+                logger.warning("Retry attempt failed: %s", e)
 
         result["path_used"] = path_used
         return result
