@@ -147,4 +147,6 @@
     - Renamed Tab 3 to **Vendor Comparison** across UI tab bars, headers, and tooltips.
     - Converted single-card layout into a clean, unified data table where **each vendor is exactly one line item**.
     - Enhanced `VendorTrustSummary` model and `compute_trust_report` tool with `score_reasoning` (transparent points breakdown of coverage, price OCR confidence, compliance, and flag deductions), `risk_level` (Low / Medium / High Risk), and `total_quoted_spend_inr`.
-    - Added summary KPI banner (Overall Confidence, Participating Vendor count, Key Decision Recommendations), client-side vendor search filter (`vendorSearchQuery`), and vendor audit inspection dialog (`vendorAuditModal`) displaying full flag details and quotation checks.
+  - **Decision-Support Scope Boundary**:
+    - The chat assistant and analyst screens function strictly as **decision-support and evaluation tools** for buyers to compare quotations and simulate allocation scenarios.
+    - The system does not execute binding line item awards or change RFX lifecycle status to awarded; formal award issuance and status changes remain future scope.

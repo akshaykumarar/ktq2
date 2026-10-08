@@ -148,13 +148,13 @@ class DecisionAnalystOrchestrator:
                 [a.item_number, a.description, f"{a.quantity:,.0f} {a.unit}", a.awarded_vendor_name, f"₹{a.unit_price_inr:,.2f}", f"₹{a.total_spend_inr:,.2f}", a.state]
                 for a in opt_result.allocations
             ]
-            tables.append(TableData(title="Award Allocation Breakdown", columns=["Item #", "Description", "Quantity", "Awarded Vendor", "Unit Price", "Total Spend", "State"], rows=alloc_rows))
+            tables.append(TableData(title="Scenario Allocation Breakdown (Decision Simulation)", columns=["Item #", "Description", "Quantity", "Suggested Vendor", "Unit Price", "Total Spend", "State"], rows=alloc_rows))
 
             vendor_rows = [
                 [vt.vendor_name, vt.allocated_items_count, f"₹{vt.total_spend_inr:,.2f}", f"{vt.share_of_spend_pct:.1f}%", "Yes" if vt.cleared_knockouts else "No", vt.review_items_awarded]
                 for vt in opt_result.vendor_totals
             ]
-            tables.append(TableData(title="Vendor Allocation Summary", columns=["Vendor", "Items Awarded", "Total Spend", "Share %", "Cleared Knockouts", "REVIEW Items"], rows=vendor_rows))
+            tables.append(TableData(title="Vendor Scenario Summary (Decision Simulation)", columns=["Vendor", "Allocated Items", "Total Spend", "Share %", "Cleared Knockouts", "REVIEW Items"], rows=vendor_rows))
 
             # Collect numbers for ground truth check
             collected_numbers.add(round(opt_result.total_project_spend_inr, 2))
@@ -188,7 +188,7 @@ class DecisionAnalystOrchestrator:
             export_ref = generate_export_file(
                 kind="Award_Pack",
                 rfx_title=f"RFx {rfx_id}",
-                headers=["Item #", "Description", "Quantity", "Awarded Vendor", "Unit Price (INR)", "Total Spend (INR)", "State"],
+                headers=["Item #", "Description", "Quantity", "Suggested Vendor", "Unit Price (INR)", "Total Spend (INR)", "State"],
                 rows=[[a.item_number, a.description, a.quantity, a.awarded_vendor_name, a.unit_price_inr, a.total_spend_inr, a.state] for a in opt_result.allocations],
                 assumptions=assumptions_used,
                 caveats=[c.text for c in caveats],
@@ -198,13 +198,14 @@ class DecisionAnalystOrchestrator:
             exports.append(export_ref)
 
             narrative = (
-                f"### Recommended Award Allocation\n\n"
+                f"### Sourcing Scenario Evaluation\n\n"
+                f"*(Decision Support Simulation — Formal line item awarding and RFX status transitions are future scope)*\n\n"
                 f"Under the **{strategy.replace('_', ' ').title()}** strategy, total projected spend is **₹{opt_result.total_project_spend_inr:,.2f}**.\n\n"
                 f"- **Allocated Vendors**: {', '.join(v.vendor_name for v in opt_result.vendor_totals)}\n"
-                f"- **Coverage**: 100% of required line items have been allocated.\n"
+                f"- **Coverage**: 100% of required line items evaluated in this scenario.\n"
             )
             if opt_result.has_unresolved_review_items:
-                narrative += f"\n> ⚠️ **Caution**: {len(opt_result.review_items_requiring_acceptance)} item(s) are priced with REVIEW status and require explicit buyer sign-off before final contract issuance.\n"
+                narrative += f"\n> ⚠️ **Caution**: {len(opt_result.review_items_requiring_acceptance)} item(s) are priced with REVIEW status and require verification before contract finalization.\n"
 
         # Route B: Trust / Reliability / Risk Audit
         elif any(w in q_lower for w in ["trust", "least trust", "risk", "unreliable", "reliability", "safe"]):

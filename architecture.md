@@ -243,7 +243,8 @@ flowchart TD
 1. **LLM Understands & Narrates; Python & PostgreSQL Compute**: Every calculation, ranking, sum, and allocation comes from deterministic tools.
 2. **Comparability First**: Overall totals are never compared without checking and stating line item coverage.
 3. **Traceability Post-Check**: All figures in generated text are verified against tool outputs; ungrounded numbers automatically downgrade confidence.
-4. **Governed Finalization**: Scenarios relying on REVIEW prices require explicit buyer checkbox sign-off before committing to the immutable audit log.
+4. **Governed Decision Scenarios**: Allocation optimizations serve strictly as decision-support simulations to evaluate sourcing strategies.
+5. **No Binding Awards**: The chat assistant and analyst screens provide decision-support intelligence only; binding line item awards and RFX status transitions to awarded are future scope.
 
 ---
 

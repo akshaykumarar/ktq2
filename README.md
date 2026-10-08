@@ -197,9 +197,9 @@ Step 3 equips buyers with natural language analysis, original RFI specification 
 3. **`POST /api/analyst/feedback`**: Submit rating, comments, and corrected SQL for any trace.
 4. **`GET /api/rfx/{id}/comparison`**: Side-by-side comparison matrix (items x vendors: prices, state, flags, crops, coverage row, spend totals).
 5. **`GET /api/rfx/{id}/trust`**: Comprehensive trust & risk profile (0-100 score, % coverage, CONFIDENT/REVIEW/MISSING quotes, money at risk).
-6. **`POST /api/rfx/{id}/award/scenarios`**: Create / run deterministic allocation scenario.
+6. **`POST /api/rfx/{id}/award/scenarios`**: Create / run deterministic allocation scenario simulation (Decision Tool).
 7. **`GET /api/rfx/{id}/award/scenarios/{sid}`**: Fetch saved scenario.
-8. **`POST /api/rfx/{id}/award/scenarios/{sid}/finalize`**: Finalizes scenario to audit log. Blocks if REVIEW items are present without explicit buyer sign-off.
+8. **`POST /api/rfx/{id}/award/scenarios/{sid}/finalize`**: Saves scenario audit record. Note: Actual RFX status change to awarded is future scope.
 9. **`GET /api/exports/{id}`**: Download multi-tab Excel workbooks with mandatory *Assumptions & Caveats* sheet.
 
 ### cURL Examples
