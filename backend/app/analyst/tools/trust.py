@@ -94,6 +94,19 @@ def compute_trust_report(rfx_id: int, secrets: AppSecrets | None = None) -> Trus
             )
             risk_rows = {row["vendor_id"]: float(row["money_at_risk"] or 0.0) for row in cur.fetchall()}
 
+            # 6. Fetch total quoted spend per vendor
+            cur.execute(
+                """
+                SELECT vendor_id,
+                       SUM(rfx_quantity * effective_price_inr) as total_spend
+                FROM ktq.v_rfx_comparison
+                WHERE rfx_id = %s AND effective_price_inr IS NOT NULL
+                GROUP BY vendor_id
+                """,
+                (rfx_id,),
+            )
+            spend_rows = {row["vendor_id"]: float(row["total_spend"] or 0.0) for row in cur.fetchall()}
+
     # Aggregate vendor trust summaries
     vendor_summaries: list[VendorTrustSummary] = []
     has_critical = False
@@ -138,6 +151,39 @@ def compute_trust_report(rfx_id: int, secrets: AppSecrets | None = None) -> Trus
 
         trust_score = max(0.0, min(100.0, coverage_score + price_score + ko_score - flag_penalty))
         money_risk = risk_rows.get(vid, 0.0)
+        total_spend = spend_rows.get(vid, 0.0)
+
+        # Risk level classification
+        if trust_score >= 80.0:
+            risk_level = "Low Risk"
+        elif trust_score >= 50.0:
+            risk_level = "Medium Risk"
+        else:
+            risk_level = "High Risk"
+
+        # Structured reasoning narrative
+        reasoning_parts = [
+            f"Coverage: {cov_pct:.0f}% ({matched}/{tot_items} items, +{coverage_score:.1f} pts)",
+        ]
+        if matched > 0:
+            conf_pct = (conf_count / matched) * 100.0
+            reasoning_parts.append(f"Pricing: {conf_count} confident / {rev_count} review ({conf_pct:.0f}%, +{price_score:.1f} pts)")
+        else:
+            reasoning_parts.append("Pricing: 0 items quoted (+0 pts)")
+
+        if ko_status in ("passed", "no_questions"):
+            reasoning_parts.append("Knockouts: Cleared (+10 pts)")
+        elif ko_status == "unresolved":
+            reasoning_parts.append("Knockouts: Unresolved (+5 pts)")
+        else:
+            reasoning_parts.append("Knockouts: Failed criteria (0 pts)")
+
+        if flag_penalty > 0:
+            reasoning_parts.append(f"Penalties: -{flag_penalty:.0f} pts ({crit_count} critical, {warn_count} warning flags)")
+        else:
+            reasoning_parts.append("Penalties: 0 deductions (Clean)")
+
+        score_reasoning = " • ".join(reasoning_parts)
 
         vendor_summaries.append(
             VendorTrustSummary(
@@ -153,6 +199,9 @@ def compute_trust_report(rfx_id: int, secrets: AppSecrets | None = None) -> Trus
                 warning_flags_count=warn_count,
                 knockouts_status=ko_status,
                 trust_score=round(trust_score, 1),
+                score_reasoning=score_reasoning,
+                risk_level=risk_level,
+                total_quoted_spend_inr=round(total_spend, 2),
                 money_at_risk_inr=money_risk,
                 flags_list=[f"{f.get('code')}: {f.get('message')}" for f in v_flags],
             )

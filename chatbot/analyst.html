@@ -134,6 +134,60 @@
       background: #f1f5f9;
       font-weight: 700;
     }
+
+    .vendor-comparison-table,
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      font-size: 0.875rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+
+    .vendor-comparison-table th,
+    .comparison-table th {
+      background: #f1f5f9;
+      color: #1e293b;
+      font-weight: 600;
+      padding: 10px 12px;
+      border-bottom: 2px solid #cbd5e1;
+      border-right: 1px solid #e2e8f0;
+      font-size: 0.8125rem;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+    }
+
+    .vendor-comparison-table td,
+    .comparison-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #e2e8f0;
+      border-right: 1px solid #e2e8f0;
+      vertical-align: middle;
+    }
+
+    .vendor-comparison-table tbody tr:hover,
+    .comparison-table tbody tr:hover {
+      background: #f8fafc;
+    }
+
+    .risk-chip-low {
+      background-color: #e8f5e9 !important;
+      color: #2e7d32 !important;
+      font-weight: 700 !important;
+    }
+
+    .risk-chip-medium {
+      background-color: #fff3e0 !important;
+      color: #e65100 !important;
+      font-weight: 700 !important;
+    }
+
+    .risk-chip-high {
+      background-color: #ffebee !important;
+      color: #c62828 !important;
+      font-weight: 700 !important;
+    }
   </style>
 </head>
 
@@ -209,9 +263,9 @@
                 </v-tooltip>
               </v-tab>
               <v-tab value="trust">
-                <v-icon icon="mdi-shield-check" class="mr-1"></v-icon> Trust & Risk
+                <v-icon icon="mdi-account-switch-outline" class="mr-1"></v-icon> Vendor Comparison
                 <v-tooltip activator="parent" location="bottom">
-                  Vendor trust scores, risk audits, quotation confidence levels, and money-at-risk breakdown.
+                  Side-by-side vendor trust scores, score reasoning, quotation confidence levels, and risk audit table.
                 </v-tooltip>
               </v-tab>
             </v-tabs>
@@ -576,346 +630,600 @@
 
               <!-- TAB 2: COMPARISON GRID & READY-MADE SQL WIDGETS -->
               <v-window-item value="grid">
-                <!-- Ready-Made Widgets Top Summary Cards (Standard SQL - No AI) -->
-                <div v-if="gridData && gridData.widgets" class="mb-4">
-                  <v-row>
-                    <v-col cols="12" sm="6" md="3">
-                      <div class="widget-stat-card">
-                        <div class="text-caption text-grey font-weight-bold">TARGET RFX SPEND</div>
-                        <div class="text-h6 font-weight-bold text-primary">
-                          ₹{{ (gridData.widgets.basket_summary.total_target_spend_inr || 0).toLocaleString() }}
-                        </div>
-                        <div class="text-caption text-grey-darken-1">Across {{
-                          gridData.widgets.basket_summary.total_line_items }} items</div>
-                      </div>
-                    </v-col>
+                <!-- Loading State -->
+                <div v-if="loadingGrid" class="text-center py-10">
+                  <v-progress-circular indeterminate color="indigo" size="48"></v-progress-circular>
+                  <div class="text-subtitle-2 text-grey-darken-1 mt-3">Loading side-by-side comparison matrix and analytics widgets from database...</div>
+                </div>
 
-                    <v-col cols="12" sm="6" md="3">
-                      <div class="widget-stat-card">
-                        <div class="text-caption text-grey font-weight-bold">OPTIMAL BASKET (SUM OF L1)</div>
-                        <div class="text-h6 font-weight-bold text-teal">
-                          ₹{{ (gridData.widgets.basket_summary.optimal_basket_spend_inr || 0).toLocaleString() }}
-                        </div>
-                        <div class="text-caption text-teal-darken-1 font-weight-medium">Lowest quoted prices</div>
-                      </div>
-                    </v-col>
+                <!-- Error State -->
+                <div v-else-if="gridError" class="pa-4">
+                  <v-alert type="error" variant="tonal" class="mb-4">
+                    <strong>Failed to load comparison data:</strong> {{ gridError }}
+                    <div class="mt-2">
+                      <v-btn size="small" color="error" variant="outlined" @click="loadGrid">
+                        <v-icon icon="mdi-refresh" class="mr-1"></v-icon> Retry
+                      </v-btn>
+                    </div>
+                  </v-alert>
+                </div>
 
-                    <v-col cols="12" sm="6" md="3">
-                      <div class="widget-stat-card">
-                        <div class="text-caption text-grey font-weight-bold">POTENTIAL SAVINGS</div>
-                        <div class="text-h6 font-weight-bold text-success">
-                          ₹{{ (gridData.widgets.basket_summary.potential_savings_inr || 0).toLocaleString() }}
-                        </div>
-                        <div class="text-caption text-success font-weight-medium">
-                          {{ gridData.widgets.basket_summary.potential_savings_pct }}% vs Target
-                        </div>
-                      </div>
-                    </v-col>
-
-                    <v-col cols="12" sm="6" md="3">
-                      <div class="widget-stat-card">
-                        <div class="text-caption text-grey font-weight-bold">QUOTED VENDORS</div>
-                        <div class="text-h6 font-weight-bold text-indigo">
-                          {{ gridData.widgets.basket_summary.total_vendors_participating }}
-                        </div>
-                        <div class="d-flex align-center mt-1 flex-wrap">
-                          <v-chip size="x-small" color="green" class="mr-1 mb-1 font-weight-bold">
-                            {{ gridData.widgets.basket_summary.full_coverage_vendors_count || 0 }} Full (All Items)
-                          </v-chip>
-                          <v-chip size="x-small" color="orange" class="mb-1 font-weight-bold">
-                            {{ gridData.widgets.basket_summary.partial_coverage_vendors_count || 0 }} Partial
-                          </v-chip>
-                        </div>
-                      </div>
-                    </v-col>
-                  </v-row>
-
-                  <!-- Widget View Switcher -->
-                  <div class="d-flex align-center justify-space-between mt-3 mb-2 flex-wrap">
-                    <v-btn-toggle v-model="gridViewMode" color="indigo" density="compact" mandatory rounded="lg">
-                      <v-btn value="matrix"><v-icon icon="mdi-grid" class="mr-1"></v-icon> Side-by-Side Matrix</v-btn>
-                      <v-btn value="l1_summary"><v-icon icon="mdi-trophy-outline" class="mr-1"></v-icon> L1 Best Price</v-btn>
-                      <v-btn value="price_spread"><v-icon icon="mdi-arrow-expand-horizontal" class="mr-1"></v-icon> Price Spread</v-btn>
-                      <v-btn value="vendor_coverage"><v-icon icon="mdi-account-multiple-check" class="mr-1"></v-icon> Vendor Response Coverage</v-btn>
-                      <v-btn value="leaderboard"><v-icon icon="mdi-podium" class="mr-1"></v-icon> Vendor Win Leaderboard</v-btn>
-                    </v-btn-toggle>
-
-                    <v-chip size="x-small" color="blue-grey" variant="flat">
-                      <v-icon icon="mdi-database-check" size="14" class="mr-1"></v-icon>
-                      Standard SQL Scripts (0 AI Tokens)
-                    </v-chip>
+                <!-- Empty State -->
+                <div v-else-if="!gridData || !gridData.items || gridData.items.length === 0" class="text-center text-grey py-12">
+                  <v-icon icon="mdi-table-remove" size="52" class="mb-2 text-grey-lighten-1"></v-icon>
+                  <div class="text-subtitle-1 font-weight-bold text-grey-darken-2">No comparison data available for RFX #{{ rfxId }}</div>
+                  <div class="text-caption text-grey mt-1">When line items and vendor quotations are ingested, all comparison matrices and SQL widgets will appear here.</div>
+                  <div class="mt-3">
+                    <v-btn size="small" color="indigo" variant="tonal" @click="loadGrid">
+                      <v-icon icon="mdi-refresh" class="mr-1"></v-icon> Refresh Comparison Data
+                    </v-btn>
                   </div>
                 </div>
 
-                <!-- VIEW 1: Side-by-Side Matrix -->
-                <div v-if="gridData && gridViewMode === 'matrix'" class="overflow-x-auto">
-                  <v-table density="compact" class="border">
-                    <thead>
-                      <tr class="bg-grey-lighten-3">
-                        <th class="text-left font-weight-bold" style="min-width: 220px;">RFx Line Item</th>
-                        <th class="text-center font-weight-bold" style="min-width: 100px;">Target (INR)</th>
-                        <th v-for="v in gridData.vendors" :key="v.vendor_id" class="text-center font-weight-bold"
-                          style="min-width: 180px;">
-                          {{ v.vendor_name }}
-                          <div class="text-caption text-grey font-weight-regular">{{ v.coverage_pct }}% Quoted</div>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="item in gridData.items" :key="item.id">
-                        <td class="font-weight-medium">
-                          #{{ item.item_number }} - {{ item.description }}
-                          <div class="text-caption text-grey">{{ item.quantity }} {{ item.unit }}</div>
-                        </td>
-                        <td class="text-center text-caption font-weight-bold">
-                          {{ item.target_price ? '₹' + item.target_price : '-' }}
-                        </td>
-                        <td v-for="v in gridData.vendors" :key="v.vendor_id" class="text-center">
-                          <div v-if="gridData.grid[item.id] && gridData.grid[item.id][v.vendor_id]"
-                            :class="['cell-box', 'state-' + (gridData.grid[item.id][v.vendor_id].state || 'confident').toLowerCase()]"
-                            @click="openCellModal(item, v, gridData.grid[item.id][v.vendor_id])">
-                            <div class="d-flex align-center justify-space-between">
-                              <span class="font-weight-bold">₹{{ gridData.grid[item.id][v.vendor_id].effective_price_inr
-                                }}</span>
-                              <span v-if="gridData.grid[item.id][v.vendor_id].is_l1" class="l1-badge">L1</span>
-                            </div>
-                            <div class="text-caption">{{ gridData.grid[item.id][v.vendor_id].state }}</div>
+                <!-- Active Data Views -->
+                <div v-else>
+                  <!-- Ready-Made Widgets Top Summary Cards (Standard SQL - No AI) -->
+                  <div v-if="gridData.widgets && gridData.widgets.basket_summary" class="mb-4">
+                    <v-row>
+                      <v-col cols="12" sm="6" md="3">
+                        <div class="widget-stat-card">
+                          <div class="text-caption text-grey font-weight-bold">TARGET RFX SPEND</div>
+                          <div class="text-h6 font-weight-bold text-primary">
+                            {{ formatCurrency(gridData.widgets.basket_summary.total_target_spend_inr) }}
                           </div>
-                          <div v-else class="cell-box state-missing text-caption">NOT QUOTED</div>
-                        </td>
-                      </tr>
-                      <!-- Total Spend Row -->
-                      <tr class="bg-grey-lighten-4 font-weight-bold">
-                        <td>Total Quoted Spend</td>
-                        <td>-</td>
-                        <td v-for="tot in gridData.totals_with_coverage" :key="tot.vendor_id" class="text-center">
-                          <div>₹{{ tot.total_spend_inr.toLocaleString() }}</div>
-                          <div class="text-caption text-grey">{{ tot.coverage_label }}</div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </v-table>
-                </div>
+                          <div class="text-caption text-grey-darken-1">Across {{ gridData.widgets.basket_summary.total_line_items }} items</div>
+                        </div>
+                      </v-col>
 
-                <!-- VIEW 2: L1 Best Price Summary (Widget 1) -->
-                <div v-if="gridData && gridViewMode === 'l1_summary'" class="overflow-x-auto">
-                  <v-card variant="outlined" class="pa-3">
-                    <div class="text-subtitle-2 font-weight-bold mb-2">
-                      <v-icon icon="mdi-trophy-outline" color="amber-darken-3" class="mr-1"></v-icon>
-                      L1 Lowest Price per Line Item & Savings vs Target (Computed via Standard SQL)
-                    </div>
-                    <v-table density="compact" class="border">
-                      <thead>
-                        <tr class="bg-grey-lighten-3">
-                          <th>Item #</th>
-                          <th>Description</th>
-                          <th>Quantity</th>
-                          <th>Target Unit Price</th>
-                          <th>Lowest (L1) Vendor</th>
-                          <th>L1 Unit Price</th>
-                          <th>Unit Savings</th>
-                          <th>Total Savings</th>
-                          <th>Savings %</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="it in gridData.widgets.l1_items" :key="it.item_id">
-                          <td>#{{ it.item_number }}</td>
-                          <td class="font-weight-medium">{{ it.description }}</td>
-                          <td>{{ it.quantity }} {{ it.unit }}</td>
-                          <td>{{ it.target_price ? '₹' + it.target_price : '-' }}</td>
-                          <td class="font-weight-bold text-teal">{{ it.l1_vendor_name }}</td>
-                          <td class="font-weight-bold">₹{{ it.l1_unit_price }}</td>
-                          <td :class="it.unit_savings && it.unit_savings > 0 ? 'text-success font-weight-bold' : ''">
-                            {{ it.unit_savings !== null ? '₹' + it.unit_savings : '-' }}
-                          </td>
-                          <td :class="it.total_savings && it.total_savings > 0 ? 'text-success font-weight-bold' : ''">
-                            {{ it.total_savings !== null ? '₹' + it.total_savings.toLocaleString() : '-' }}
-                          </td>
-                          <td>
-                            <v-chip v-if="it.savings_pct !== null" size="x-small"
-                              :color="it.savings_pct >= 0 ? 'green' : 'red'">
-                              {{ it.savings_pct }}%
+                      <v-col cols="12" sm="6" md="3">
+                        <div class="widget-stat-card">
+                          <div class="text-caption text-grey font-weight-bold">OPTIMAL BASKET (SUM OF L1)</div>
+                          <div class="text-h6 font-weight-bold text-teal">
+                            {{ formatCurrency(gridData.widgets.basket_summary.optimal_basket_spend_inr) }}
+                          </div>
+                          <div class="text-caption text-teal-darken-1 font-weight-medium">Lowest quoted prices</div>
+                        </div>
+                      </v-col>
+
+                      <v-col cols="12" sm="6" md="3">
+                        <div class="widget-stat-card">
+                          <div class="text-caption text-grey font-weight-bold">POTENTIAL SAVINGS</div>
+                          <div class="text-h6 font-weight-bold text-success">
+                            {{ formatCurrency(gridData.widgets.basket_summary.potential_savings_inr) }}
+                          </div>
+                          <div class="text-caption text-success font-weight-medium">
+                            {{ formatPct(gridData.widgets.basket_summary.potential_savings_pct) }} vs Target
+                          </div>
+                        </div>
+                      </v-col>
+
+                      <v-col cols="12" sm="6" md="3">
+                        <div class="widget-stat-card">
+                          <div class="text-caption text-grey font-weight-bold">QUOTED VENDORS</div>
+                          <div class="text-h6 font-weight-bold text-indigo">
+                            {{ gridData.widgets.basket_summary.total_vendors_participating }}
+                          </div>
+                          <div class="d-flex align-center mt-1 flex-wrap">
+                            <v-chip size="x-small" color="green" class="mr-1 mb-1 font-weight-bold">
+                              {{ gridData.widgets.basket_summary.full_coverage_vendors_count || 0 }} Full (All Items)
                             </v-chip>
-                            <span v-else>-</span>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </v-table>
-                  </v-card>
-                </div>
-
-                <!-- VIEW 3: Price Spread & Bidder Variance (Widget 2) -->
-                <div v-if="gridData && gridViewMode === 'price_spread'" class="overflow-x-auto">
-                  <v-card variant="outlined" class="pa-3">
-                    <div class="text-subtitle-2 font-weight-bold mb-2">
-                      <v-icon icon="mdi-arrow-expand-horizontal" color="indigo" class="mr-1"></v-icon>
-                      Line Item Price Dispersion & Vendor Spread (Computed via Standard SQL)
-                    </div>
-                    <v-table density="compact" class="border">
-                      <thead>
-                        <tr class="bg-grey-lighten-3">
-                          <th>Item #</th>
-                          <th>Description</th>
-                          <th>Bidders Count</th>
-                          <th>Lowest Price (Min)</th>
-                          <th>Highest Price (Max)</th>
-                          <th>Absolute Spread (Max - Min)</th>
-                          <th>Spread %</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="it in gridData.widgets.price_spread" :key="it.item_id">
-                          <td>#{{ it.item_number }}</td>
-                          <td class="font-weight-medium">{{ it.description }}</td>
-                          <td>
-                            <v-chip size="x-small" color="indigo">{{ it.bidders_count }} Bidders</v-chip>
-                          </td>
-                          <td class="text-teal font-weight-bold">₹{{ it.min_price }}</td>
-                          <td class="text-red font-weight-bold">₹{{ it.max_price }}</td>
-                          <td class="font-weight-bold">₹{{ it.spread_inr }}</td>
-                          <td>
-                            <v-chip size="x-small" :color="it.spread_pct > 30 ? 'orange' : 'grey'">
-                              {{ it.spread_pct }}%
+                            <v-chip size="x-small" color="orange" class="mb-1 font-weight-bold">
+                              {{ gridData.widgets.basket_summary.partial_coverage_vendors_count || 0 }} Partial
                             </v-chip>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </v-table>
-                  </v-card>
-                </div>
+                          </div>
+                        </div>
+                      </v-col>
+                    </v-row>
 
-                <!-- VIEW 4: Vendor Win Leaderboard (Widget 3) -->
-                <div v-if="gridData && gridViewMode === 'leaderboard'" class="overflow-x-auto">
-                  <v-card variant="outlined" class="pa-3">
-                    <div class="text-subtitle-2 font-weight-bold mb-2">
-                      <v-icon icon="mdi-podium" color="indigo" class="mr-1"></v-icon>
-                      Vendor L1 Win Count Leaderboard (Computed via Standard SQL)
-                    </div>
-                    <v-table density="compact" class="border">
-                      <thead>
-                        <tr class="bg-grey-lighten-3">
-                          <th>Vendor Name</th>
-                          <th>Items Won (L1)</th>
-                          <th>Total RFX Items</th>
-                          <th>Win Rate %</th>
-                          <th>L1 Spend Share (INR)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="v in gridData.widgets.vendor_leaderboard" :key="v.vendor_id">
-                          <td class="font-weight-bold">{{ v.vendor_name }}</td>
-                          <td>
-                            <v-chip size="small" :color="v.items_won > 0 ? 'green' : 'grey'" class="font-weight-bold">
-                              {{ v.items_won }} Won
-                            </v-chip>
-                          </td>
-                          <td>{{ v.total_items }}</td>
-                          <td>{{ v.win_pct }}%</td>
-                          <td class="font-weight-bold">₹{{ v.l1_spend_share_inr.toLocaleString() }}</td>
-                        </tr>
-                      </tbody>
-                    </v-table>
-                  </v-card>
-                </div>
+                    <!-- Widget View Switcher -->
+                    <div class="d-flex align-center justify-space-between mt-3 mb-2 flex-wrap">
+                      <v-btn-toggle v-model="gridViewMode" color="indigo" density="compact" mandatory rounded="lg">
+                        <v-btn value="matrix"><v-icon icon="mdi-grid" class="mr-1"></v-icon> Side-by-Side Matrix</v-btn>
+                        <v-btn value="l1_summary"><v-icon icon="mdi-trophy-outline" class="mr-1"></v-icon> L1 Best Price</v-btn>
+                        <v-btn value="price_spread"><v-icon icon="mdi-arrow-expand-horizontal" class="mr-1"></v-icon> Price Spread</v-btn>
+                        <v-btn value="vendor_coverage"><v-icon icon="mdi-account-multiple-check" class="mr-1"></v-icon> Vendor Response Coverage</v-btn>
+                        <v-btn value="leaderboard"><v-icon icon="mdi-podium" class="mr-1"></v-icon> Vendor Win Leaderboard</v-btn>
+                      </v-btn-toggle>
 
-                <!-- VIEW 5: Vendor Response Coverage Breakdown (Widget 4) -->
-                <div v-if="gridData && gridViewMode === 'vendor_coverage'" class="overflow-x-auto">
-                  <v-card variant="outlined" class="pa-3">
-                    <div class="d-flex align-center justify-space-between mb-3 flex-wrap">
-                      <div class="text-subtitle-2 font-weight-bold">
-                        <v-icon icon="mdi-account-multiple-check" color="teal" class="mr-1"></v-icon>
-                        Vendor Response Coverage: Full vs Partial Quotations (Computed via Standard SQL)
-                      </div>
-                      <div class="d-flex align-center mt-1 mt-sm-0">
-                        <v-chip size="small" color="green" class="mr-2 font-weight-bold">
-                          {{ (gridData.widgets?.vendor_coverage?.full_coverage_count) || 0 }} Full Quotes (All Items)
+                      <div class="d-flex align-center mt-2 mt-sm-0">
+                        <v-chip size="x-small" color="blue-grey" variant="flat" class="mr-2">
+                          <v-icon icon="mdi-database-check" size="14" class="mr-1"></v-icon>
+                          Standard SQL Queries (0 AI Tokens)
                         </v-chip>
-                        <v-chip size="small" color="orange" class="font-weight-bold">
-                          {{ (gridData.widgets?.vendor_coverage?.partial_coverage_count) || 0 }} Partial Quotes
-                        </v-chip>
+                        <v-btn size="small" variant="tonal" color="indigo" prepend-icon="mdi-refresh" @click="loadGrid">
+                          Refresh Grid
+                        </v-btn>
                       </div>
                     </div>
+                  </div>
 
-                    <v-table density="compact" class="border">
-                      <thead>
-                        <tr class="bg-grey-lighten-3">
-                          <th class="text-left font-weight-bold">Vendor Name</th>
-                          <th class="text-center font-weight-bold">Coverage Status</th>
-                          <th class="text-center font-weight-bold">Quoted Items</th>
-                          <th class="text-center font-weight-bold">Coverage %</th>
-                          <th class="text-center font-weight-bold">Price Confidence</th>
-                          <th class="text-right font-weight-bold">Total Quoted Spend (INR)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-if="!gridData.widgets?.vendor_coverage?.all_vendors || gridData.widgets.vendor_coverage.all_vendors.length === 0">
-                          <td colspan="6" class="text-center text-grey py-6">No vendor responses received for this RFX.</td>
-                        </tr>
-                        <tr v-for="v in (gridData.widgets?.vendor_coverage?.all_vendors || [])" :key="v.response_id || v.vendor_id">
-                          <td class="font-weight-bold">
-                            <v-icon :icon="v.is_full_coverage ? 'mdi-check-decagram' : 'mdi-alert-circle-outline'"
-                              :color="v.is_full_coverage ? 'green' : 'orange'" size="16" class="mr-1"></v-icon>
-                            {{ v.vendor_name }}
-                          </td>
-                          <td class="text-center">
-                            <v-chip size="x-small" :color="v.is_full_coverage ? 'green' : 'orange'" class="font-weight-bold">
-                              {{ v.is_full_coverage ? 'FULL QUOTE (ALL ITEMS)' : 'PARTIAL RESPONSE' }}
-                            </v-chip>
-                          </td>
-                          <td class="text-center font-weight-medium">
-                            {{ v.quoted_items_count }} / {{ v.total_rfx_items }} items
-                          </td>
-                          <td class="text-center font-weight-bold" :class="v.is_full_coverage ? 'text-success' : 'text-orange-darken-2'">
-                            {{ v.coverage_pct }}%
-                          </td>
-                          <td class="text-center text-caption">
-                            <span class="text-success font-weight-medium">{{ v.confident_items_count }} Confident</span>
-                            <span v-if="v.review_items_count > 0" class="text-orange font-weight-medium ml-1">/ {{ v.review_items_count }} Review</span>
-                          </td>
-                          <td class="text-right font-weight-bold">
-                            ₹{{ Number(v.total_spend_inr || 0).toLocaleString() }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </v-table>
-                  </v-card>
+                  <!-- VIEW 1: Side-by-Side Matrix -->
+                  <div v-if="gridViewMode === 'matrix'" class="overflow-x-auto">
+                    <div class="pa-2 bg-white rounded border">
+                      <table class="comparison-table">
+                        <thead>
+                          <tr>
+                            <th class="text-left font-weight-bold" style="min-width: 240px;">RFx Line Item</th>
+                            <th class="text-center font-weight-bold" style="min-width: 110px;">Target (INR)</th>
+                            <th v-if="!gridData.vendors || gridData.vendors.length === 0" class="text-center text-grey">
+                              No Vendors Quoted
+                            </th>
+                            <th v-for="v in (gridData.vendors || [])" :key="v.vendor_id" class="text-center font-weight-bold"
+                              style="min-width: 180px;">
+                              <div>{{ v.vendor_name }}</div>
+                              <v-chip size="x-small" :color="v.coverage_pct >= 100 ? 'green' : 'orange'" variant="tonal" class="mt-1 font-weight-bold">
+                                {{ v.coverage_pct }}% Quoted
+                              </v-chip>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="item in gridData.items" :key="item.id">
+                            <td class="font-weight-medium">
+                              <div class="font-weight-bold text-indigo">#{{ item.item_number }} - {{ item.description }}</div>
+                              <div class="text-caption text-grey">{{ formatNumber(item.quantity) }} {{ item.unit || 'pcs' }}</div>
+                            </td>
+                            <td class="text-center text-body-2 font-weight-bold text-grey-darken-3">
+                              {{ formatCurrency(item.target_price) }}
+                            </td>
+                            <td v-if="!gridData.vendors || gridData.vendors.length === 0" class="text-center text-grey">
+                              -
+                            </td>
+                            <td v-for="v in gridData.vendors" :key="v.vendor_id" class="text-center">
+                              <div v-if="gridData.grid && gridData.grid[item.id] && gridData.grid[item.id][v.vendor_id]"
+                                :class="['cell-box', 'state-' + (gridData.grid[item.id][v.vendor_id].state || 'confident').toLowerCase()]"
+                                @click="openCellModal(item, v, gridData.grid[item.id][v.vendor_id])">
+                                <div class="d-flex align-center justify-space-between">
+                                  <span class="font-weight-bold">{{ formatCurrency(gridData.grid[item.id][v.vendor_id].effective_price_inr) }}</span>
+                                  <span v-if="gridData.grid[item.id][v.vendor_id].is_l1" class="l1-badge ml-1">L1</span>
+                                </div>
+                                <div class="text-caption font-weight-medium text-capitalize">{{ gridData.grid[item.id][v.vendor_id].state || 'Confident' }}</div>
+                              </div>
+                              <div v-else class="cell-box state-missing text-caption">NOT QUOTED</div>
+                            </td>
+                          </tr>
+                          <!-- Total Spend Row -->
+                          <tr v-if="gridData.totals_with_coverage && gridData.totals_with_coverage.length > 0" class="total-row bg-grey-lighten-4">
+                            <td class="font-weight-bold">Total Quoted Spend</td>
+                            <td class="text-center font-weight-bold text-teal">
+                              {{ formatCurrency(gridData.widgets?.basket_summary?.total_target_spend_inr) }}
+                            </td>
+                            <td v-for="tot in gridData.totals_with_coverage" :key="tot.vendor_id" class="text-center">
+                              <div class="font-weight-bold text-body-2">{{ formatCurrency(tot.total_spend_inr) }}</div>
+                              <div class="text-caption text-grey font-weight-medium">{{ tot.coverage_label }}</div>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <!-- VIEW 2: L1 Best Price Summary (Widget 1) -->
+                  <div v-if="gridViewMode === 'l1_summary'" class="overflow-x-auto">
+                    <v-card variant="outlined" class="pa-3 bg-white">
+                      <div class="text-subtitle-2 font-weight-bold mb-2">
+                        <v-icon icon="mdi-trophy-outline" color="amber-darken-3" class="mr-1"></v-icon>
+                        L1 Lowest Price per Line Item & Savings vs Target (Computed via Standard SQL)
+                      </div>
+                      <table class="comparison-table">
+                        <thead>
+                          <tr>
+                            <th style="width: 70px;">Item #</th>
+                            <th style="min-width: 200px;">Description</th>
+                            <th style="min-width: 110px;">Quantity</th>
+                            <th class="text-right" style="min-width: 120px;">Target Price</th>
+                            <th style="min-width: 180px;">Lowest (L1) Vendor</th>
+                            <th class="text-right" style="min-width: 120px;">L1 Unit Price</th>
+                            <th class="text-right" style="min-width: 120px;">Unit Savings</th>
+                            <th class="text-right" style="min-width: 130px;">Total Savings</th>
+                            <th class="text-center" style="min-width: 100px;">Savings %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-if="!gridData.widgets?.l1_items || gridData.widgets.l1_items.length === 0">
+                            <td colspan="9" class="text-center text-grey py-6">No L1 price data available.</td>
+                          </tr>
+                          <tr v-for="it in (gridData.widgets?.l1_items || [])" :key="it.item_id">
+                            <td class="font-weight-bold text-indigo text-center">#{{ it.item_number }}</td>
+                            <td class="font-weight-medium">{{ it.description }}</td>
+                            <td>{{ formatNumber(it.quantity) }} {{ it.unit || 'pcs' }}</td>
+                            <td class="text-right font-weight-medium">{{ formatCurrency(it.target_price) }}</td>
+                            <td class="font-weight-bold text-teal">
+                              <v-icon icon="mdi-trophy-award" size="16" color="amber-darken-3" class="mr-1"></v-icon>
+                              {{ it.l1_vendor_name }}
+                            </td>
+                            <td class="text-right font-weight-bold">{{ formatCurrency(it.l1_unit_price) }}</td>
+                            <td class="text-right" :class="it.unit_savings && it.unit_savings > 0 ? 'text-success font-weight-bold' : ''">
+                              {{ formatCurrency(it.unit_savings) }}
+                            </td>
+                            <td class="text-right" :class="it.total_savings && it.total_savings > 0 ? 'text-success font-weight-bold' : ''">
+                              {{ formatCurrency(it.total_savings) }}
+                            </td>
+                            <td class="text-center">
+                              <v-chip v-if="it.savings_pct !== null && it.savings_pct !== undefined" size="x-small"
+                                :color="it.savings_pct >= 0 ? 'green' : 'red'" class="font-weight-bold">
+                                {{ it.savings_pct }}%
+                              </v-chip>
+                              <span v-else class="text-grey">-</span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </v-card>
+                  </div>
+
+                  <!-- VIEW 3: Price Spread & Bidder Variance (Widget 2) -->
+                  <div v-if="gridViewMode === 'price_spread'" class="overflow-x-auto">
+                    <v-card variant="outlined" class="pa-3 bg-white">
+                      <div class="text-subtitle-2 font-weight-bold mb-2">
+                        <v-icon icon="mdi-arrow-expand-horizontal" color="indigo" class="mr-1"></v-icon>
+                        Line Item Price Dispersion & Vendor Spread (Computed via Standard SQL)
+                      </div>
+                      <table class="comparison-table">
+                        <thead>
+                          <tr>
+                            <th style="width: 70px;">Item #</th>
+                            <th style="min-width: 200px;">Description</th>
+                            <th class="text-center" style="min-width: 120px;">Bidders Count</th>
+                            <th class="text-right" style="min-width: 120px;">Lowest Price (Min)</th>
+                            <th class="text-right" style="min-width: 120px;">Highest Price (Max)</th>
+                            <th class="text-right" style="min-width: 130px;">Spread (Max - Min)</th>
+                            <th class="text-center" style="min-width: 100px;">Spread %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-if="!gridData.widgets?.price_spread || gridData.widgets.price_spread.length === 0">
+                            <td colspan="7" class="text-center text-grey py-6">No price spread data available.</td>
+                          </tr>
+                          <tr v-for="it in (gridData.widgets?.price_spread || [])" :key="it.item_id">
+                            <td class="font-weight-bold text-indigo text-center">#{{ it.item_number }}</td>
+                            <td class="font-weight-medium">{{ it.description }}</td>
+                            <td class="text-center">
+                              <v-chip size="x-small" color="indigo" variant="tonal" class="font-weight-bold">
+                                {{ it.bidders_count }} Bidders
+                              </v-chip>
+                            </td>
+                            <td class="text-right text-teal font-weight-bold">{{ formatCurrency(it.min_price) }}</td>
+                            <td class="text-right text-red font-weight-bold">{{ formatCurrency(it.max_price) }}</td>
+                            <td class="text-right font-weight-bold">{{ formatCurrency(it.spread_inr) }}</td>
+                            <td class="text-center">
+                              <v-chip size="x-small" :color="it.spread_pct > 30 ? 'orange' : 'grey'" class="font-weight-bold">
+                                {{ formatPct(it.spread_pct) }}
+                              </v-chip>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </v-card>
+                  </div>
+
+                  <!-- VIEW 4: Vendor Win Leaderboard (Widget 3) -->
+                  <div v-if="gridViewMode === 'leaderboard'" class="overflow-x-auto">
+                    <v-card variant="outlined" class="pa-3 bg-white">
+                      <div class="text-subtitle-2 font-weight-bold mb-2">
+                        <v-icon icon="mdi-podium" color="indigo" class="mr-1"></v-icon>
+                        Vendor L1 Win Count Leaderboard (Computed via Standard SQL)
+                      </div>
+                      <table class="comparison-table">
+                        <thead>
+                          <tr>
+                            <th style="min-width: 220px;">Vendor Name</th>
+                            <th class="text-center" style="min-width: 130px;">Items Won (L1)</th>
+                            <th class="text-center" style="min-width: 120px;">Total RFX Items</th>
+                            <th class="text-center" style="min-width: 110px;">Win Rate %</th>
+                            <th class="text-right" style="min-width: 140px;">L1 Spend Share (INR)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-if="!gridData.widgets?.vendor_leaderboard || gridData.widgets.vendor_leaderboard.length === 0">
+                            <td colspan="5" class="text-center text-grey py-6">No leaderboard data available.</td>
+                          </tr>
+                          <tr v-for="v in (gridData.widgets?.vendor_leaderboard || [])" :key="v.vendor_id">
+                            <td class="font-weight-bold text-grey-darken-4">
+                              <v-icon icon="mdi-domain" size="16" color="indigo" class="mr-1"></v-icon>
+                              {{ v.vendor_name }}
+                            </td>
+                            <td class="text-center">
+                              <v-chip size="small" :color="v.items_won > 0 ? 'green' : 'grey'" class="font-weight-bold">
+                                {{ v.items_won }} Won
+                              </v-chip>
+                            </td>
+                            <td class="text-center font-weight-medium">{{ v.total_items }}</td>
+                            <td class="text-center font-weight-bold" :class="v.win_pct > 0 ? 'text-teal' : 'text-grey'">
+                              {{ formatPct(v.win_pct) }}
+                            </td>
+                            <td class="text-right font-weight-bold text-teal">
+                              {{ formatCurrency(v.l1_spend_share_inr) }}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </v-card>
+                  </div>
+
+                  <!-- VIEW 5: Vendor Response Coverage Breakdown (Widget 4) -->
+                  <div v-if="gridViewMode === 'vendor_coverage'" class="overflow-x-auto">
+                    <v-card variant="outlined" class="pa-3 bg-white">
+                      <div class="d-flex align-center justify-space-between mb-3 flex-wrap">
+                        <div class="text-subtitle-2 font-weight-bold">
+                          <v-icon icon="mdi-account-multiple-check" color="teal" class="mr-1"></v-icon>
+                          Vendor Response Coverage: Full vs Partial Quotations (Computed via Standard SQL)
+                        </div>
+                        <div class="d-flex align-center mt-1 mt-sm-0">
+                          <v-chip size="small" color="green" class="mr-2 font-weight-bold">
+                            {{ (gridData.widgets?.vendor_coverage?.full_coverage_count) || 0 }} Full Quotes (All Items)
+                          </v-chip>
+                          <v-chip size="small" color="orange" class="font-weight-bold">
+                            {{ (gridData.widgets?.vendor_coverage?.partial_coverage_count) || 0 }} Partial Quotes
+                          </v-chip>
+                        </div>
+                      </div>
+
+                      <table class="comparison-table">
+                        <thead>
+                          <tr>
+                            <th class="text-left font-weight-bold" style="min-width: 220px;">Vendor Name</th>
+                            <th class="text-center font-weight-bold" style="min-width: 160px;">Coverage Status</th>
+                            <th class="text-center font-weight-bold" style="min-width: 130px;">Quoted Items</th>
+                            <th class="text-center font-weight-bold" style="min-width: 110px;">Coverage %</th>
+                            <th class="text-center font-weight-bold" style="min-width: 170px;">Price Confidence</th>
+                            <th class="text-right font-weight-bold" style="min-width: 140px;">Total Quoted Spend</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-if="!gridData.widgets?.vendor_coverage?.all_vendors || gridData.widgets.vendor_coverage.all_vendors.length === 0">
+                            <td colspan="6" class="text-center text-grey py-6">No vendor responses received for this RFX.</td>
+                          </tr>
+                          <tr v-for="v in (gridData.widgets?.vendor_coverage?.all_vendors || [])" :key="v.response_id || v.vendor_id">
+                            <td class="font-weight-bold">
+                              <v-icon :icon="v.is_full_coverage ? 'mdi-check-decagram' : 'mdi-alert-circle-outline'"
+                                :color="v.is_full_coverage ? 'green' : 'orange'" size="16" class="mr-1"></v-icon>
+                              {{ v.vendor_name }}
+                            </td>
+                            <td class="text-center">
+                              <v-chip size="x-small" :color="v.is_full_coverage ? 'green' : 'orange'" class="font-weight-bold">
+                                {{ v.is_full_coverage ? 'FULL QUOTE (ALL ITEMS)' : 'PARTIAL RESPONSE' }}
+                              </v-chip>
+                            </td>
+                            <td class="text-center font-weight-medium">
+                              {{ v.quoted_items_count }} / {{ v.total_rfx_items }} items
+                            </td>
+                            <td class="text-center font-weight-bold" :class="v.is_full_coverage ? 'text-success' : 'text-orange-darken-2'">
+                              {{ formatPct(v.coverage_pct) }}
+                            </td>
+                            <td class="text-center text-caption">
+                              <span class="text-success font-weight-medium">{{ v.confident_items_count }} Confident</span>
+                              <span v-if="v.review_items_count > 0" class="text-orange font-weight-medium ml-1">/ {{ v.review_items_count }} Review</span>
+                            </td>
+                            <td class="text-right font-weight-bold text-teal">
+                              {{ formatCurrency(v.total_spend_inr) }}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </v-card>
+                  </div>
                 </div>
               </v-window-item>
 
-              <!-- TAB 3: TRUST & RISK -->
+              <!-- TAB 3: VENDOR COMPARISON (Redesigned Table View) -->
               <v-window-item value="trust">
-                <div v-if="trustData">
-                  <v-alert
-                    :type="trustData.overall_confidence === 'high' ? 'success' : (trustData.overall_confidence === 'medium' ? 'warning' : 'error')"
-                    variant="tonal" class="mb-4">
-                    <strong>Overall Confidence: {{ (trustData.overall_confidence || 'medium').toUpperCase() }}</strong>
-                    <div class="text-caption" v-for="r in trustData.recommendations" :key="r">• {{ r }}</div>
-                  </v-alert>
+                <!-- Loading State -->
+                <div v-if="loadingTrust" class="text-center py-10">
+                  <v-progress-circular indeterminate color="indigo" size="48"></v-progress-circular>
+                  <div class="text-subtitle-2 text-grey-darken-1 mt-3">Evaluating vendor trust scores, score reasoning, and risk profile...</div>
+                </div>
 
-                  <v-row>
-                    <v-col v-for="v in trustData.vendors" :key="v.vendor_id" cols="12" md="4">
-                      <v-card variant="outlined" class="pa-3">
-                        <div class="d-flex align-center justify-space-between mb-2">
-                          <span class="font-weight-bold">{{ v.vendor_name }}</span>
-                          <v-chip size="small"
-                            :color="v.trust_score >= 80 ? 'green' : (v.trust_score >= 50 ? 'orange' : 'red')">
-                            Trust: {{ v.trust_score }}/100
-                          </v-chip>
+                <!-- Error State -->
+                <div v-else-if="trustError" class="pa-4">
+                  <v-alert type="error" variant="tonal" class="mb-4">
+                    <strong>Failed to load vendor comparison:</strong> {{ trustError }}
+                    <div class="mt-2">
+                      <v-btn size="small" color="error" variant="outlined" @click="loadTrust">
+                        <v-icon icon="mdi-refresh" class="mr-1"></v-icon> Retry
+                      </v-btn>
+                    </div>
+                  </v-alert>
+                </div>
+
+                <!-- Empty State -->
+                <div v-else-if="!trustData || !trustData.vendors || trustData.vendors.length === 0" class="text-center text-grey py-12">
+                  <v-icon icon="mdi-account-group-outline" size="52" class="mb-2 text-grey-lighten-1"></v-icon>
+                  <div class="text-subtitle-1 font-weight-bold text-grey-darken-2">No vendor responses found for RFX #{{ rfxId }}</div>
+                  <div class="text-caption text-grey mt-1">Ingest vendor quotations to calculate trust scores, reasoning, price confidence, and money at risk.</div>
+                  <div class="mt-3">
+                    <v-btn size="small" color="indigo" variant="tonal" @click="loadTrust">
+                      <v-icon icon="mdi-refresh" class="mr-1"></v-icon> Refresh Vendor Audit
+                    </v-btn>
+                  </div>
+                </div>
+
+                <!-- Active Vendor Comparison View -->
+                <div v-else>
+                  <!-- Summary KPI Header Banner -->
+                  <v-card variant="outlined" class="pa-4 mb-4 bg-white">
+                    <div class="d-flex align-center justify-space-between flex-wrap">
+                      <div class="d-flex align-center flex-wrap">
+                        <div class="mr-4">
+                          <span class="text-subtitle-1 font-weight-bold">Vendor Comparison & Trust Audit</span>
+                          <div class="text-caption text-grey">RFX Project: <strong>{{ trustData.rfx_title || ('RFX #' + rfxId) }}</strong></div>
                         </div>
-                        <v-divider class="my-2"></v-divider>
-                        <div class="text-caption">
-                          <div>Coverage: <strong>{{ v.coverage_pct }}%</strong> ({{ v.matched_items }}/{{ v.total_items
-                            }} items)</div>
-                          <div>Prices: <strong>{{ v.confident_items }}</strong> Confident / <strong
-                              class="text-orange">{{ v.review_items }}</strong> Review</div>
-                          <div>Critical Flags: <strong :class="v.critical_flags_count > 0 ? 'text-red' : ''">{{
-                              v.critical_flags_count }}</strong></div>
-                          <div>Money at Risk: <strong>₹{{ (v.money_at_risk_inr || 0).toLocaleString() }}</strong></div>
+                        <v-chip size="small" :color="trustData.overall_confidence === 'high' ? 'green' : (trustData.overall_confidence === 'medium' ? 'orange' : 'red')" class="font-weight-bold mr-2">
+                          {{ (trustData.overall_confidence || 'medium').toUpperCase() }} OVERALL CONFIDENCE
+                        </v-chip>
+                        <v-chip size="small" color="indigo" variant="tonal" class="font-weight-medium">
+                          {{ (trustData.vendors || []).length }} Participating Vendors
+                        </v-chip>
+                      </div>
+
+                      <div class="d-flex align-center mt-2 mt-sm-0 flex-wrap">
+                        <v-btn size="small" color="indigo" variant="tonal" class="mr-2" prepend-icon="mdi-refresh" @click="loadTrust">
+                          Refresh Audit
+                        </v-btn>
+                        <div style="min-width: 240px;">
+                          <v-text-field v-model="vendorSearchQuery" density="compact" variant="outlined" hide-details
+                            placeholder="Search vendor, risk tier, reasoning..." prepend-inner-icon="mdi-magnify" clearable>
+                          </v-text-field>
                         </div>
-                      </v-card>
-                    </v-col>
-                  </v-row>
+                      </div>
+                    </div>
+
+                    <!-- Recommendations Banner -->
+                    <div v-if="trustData.recommendations && trustData.recommendations.length > 0" class="mt-3">
+                      <v-alert
+                        :type="trustData.overall_confidence === 'high' ? 'success' : (trustData.overall_confidence === 'medium' ? 'warning' : 'error')"
+                        variant="tonal" density="compact" class="text-caption">
+                        <div class="font-weight-bold mb-1">Key Decision Recommendations:</div>
+                        <div v-for="(rec, rIdx) in trustData.recommendations" :key="rIdx" class="d-flex align-start">
+                          <span class="mr-1">&bull;</span> <span>{{ rec }}</span>
+                        </div>
+                      </v-alert>
+                    </div>
+                  </v-card>
+
+                  <!-- Single Table: Each Vendor is Exactly One Line Item -->
+                  <v-card variant="outlined" class="pa-3 bg-white">
+                    <div class="d-flex align-center justify-space-between mb-3">
+                      <div class="text-subtitle-2 font-weight-bold">
+                        <v-icon icon="mdi-table-account" color="indigo" class="mr-1"></v-icon>
+                        Vendor Trust, Reliability & Risk Matrix (1 Line Item Per Vendor)
+                      </div>
+                      <v-chip size="x-small" color="indigo" variant="tonal">
+                        Showing {{ filteredVendors.length }} of {{ trustData.vendors.length }} Vendors
+                      </v-chip>
+                    </div>
+
+                    <div style="overflow-x: auto; width: 100%;">
+                      <table class="vendor-comparison-table">
+                        <thead>
+                          <tr>
+                            <th style="min-width: 200px;">Vendor & Status</th>
+                            <th class="text-center" style="min-width: 150px;">Trust Score & Tier</th>
+                            <th style="min-width: 320px;">Score Reasoning & Points Breakdown</th>
+                            <th class="text-center" style="min-width: 120px;">Item Coverage</th>
+                            <th class="text-center" style="min-width: 160px;">Price Confidence</th>
+                            <th class="text-center" style="min-width: 120px;">Compliance</th>
+                            <th class="text-center" style="min-width: 120px;">Open Flags</th>
+                            <th class="text-right" style="min-width: 130px;">Money at Risk</th>
+                            <th class="text-right" style="min-width: 140px;">Total Quoted Spend</th>
+                            <th class="text-center" style="width: 80px;">Audit</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-if="filteredVendors.length === 0">
+                            <td colspan="10" class="text-center text-grey py-6">
+                              <span v-if="vendorSearchQuery">No vendors match search "{{ vendorSearchQuery }}".</span>
+                              <span v-else>No vendor quotation data available.</span>
+                            </td>
+                          </tr>
+                          <tr v-for="v in filteredVendors" :key="v.vendor_id">
+                            <!-- Column 1: Vendor Name & Status -->
+                            <td>
+                              <div class="font-weight-bold text-grey-darken-4 text-body-2">{{ v.vendor_name }}</div>
+                              <div class="d-flex align-center mt-1 flex-wrap">
+                                <v-chip size="x-small" :color="v.coverage_pct >= 100 ? 'green' : 'orange'" class="font-weight-bold mr-1">
+                                  {{ v.coverage_pct >= 100 ? 'FULL QUOTE' : 'PARTIAL' }}
+                                </v-chip>
+                                <span class="text-caption text-grey">ID: #{{ v.vendor_id }}</span>
+                              </div>
+                            </td>
+
+                            <!-- Column 2: Trust Score & Risk Level -->
+                            <td class="text-center">
+                              <div class="d-flex align-center justify-center mb-1">
+                                <v-chip size="small" :color="v.trust_score >= 80 ? 'green' : (v.trust_score >= 50 ? 'orange' : 'red')" class="font-weight-bold text-body-2">
+                                  {{ v.trust_score }} / 100
+                                </v-chip>
+                              </div>
+                              <div>
+                                <v-chip size="x-small" :class="'risk-chip-' + (v.risk_level || 'Low Risk').toLowerCase().replace(' risk', '')">
+                                  {{ (v.risk_level || 'Low Risk').toUpperCase() }}
+                                </v-chip>
+                              </div>
+                              <v-progress-linear :model-value="v.trust_score" :color="v.trust_score >= 80 ? 'green' : (v.trust_score >= 50 ? 'orange' : 'red')" height="4" rounded class="mt-1"></v-progress-linear>
+                            </td>
+
+                            <!-- Column 3: Score Reasoning & Points Breakdown -->
+                            <td>
+                              <div class="text-caption text-grey-darken-3 font-weight-medium" style="line-height: 1.4;">
+                                {{ v.score_reasoning || 'Score computed deterministically from item coverage, OCR confidence, compliance, and flag deductions.' }}
+                              </div>
+                            </td>
+
+                            <!-- Column 4: Item Coverage -->
+                            <td class="text-center">
+                              <div class="font-weight-bold text-body-2" :class="v.coverage_pct >= 100 ? 'text-success' : 'text-orange-darken-2'">
+                                {{ formatPct(v.coverage_pct) }}
+                              </div>
+                              <div class="text-caption text-grey">{{ v.matched_items }} / {{ v.total_items }} items</div>
+                            </td>
+
+                            <!-- Column 5: Price Quality & Confidence -->
+                            <td class="text-center">
+                              <div class="d-flex align-center justify-center flex-wrap">
+                                <v-chip size="x-small" color="green" variant="tonal" class="mr-1 mb-1 font-weight-bold">
+                                  {{ v.confident_items }} Confident
+                                </v-chip>
+                                <v-chip v-if="v.review_items > 0" size="x-small" color="orange" variant="tonal" class="mb-1 font-weight-bold">
+                                  {{ v.review_items }} Review
+                                </v-chip>
+                              </div>
+                              <div v-if="v.missing_items > 0" class="text-caption text-grey">
+                                {{ v.missing_items }} unquoted
+                              </div>
+                            </td>
+
+                            <!-- Column 6: Compliance & Knockouts -->
+                            <td class="text-center">
+                              <v-chip size="x-small"
+                                :color="v.knockouts_status === 'passed' ? 'green' : (v.knockouts_status === 'unresolved' ? 'orange' : (v.knockouts_status === 'failed' ? 'red' : 'blue-grey'))"
+                                class="font-weight-bold">
+                                {{ v.knockouts_status === 'passed' ? 'PASSED' : (v.knockouts_status === 'unresolved' ? 'UNRESOLVED' : (v.knockouts_status === 'failed' ? 'FAILED' : 'NO KNOCKOUTS')) }}
+                              </v-chip>
+                            </td>
+
+                            <!-- Column 7: Open Flags -->
+                            <td class="text-center">
+                              <div v-if="v.critical_flags_count > 0 || v.warning_flags_count > 0">
+                                <v-chip v-if="v.critical_flags_count > 0" size="x-small" color="red" class="font-weight-bold mr-1">
+                                  {{ v.critical_flags_count }} Critical
+                                </v-chip>
+                                <v-chip v-if="v.warning_flags_count > 0" size="x-small" color="orange" class="font-weight-bold">
+                                  {{ v.warning_flags_count }} Warn
+                                </v-chip>
+                              </div>
+                              <div v-else>
+                                <v-chip size="x-small" color="green" variant="tonal" class="font-weight-bold">
+                                  0 Flags (Clean)
+                                </v-chip>
+                              </div>
+                            </td>
+
+                            <!-- Column 8: Money at Risk -->
+                            <td class="text-right">
+                              <span class="font-weight-bold text-body-2" :class="v.money_at_risk_inr > 0 ? 'text-red font-weight-bold' : 'text-grey'">
+                                {{ formatCurrency(v.money_at_risk_inr) }}
+                              </span>
+                            </td>
+
+                            <!-- Column 9: Total Quoted Spend -->
+                            <td class="text-right">
+                              <span class="font-weight-bold text-teal text-body-2">
+                                {{ formatCurrency(v.total_quoted_spend_inr) }}
+                              </span>
+                            </td>
+
+                            <!-- Column 10: Action Button -->
+                            <td class="text-center">
+                              <v-btn size="x-small" color="indigo" variant="tonal" icon="mdi-text-box-search-outline" @click="openVendorAudit(v)">
+                                <v-tooltip activator="parent" location="left">Inspect Vendor Audit & Flags</v-tooltip>
+                              </v-btn>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </v-card>
                 </div>
               </v-window-item>
             </v-window>
@@ -940,6 +1248,85 @@
           </v-card-text>
           <v-card-actions><v-spacer></v-spacer><v-btn color="indigo"
               @click="cellModal = false">Close</v-btn></v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Vendor Audit & Flag Details Modal -->
+      <v-dialog v-model="vendorAuditModal" max-width="700px">
+        <v-card v-if="selectedVendorAudit">
+          <v-card-title class="bg-indigo text-white d-flex align-center justify-space-between">
+            <div class="d-flex align-center">
+              <v-icon icon="mdi-shield-search" class="mr-2"></v-icon>
+              <span>Vendor Audit: {{ selectedVendorAudit.vendor_name }}</span>
+            </div>
+            <v-chip size="small" :color="selectedVendorAudit.trust_score >= 80 ? 'green' : (selectedVendorAudit.trust_score >= 50 ? 'orange' : 'red')" class="font-weight-bold text-white">
+              {{ selectedVendorAudit.trust_score }}/100 ({{ selectedVendorAudit.risk_level }})
+            </v-chip>
+          </v-card-title>
+          <v-card-text class="pa-4">
+            <!-- Score Breakdown Summary -->
+            <div class="pa-3 bg-grey-lighten-4 rounded mb-3 border">
+              <div class="text-subtitle-2 font-weight-bold mb-1 text-indigo">Score Reasoning & Calculation</div>
+              <div class="text-body-2 text-grey-darken-3">{{ selectedVendorAudit.score_reasoning }}</div>
+            </div>
+
+            <!-- Key Metrics Grid -->
+            <v-row density="compact" class="mb-3">
+              <v-col cols="6" sm="3">
+                <div class="pa-2 border rounded bg-grey-lighten-5 text-center">
+                  <div class="text-caption text-grey font-weight-bold">COVERAGE</div>
+                  <div class="text-body-2 font-weight-bold">{{ selectedVendorAudit.coverage_pct }}%</div>
+                  <div class="text-caption text-grey">{{ selectedVendorAudit.matched_items }}/{{ selectedVendorAudit.total_items }} items</div>
+                </div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div class="pa-2 border rounded bg-grey-lighten-5 text-center">
+                  <div class="text-caption text-grey font-weight-bold">PRICE CONFIDENCE</div>
+                  <div class="text-body-2 font-weight-bold text-success">{{ selectedVendorAudit.confident_items }} Confident</div>
+                  <div class="text-caption text-orange font-weight-medium">{{ selectedVendorAudit.review_items }} Review</div>
+                </div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div class="pa-2 border rounded bg-grey-lighten-5 text-center">
+                  <div class="text-caption text-grey font-weight-bold">MONEY AT RISK</div>
+                  <div class="text-body-2 font-weight-bold" :class="selectedVendorAudit.money_at_risk_inr > 0 ? 'text-red' : 'text-grey'">
+                    {{ formatCurrency(selectedVendorAudit.money_at_risk_inr) }}
+                  </div>
+                </div>
+              </v-col>
+              <v-col cols="6" sm="3">
+                <div class="pa-2 border rounded bg-grey-lighten-5 text-center">
+                  <div class="text-caption text-grey font-weight-bold">TOTAL QUOTED</div>
+                  <div class="text-body-2 font-weight-bold text-teal">
+                    {{ formatCurrency(selectedVendorAudit.total_quoted_spend_inr) }}
+                  </div>
+                </div>
+              </v-col>
+            </v-row>
+
+            <!-- Flags & Warnings List -->
+            <div class="mb-3">
+              <div class="text-subtitle-2 font-weight-bold mb-2">
+                <v-icon icon="mdi-flag-outline" color="orange" class="mr-1"></v-icon>
+                Quotation Flags & Extraction Review Points ({{ (selectedVendorAudit.flags_list || []).length }})
+              </div>
+              <div v-if="!selectedVendorAudit.flags_list || selectedVendorAudit.flags_list.length === 0" class="text-caption text-grey bg-grey-lighten-5 pa-3 rounded border">
+                <v-icon icon="mdi-check-circle" color="green" size="16" class="mr-1"></v-icon>
+                No active flags or extraction warnings for this vendor. Quotation passed all automated checks.
+              </div>
+              <v-list v-else density="compact" class="border rounded">
+                <v-list-item v-for="(flg, fIdx) in selectedVendorAudit.flags_list" :key="fIdx"
+                  :prepend-icon="flg.toLowerCase().includes('critical') ? 'mdi-alert-octagon' : 'mdi-alert'"
+                  :class="flg.toLowerCase().includes('critical') ? 'text-red' : 'text-orange-darken-3'">
+                  <v-list-item-title class="text-caption font-weight-medium text-wrap">{{ flg }}</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </div>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="indigo" variant="flat" @click="vendorAuditModal = false">Close</v-btn>
+          </v-card-actions>
         </v-card>
       </v-dialog>
 
@@ -979,7 +1366,14 @@
         const chatHistory = ref([]);
         const loadingChat = ref(false);
         const gridData = ref(null);
+        const loadingGrid = ref(false);
+        const gridError = ref(null);
         const trustData = ref(null);
+        const loadingTrust = ref(false);
+        const trustError = ref(null);
+        const vendorSearchQuery = ref('');
+        const vendorAuditModal = ref(false);
+        const selectedVendorAudit = ref(null);
         const savedArtifacts = ref([]);
         const cellModal = ref(false);
         const selectedCell = ref(null);
@@ -990,6 +1384,27 @@
         const loadingRfi = ref(false);
         const rfiError = ref(null);
         const rfiItemSearch = ref('');
+
+        function formatCurrency(val) {
+          if (val === null || val === undefined || val === '') return '-';
+          const num = Number(val);
+          if (isNaN(num)) return '-';
+          return '₹' + num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        }
+
+        function formatNumber(val) {
+          if (val === null || val === undefined || val === '') return '-';
+          const num = Number(val);
+          if (isNaN(num)) return '-';
+          return num.toLocaleString();
+        }
+
+        function formatPct(val) {
+          if (val === null || val === undefined || val === '') return '-';
+          const num = Number(val);
+          if (isNaN(num)) return '-';
+          return num.toFixed(1) + '%';
+        }
 
         const filteredRfiItems = computed(() => {
           if (!rfiData.value || !Array.isArray(rfiData.value.items)) return [];
@@ -1002,6 +1417,19 @@
             const spec = (it.specifications || '').toLowerCase();
             const num = String(it.item_number || '');
             return desc.includes(q) || code.includes(q) || mat.includes(q) || spec.includes(q) || num.includes(q);
+          });
+        });
+
+        const filteredVendors = computed(() => {
+          if (!trustData.value || !Array.isArray(trustData.value.vendors)) return [];
+          const q = (vendorSearchQuery.value || '').trim().toLowerCase();
+          if (!q) return trustData.value.vendors;
+          return trustData.value.vendors.filter(v => {
+            const name = (v.vendor_name || '').toLowerCase();
+            const risk = (v.risk_level || '').toLowerCase();
+            const reason = (v.score_reasoning || '').toLowerCase();
+            const ko = (v.knockouts_status || '').toLowerCase();
+            return name.includes(q) || risk.includes(q) || reason.includes(q) || ko.includes(q);
           });
         });
 
@@ -1164,19 +1592,47 @@
         async function loadGrid(forcedId) {
           const targetId = getActiveRfxId(forcedId);
           if (!targetId) return;
+          loadingGrid.value = true;
+          gridError.value = null;
           try {
             const res = await fetch(`/api/rfx/${targetId}/comparison`);
-            gridData.value = await res.json();
-          } catch (e) { console.error(e); }
+            if (res.ok) {
+              gridData.value = await res.json();
+            } else {
+              const err = await res.json().catch(() => ({}));
+              gridError.value = err.detail || `Error ${res.status}: Failed to load comparison grid`;
+              gridData.value = null;
+            }
+          } catch (e) {
+            console.error('Failed to load comparison grid:', e);
+            gridError.value = e.message || 'Network error fetching comparison data';
+            gridData.value = null;
+          } finally {
+            loadingGrid.value = false;
+          }
         }
 
         async function loadTrust(forcedId) {
           const targetId = getActiveRfxId(forcedId);
           if (!targetId) return;
+          loadingTrust.value = true;
+          trustError.value = null;
           try {
             const res = await fetch(`/api/rfx/${targetId}/trust`);
-            trustData.value = await res.json();
-          } catch (e) { console.error(e); }
+            if (res.ok) {
+              trustData.value = await res.json();
+            } else {
+              const err = await res.json().catch(() => ({}));
+              trustError.value = err.detail || `Error ${res.status}: Failed to load vendor comparison`;
+              trustData.value = null;
+            }
+          } catch (e) {
+            console.error('Failed to load vendor comparison:', e);
+            trustError.value = e.message || 'Network error fetching vendor comparison';
+            trustData.value = null;
+          } finally {
+            loadingTrust.value = false;
+          }
         }
 
         async function loadArtifacts(forcedId) {
@@ -1280,6 +1736,11 @@
           cellModal.value = true;
         }
 
+        function openVendorAudit(vendor) {
+          selectedVendorAudit.value = vendor;
+          vendorAuditModal.value = true;
+        }
+
         function openFeedback(traceId, rating) {
           feedbackForm.value = { trace_id: traceId, rating: rating, comment: '', corrected_sql: '' };
           feedbackModal.value = true;
@@ -1313,9 +1774,13 @@
         return {
           rfxId, rfxList, rfxOptions, loadingRfxList, onRfxChanged,
           activeTab, gridViewMode, sessionId, userQuery, chatHistory, loadingChat,
-          gridData, trustData, savedArtifacts, cellModal, selectedCell, feedbackModal, feedbackForm,
+          gridData, loadingGrid, gridError, loadGrid,
+          trustData, loadingTrust, trustError, loadTrust, vendorSearchQuery, filteredVendors,
+          vendorAuditModal, selectedVendorAudit, openVendorAudit,
+          savedArtifacts, cellModal, selectedCell, feedbackModal, feedbackForm,
           rfiData, loadingRfi, rfiError, rfiItemSearch, filteredRfiItems, loadRfiDetails,
           formatDimensions, formatDate, computeTotalTargetSpend, computeTotalQuantity,
+          formatCurrency, formatNumber, formatPct,
           quickQuestions,
           renderMarkdown, askQuick, sendQuery, openCellModal, openFeedback, sendFeedback,
           showSavedArtifact, loadAllData

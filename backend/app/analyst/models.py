@@ -181,6 +181,9 @@ class VendorTrustSummary(BaseModel):
     warning_flags_count: int
     knockouts_status: Literal["passed", "failed", "unresolved", "no_questions"]
     trust_score: float = Field(description="Computed reliability score 0-100")
+    score_reasoning: str = Field(default="", description="Detailed human-readable explanation of how the score was calculated")
+    risk_level: str = Field(default="Low Risk", description="Risk classification: Low Risk, Medium Risk, High Risk")
+    total_quoted_spend_inr: float = Field(default=0.0, description="Total quoted spend in INR")
     money_at_risk_inr: float = Field(default=0.0, description="Estimated spend tied to REVIEW/flagged lines")
     flags_list: list[str] = Field(default_factory=list)
 

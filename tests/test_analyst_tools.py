@@ -124,3 +124,34 @@ def test_analyst_repository_artifact_caching():
     assert cached is not None
     assert cached["answer_text"] == "Vendor A is cheapest at 10 INR"
 
+
+def test_vendor_trust_summary_model_and_reasoning():
+    """Verify VendorTrustSummary Pydantic model validates score_reasoning and risk_level."""
+    from backend.app.analyst.models import VendorTrustSummary
+
+    summary = VendorTrustSummary(
+        vendor_id=1,
+        vendor_name="Apex Packaging",
+        coverage_pct=100.0,
+        total_items=4,
+        matched_items=4,
+        confident_items=4,
+        review_items=0,
+        missing_items=0,
+        critical_flags_count=0,
+        warning_flags_count=0,
+        knockouts_status="passed",
+        trust_score=95.0,
+        score_reasoning="Coverage: 100% (+40 pts) • Pricing: 4 confident / 0 review (+30 pts) • Knockouts: Cleared (+10 pts) • Penalties: 0 deductions",
+        risk_level="Low Risk",
+        total_quoted_spend_inr=125000.0,
+        money_at_risk_inr=0.0,
+        flags_list=[],
+    )
+    assert summary.vendor_id == 1
+    assert summary.risk_level == "Low Risk"
+    assert summary.trust_score == 95.0
+    assert "Coverage: 100%" in summary.score_reasoning
+    assert summary.total_quoted_spend_inr == 125000.0
+
+

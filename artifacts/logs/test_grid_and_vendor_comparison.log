@@ -1,0 +1,6 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0 -- /Users/akshaykumar/code/ktq2/.venv/bin/python3.14
+cachedir: .pytest_cache
+rootdir: /Users/akshaykumar/code/ktq2
+plugins: logfire-5.1.1, platformdirs-4.12.3, anyio-4.15.1
+collecting ... 
