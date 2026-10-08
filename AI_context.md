@@ -138,6 +138,13 @@
   - Renders complete line item specifications table with item numbering, descriptions, item codes, quantities with unit chips, material chips, formatted dimensions (`L × W × H unit`), unit target prices in INR, total target values, required dates, specifications, and total summary aggregation row.
   - URL query parameter auto-initialization (`?rfx_id=...` / `?id=...` / `?tab=...`) to immediately focus on the specified RFX and tab upon landing.
   - Automatically loads and refreshes `/api/rfi/{id}` on RFX selection or manual refresh.
-
-
-
+- **Step 5: Comparison Grid Fixes & Vendor Comparison Redesign**:
+  - **Comparison Grid Table Visibility & Reliability**:
+    - Resolved template crashes caused by unsafe numerical method calls (`.toLocaleString()`) on null/undefined properties with centralized formatters (`formatCurrency`, `formatNumber`, `formatPct`).
+    - Added reactive loading indicators (`loadingGrid`), error states (`gridError`), and empty state messaging when an RFX has no quotations.
+    - Robust rendering across all 5 comparison table views: Side-by-Side Matrix, L1 Best Price Summary & Savings, Price Spread & Bidder Variance, Vendor Response Coverage Breakdown, and Vendor Win Leaderboard.
+  - **Vendor Comparison Redesign (formerly Trust & Risk)**:
+    - Renamed Tab 3 to **Vendor Comparison** across UI tab bars, headers, and tooltips.
+    - Converted single-card layout into a clean, unified data table where **each vendor is exactly one line item**.
+    - Enhanced `VendorTrustSummary` model and `compute_trust_report` tool with `score_reasoning` (transparent points breakdown of coverage, price OCR confidence, compliance, and flag deductions), `risk_level` (Low / Medium / High Risk), and `total_quoted_spend_inr`.
+    - Added summary KPI banner (Overall Confidence, Participating Vendor count, Key Decision Recommendations), client-side vendor search filter (`vendorSearchQuery`), and vendor audit inspection dialog (`vendorAuditModal`) displaying full flag details and quotation checks.

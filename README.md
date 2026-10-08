@@ -221,7 +221,13 @@ curl -X GET http://localhost:8000/api/rfx/6/comparison
 ```
 *Returns side-by-side matrix along with deterministic SQL widgets: `basket_summary` (with full vs partial quote counts), `vendor_coverage` (100% quoted vs partial responses per vendor), `l1_items`, `price_spread`, and `vendor_leaderboard`.*
 
-#### 3. Fetch Stored Graphs & Reports (0 Tokens):
+#### 3. Fetch Vendor Comparison & Trust Audit:
+```bash
+curl -X GET http://localhost:8000/api/rfx/6/trust
+```
+*Returns vendor reliability scores, deterministic point calculations (`score_reasoning`), risk tier (`risk_level`), price confidence breakdown, money at risk, and total quoted spend per vendor.*
+
+#### 4. Fetch Stored Graphs & Reports (0 Tokens):
 ```bash
 curl -X GET http://localhost:8000/api/rfx/6/artifacts
 ```

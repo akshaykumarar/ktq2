@@ -254,8 +254,8 @@ flowchart TD
     subgraph ClientUI["1. Unified Client Interface (chatbot/analyst.html)"]
         UI1["RFI Specification & Line Items Table"]
         UI2["Analyst & Vendor Chat (Tooltip-Guided)"]
-        UI3["Comparison Grid & SQL Widgets"]
-        UI4["Trust & Risk Audits"]
+        UI3["Comparison Grid & 5 SQL Table Views"]
+        UI4["Vendor Comparison Matrix (1 Row Per Vendor + Score Reasoning)"]
         UI5["Saved Graphs & Reports Viewer"]
         UI6["Dynamic RFX Dropdown Selector (GET /api/rfi)"]
     end
