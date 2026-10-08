@@ -13,7 +13,12 @@ from backend.app.intake.models import (
     PackagingLineItem,
     PackagingRequirement,
 )
-from backend.app.intake.validation import apply_traceable_defaults, identify_missing_fields
+from backend.app.intake.validation import (
+    apply_traceable_defaults,
+    identify_missing_fields,
+    is_commercial_term_or_header,
+    is_separator_line,
+)
 
 
 def _normalize_header(value: Any, fallback: str) -> str:
@@ -139,6 +144,10 @@ def rows_to_packaging_requirements(
         )
         if not description:
             issues.append(f"{sheet_info}: Skipped row missing item description.")
+            continue
+
+        # Skip separator rows and commercial terms / notes rows in spreadsheets
+        if is_separator_line(str(description)) or is_commercial_term_or_header(str(description)):
             continue
 
         # 2. Quantity

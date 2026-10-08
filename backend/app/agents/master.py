@@ -16,9 +16,128 @@ from backend.app.agents.vendor import execute_vendor_task
 from backend.app.config.settings import AppSecrets
 from backend.app.db.repository import RFIRepository
 from backend.app.intake.agent import extract_requirements
-from backend.app.intake.validation import find_non_packaging_terms
+from backend.app.intake.validation import (
+    extract_commercial_terms,
+    find_non_packaging_terms,
+    is_commercial_term_or_header,
+    is_packaging_related,
+    is_separator_line,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def parse_removal_intent(user_text: str, total_items: int = 0) -> tuple[list[int | str], str] | None:
+    """Parse user command to remove items by range, list of indices, relative offset, or keyword."""
+    q_lower = user_text.strip().lower()
+
+    # Check if there is a removal verb: remove, delete, drop, clear, omit, exclude
+    if not any(v in q_lower for v in ["remove", "delete", "drop", "clear", "omit", "exclude"]):
+        return None
+
+    # 1. Terms / Separator line items: "remove commercial terms", "delete terms", "remove separator items", "remove all terms"
+    if re.search(
+        r"(?:remove|delete|drop|clear|omit)\s+(?:the\s+)?(?:all\s+)?(commercial\s*terms|terms\s*(?:and|&)\s*conditions|terms|notes|separators?|divider\s*lines?|headings?|terms\s*and\s*conditions\s*items?|non-product\s*items?)",
+        q_lower,
+    ):
+        patterns = [
+            "commercial terms", "mandatory", "terms", "moq", "freight", "warranty", "sla",
+            "volume discounts", "payment terms", "currency", "---", "===", "___"
+        ]
+        return patterns, "commercial terms and separator items"
+
+    # 2. Relative offset: "remove last 3 items", "delete the last item", "remove last 7"
+    rel_match = re.search(r"(?:remove|delete|drop)\s+(?:the\s+)?last\s+(\d+)\s+(?:items?|lines?|rows?)?", q_lower)
+    if rel_match and total_items > 0:
+        count = int(rel_match.group(1))
+        start_idx = max(1, total_items - count + 1)
+        targets: list[int | str] = list(range(start_idx, total_items + 1))
+        return targets, f"the last {len(targets)} item(s) (items {start_idx} to {total_items})"
+
+    if re.search(r"(?:remove|delete|drop)\s+(?:the\s+)?last\s+(?:item|line|row)", q_lower) and total_items > 0:
+        return [total_items], f"the last item (#{total_items})"
+
+    # 3. Explicit Range: "remove items 33 to 39", "remove 33-39", "delete items from 33 to 39", "delete lines 33 through 39", "remove items between 33 and 39"
+    range_match1 = re.search(
+        r"(?:remove|delete|drop|clear)\s+(?:items?|lines?|rows?|line\s*items?|item\s*numbers?)?\s*(?:from\s+)?(\d+)\s*(?:to|-|through|until|\.\.)\s*(\d+)",
+        q_lower,
+    )
+    if range_match1:
+        start_num = int(range_match1.group(1))
+        end_num = int(range_match1.group(2))
+        if start_num > end_num:
+            start_num, end_num = end_num, start_num
+        targets = list(range(start_num, end_num + 1))
+        return targets, f"items {start_num} to {end_num}"
+
+    range_match2 = re.search(
+        r"(?:remove|delete|drop|clear)\s+(?:items?|lines?|rows?|line\s*items?|item\s*numbers?)?\s*between\s+(\d+)\s+and\s+(\d+)",
+        q_lower,
+    )
+    if range_match2:
+        start_num = int(range_match2.group(1))
+        end_num = int(range_match2.group(2))
+        if start_num > end_num:
+            start_num, end_num = end_num, start_num
+        targets = list(range(start_num, end_num + 1))
+        return targets, f"items {start_num} to {end_num}"
+
+    # 4. Comma / 'and' separated numbers: "remove items 33, 34, 35", "delete line 1, 2 and 3", "remove item 2 and item 4"
+    multi_num_match = re.findall(r"\b\d+\b", q_lower)
+    if len(multi_num_match) > 1 and any(sep in q_lower for sep in [",", "and", "&"]):
+        targets_int = [int(n) for n in multi_num_match]
+        unique_targets: list[int | str] = list(dict.fromkeys(targets_int))
+        return unique_targets, f"items {', '.join(map(str, unique_targets))}"
+
+    # 5. Single item by number: "remove item 3", "delete 3", "drop line #3", "remove item #3"
+    single_num_match = re.search(r"(?:remove|delete|drop)\s+(?:item\s+|line\s+|#|row\s+)?(\d+)\b", q_lower)
+    if single_num_match:
+        target_n = int(single_num_match.group(1))
+        return [target_n], f"item {target_n}"
+
+    # 6. Specific item by code or description: "remove brown tape", "delete [Pkg-029]", "remove bubble mailers"
+    name_match = re.search(r"(?:remove|delete|drop)\s+(?:item\s+|line\s+|product\s+|#)?([a-zA-Z0-9\s#\[\]_-]+)", q_lower)
+    if name_match:
+        target_name = name_match.group(1).strip()
+        # Clean up any trailing filler words
+        target_name = re.sub(r"\s+(?:from\s+(?:the\s+)?(?:rfi|active\s+rfi|draft)|please|now)$", "", target_name, flags=re.I).strip()
+        if target_name:
+            return [target_name], f"'{target_name}'"
+
+    return None
+
+
+def parse_modification_intent(user_text: str) -> tuple[int | str, dict[str, Any]] | None:
+    """Parse user command to modify an existing item's quantity, price, or specifications."""
+    q_lower = user_text.strip().lower()
+    if not any(v in q_lower for v in ["change", "update", "modify", "set", "adjust"]):
+        return None
+
+    # Modify quantity: "change item 2 quantity to 500", "update item 1 qty to 1000", "set line 3 to 200 pcs"
+    qty_match = re.search(
+        r"(?:change|update|modify|set|adjust)\s+(?:item\s+|line\s+|#)?(\d+|[a-zA-Z0-9_-]+)\s+(?:quantity|qty|volume|count)?\s*(?:to|=|as)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*([a-zA-Z]+)?",
+        q_lower,
+    )
+    if qty_match:
+        target = qty_match.group(1).strip()
+        val = float(qty_match.group(2).replace(",", ""))
+        unit = qty_match.group(3)
+        updates: dict[str, Any] = {"quantity": val}
+        if unit and unit in ["pcs", "boxes", "cartons", "rolls", "bags", "kg", "meters", "mailers", "units"]:
+            updates["unit"] = unit
+        return (int(target) if target.isdigit() else target), updates
+
+    # Modify target price: "set item 2 price to 15", "change item 1 target price to 20 INR"
+    price_match = re.search(
+        r"(?:change|update|modify|set|adjust)\s+(?:item\s+|line\s+|#)?(\d+|[a-zA-Z0-9_-]+)\s+(?:target\s+price|price|budget|rate)\s*(?:to|=|as)?\s*(?:inr|rs\.?|₹|\$)?\s*(\d+(?:,\d+)*(?:\.\d+)?)",
+        q_lower,
+    )
+    if price_match:
+        target = price_match.group(1).strip()
+        val = float(price_match.group(2).replace(",", ""))
+        return (int(target) if target.isdigit() else target), {"target_price": val}
+
+    return None
 
 
 class ChatSessionState(BaseModel):
@@ -326,14 +445,57 @@ async def handle_rfi_workflow_turn(
             current_rfi = repo.get_by_id(rfi_id)
             return _format_rfi_card(current_rfi, intro_msg="Understood. The duplicate item was not added. Here is your current active RFI:"), "rfx"
 
-    # 5. Check for Remove / Delete item command
-    remove_match = re.search(r"(?:remove|delete|drop)\s+(?:item\s+)?([a-zA-Z0-9\s-]+)", q_lower)
-    if remove_match and session.active_rfi_id:
-        target_identifier = remove_match.group(1).strip()
+    # 5. Check for Remove / Delete item command (range, multi-item, relative, keyword)
+    if session.active_rfi_id:
         rfi_id = int(session.active_rfi_id) if str(session.active_rfi_id).isdigit() else 101
-        updated = repo.remove_item(rfi_id, target_identifier)
-        if updated:
-            return _format_rfi_card(updated, intro_msg=f"I have removed '{target_identifier}' from your active RFI:"), "rfx"
+        existing_rfi = repo.get_by_id(rfi_id)
+        current_count = len(existing_rfi.get("items", [])) if existing_rfi else 0
+        rem_res = parse_removal_intent(q_clean, total_items=current_count)
+        if rem_res:
+            target_identifiers, feedback_label = rem_res
+            updated = repo.remove_items(rfi_id, target_identifiers)
+            if updated:
+                return _format_rfi_card(updated, intro_msg=f"I have removed {feedback_label} from your active RFI:"), "rfx"
+
+    # 5b. Check for Change / Modify / Update item command
+    if session.active_rfi_id:
+        mod_res = parse_modification_intent(q_clean)
+        if mod_res:
+            target_ident, item_updates = mod_res
+            rfi_id = int(session.active_rfi_id) if str(session.active_rfi_id).isdigit() else 101
+            updated = repo.update_item(rfi_id, target_ident, item_updates)
+            if updated:
+                return _format_rfi_card(updated, intro_msg=f"I have updated item '{target_ident}' in your active RFI:"), "rfx"
+
+    # 5c. Check for explicit Commercial Terms and Notes update on active RFI
+    comm_terms = extract_commercial_terms(user_message)
+    if session.active_rfi_id and any([
+        comm_terms.get("payment_terms"),
+        comm_terms.get("delivery_terms"),
+        comm_terms.get("validity_days"),
+        comm_terms.get("currency"),
+        comm_terms.get("notes"),
+    ]):
+        rfi_id = int(session.active_rfi_id) if str(session.active_rfi_id).isdigit() else 101
+        term_updates = {}
+        if comm_terms.get("payment_terms"):
+            term_updates["payment_terms"] = comm_terms["payment_terms"]
+        if comm_terms.get("delivery_terms"):
+            term_updates["delivery_terms"] = comm_terms["delivery_terms"]
+        if comm_terms.get("validity_days"):
+            term_updates["validity_days"] = comm_terms["validity_days"]
+        if comm_terms.get("currency"):
+            term_updates["currency"] = comm_terms["currency"]
+
+        ext_check = await extract_requirements(user_message)
+        if not ext_check.requirements:
+            if comm_terms.get("notes"):
+                existing = repo.get_by_id(rfi_id)
+                current_scope = existing.get("scope", "") if existing else ""
+                term_updates["scope"] = f"{current_scope} | Notes: {'; '.join(comm_terms['notes'])}".strip(" |")
+            updated = repo.update(rfi_id, term_updates)
+            if updated:
+                return _format_rfi_card(updated, intro_msg="I have updated the commercial terms and notes for your active RFI:"), "rfx"
 
     # 6. Check for Non-Packaging Item
     non_pkg = find_non_packaging_terms(user_message)
@@ -362,7 +524,7 @@ async def handle_rfi_workflow_turn(
             existing_rfi = repo.get_by_id(rfi_id)
             if existing_rfi:
                 existing_items = existing_rfi.get("items", [])
-                
+
                 # Check for duplicates against existing items
                 duplicate_found = None
                 for new_req in ext_res.requirements:
@@ -385,7 +547,7 @@ async def handle_rfi_workflow_turn(
                         "dimensions": req.dimensions,
                         "specifications": req.specification or user_message,
                         "required_date": req.delivery_date or "2026-11-15",
-                        "currency": "INR",
+                        "currency": req.currency or existing_rfi.get("currency") or "INR",
                     }
                     for idx, req in enumerate(ext_res.requirements)
                 ]
@@ -408,7 +570,17 @@ async def handle_rfi_workflow_turn(
                         "rfx",
                     )
 
-                # No duplicate: append directly to existing active RFI
+                # No duplicate: append directly to existing active RFI and apply any commercial terms
+                if comm_terms.get("payment_terms") or comm_terms.get("delivery_terms") or comm_terms.get("validity_days"):
+                    repo.update(rfi_id, {
+                        k: v for k, v in {
+                            "payment_terms": comm_terms.get("payment_terms"),
+                            "delivery_terms": comm_terms.get("delivery_terms"),
+                            "validity_days": comm_terms.get("validity_days"),
+                            "currency": comm_terms.get("currency"),
+                        }.items() if v is not None
+                    })
+
                 updated_rfi = repo.add_items(rfi_id, new_items_payload)
                 return _format_rfi_card(updated_rfi, intro_msg=f"I have added {len(ext_res.requirements)} item(s) to your active RFI:"), "rfx"
 
@@ -417,16 +589,26 @@ async def handle_rfi_workflow_turn(
         qty_str = f"{int(req0.quantity)}" if req0.quantity else "1"
         rfi_title = ext_res.title or f"RFI for {qty_str} {req0.item_description}".strip()
         items_summary = ", ".join(r.item_description for r in ext_res.requirements)
+
+        payment_terms = comm_terms.get("payment_terms") or "Net 30 Days"
+        delivery_terms = comm_terms.get("delivery_terms") or f"Delivered to {location.title()} (DDP)"
+        validity_days = comm_terms.get("validity_days") or 30
+        currency = comm_terms.get("currency") or "INR"
+
+        scope_text = f"Packaging procurement of {len(ext_res.requirements)} line item(s) ({items_summary}) delivered to {location.title()}"
+        if comm_terms.get("notes"):
+            scope_text += f" | Terms: {'; '.join(comm_terms['notes'])}"
+
         rfi_payload = {
             "title": rfi_title,
             "category": ext_res.detected_category or "Corrugated packaging",
-            "scope": f"Packaging procurement of {len(ext_res.requirements)} line item(s) ({items_summary}) delivered to {location.title()}",
-            "currency": "INR",
+            "scope": scope_text,
+            "currency": currency,
             "status": "draft",
             "source": "chat_intake",
-            "delivery_terms": f"Delivered to {location.title()} (DDP)",
-            "payment_terms": "Net 30 Days",
-            "validity_days": 30,
+            "delivery_terms": delivery_terms,
+            "payment_terms": payment_terms,
+            "validity_days": validity_days,
         }
         items_payload = [
             {
@@ -438,7 +620,7 @@ async def handle_rfi_workflow_turn(
                 "dimensions": req.dimensions,
                 "specifications": req.specification or user_message,
                 "required_date": req.delivery_date or "2026-11-15",
-                "currency": "INR",
+                "currency": currency,
             }
             for idx, req in enumerate(ext_res.requirements)
         ]
@@ -488,6 +670,14 @@ async def run_master_orchestration(
         q_lower in ["create an rfi", "create an rfx", "rfi", "create rfi", "create rfx", "new rfi", "start rfi", "draft rfi", "request for information"]
         or q_lower.startswith("create an rfi")
         or q_lower.startswith("create an rfx")
+        or (
+            is_packaging_related(user_message)
+            and not any(k in q_lower for k in [
+                "check vendor response", "vendor response", "vendor status",
+                "rfx status", "rfi status", "status of", "check status",
+                "track rfx", "track rfi", "who sells", "find supplier", "find vendor", "search vendor",
+            ])
+        )
     )
 
     # Legacy laptop test compatibility: "Create an RFX for 200 laptops"

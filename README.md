@@ -122,9 +122,16 @@ Then visit:
 
 ### 5. Conversational RFI Workflow (`POST /api/chat` & `/ui`)
 - **Chat Outcome Loader**: Chat UI (`/ui`) displays an animated processing loader bubble in the chat view and input area whenever an outcome is expected.
-- **RFI Initial Input Flow**: When selecting "Create an RFI" from the welcome cards or user input, the assistant guides the user to supply packaging details instead of prematurely creating an empty dummy RFX.
+- **RFI Initial Input Flow**: When selecting "Create an RFI" from the welcome cards or entering packaging requirements directly, the assistant guides the user and initializes draft creation without creating empty dummy RFX records.
 - **Single Active RFI Continuity**: Sessions track and operate continuously on a single active draft RFI. Subsequent additions update and append to the active draft rather than spawning fragmented separate RFIs.
-- **Dynamic Item Modification**: Users can add items incrementally or remove specific items by number or name (e.g., `remove item 2`, `remove brown tape`) with automated line-item re-indexing.
+- **Commercial Terms Auto-Separation**: Separator lines (`--------------------`, `====`) and commercial conditions clauses (e.g. `Mandatory Commercial Terms To Include:`, `Clear Indication of MOQ`, `Freight / Shipping Cost`, `Warranty SLA`, `Payment Terms`, `Currency: INR/USD`) are automatically parsed into RFI terms metadata (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`) rather than becoming dummy line items.
+- **Dynamic Natural Language Line Item Operations**:
+  - **Range removals**: `remove items 33 to 39`, `remove 33-39`, `delete 1-5`.
+  - **Multi-item lists**: `remove items 2, 4, 6`, `delete 1, 3`.
+  - **Relative removals**: `remove last item`, `delete last 7 items`.
+  - **Product names/codes**: `remove [Pkg-029]`, `remove brown tape`.
+  - **Field updates**: `update item 1 quantity to 1500`, `change item 2 target price to 20`.
+  - **Automatic Re-indexing**: Removed items trigger consecutive re-indexing (`1..N`) for all remaining line items.
 - **Duplicate Detection & Confirmation**: If an incoming requirement matches an item already in the draft, the assistant flags the duplicate and prompts the user for explicit confirmation before proceeding.
 - **Advanced Natural Language Parsing**: Robustly parses compound requirements:
   - Metric & imperial cube box dimensions (`50inch cube boxes 300` -> 300 boxes of 50x50x50 inch).

@@ -115,3 +115,33 @@ def test_excel_intake_api_endpoint() -> None:
     assert len(data["requirements"]) == 2
     assert data["requirements"][0]["item_description"] == "Self-Adhesive Packing Tape"
     assert data["requirements"][1]["quantity"] == 50000.0
+
+
+def test_excel_spreadsheet_with_footer_notes_and_remarks() -> None:
+    """Test that Excel spreadsheets with footer notes, divider rows, or remarks rows
+    do not parse them as line items or raise missing quantity errors.
+    """
+    content = _create_test_xlsx(
+        headers=["Item Description", "Quantity", "Unit", "Dimensions", "Target Price"],
+        rows=[
+            ["Carton 5 Ply Heavy Duty", 1500, "boxes", "500x400x300 mm", 45.0],
+            ["Transparent Packing Tape", 500, "rolls", None, 30.0],
+            ["--------------------", None, None, None, None],
+            ["Note: GST 18% extra. All rates must include freight and transit insurance to Bangalore warehouse.", None, None, None, None],
+            ["Payment terms 45 days after receipt of goods.", None, None, None, None],
+        ],
+    )
+    extraction = parse_spreadsheet_bytes(file_name="order_with_notes.xlsx", content=content)
+    reqs, issues = rows_to_packaging_requirements(extraction.rows)
+
+    # Exactly 2 product line items should be parsed
+    assert len(reqs) == 2
+    assert reqs[0].item_description == "Carton 5 Ply Heavy Duty"
+    assert reqs[0].quantity == 1500.0
+    assert reqs[1].item_description == "Transparent Packing Tape"
+    assert reqs[1].quantity == 500.0
+
+    # Notes and divider rows should not be reported as missing quantity error issues
+    assert not any("Note:" in issue for issue in issues)
+    assert not any("Payment terms" in issue for issue in issues)
+

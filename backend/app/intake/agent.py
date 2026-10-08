@@ -16,9 +16,13 @@ from backend.app.intake.models import (
 from backend.app.intake.validation import (
     apply_traceable_defaults,
     check_rfi_readiness,
+    extract_commercial_terms,
     find_non_packaging_terms,
     identify_missing_fields,
+    is_commercial_term_or_header,
+    is_conversational_or_boilerplate,
     is_packaging_related,
+    is_separator_line,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,7 +41,8 @@ Rules:
 5. Identify ambiguous fields if multiple interpretations exist.
 6. NEVER invent, hallucinate, or assume critical values (quantity, dimensions, material, target price).
    If not specified in the input text, leave them as None and add to missing_fields.
-7. Return an IntakeExtractionResult instance.
+7. Strictly EXCLUDE conversational greetings/closings (e.g. "Hi team", "Regards"), general paragraphs, commercial terms, notes, and terms and conditions (e.g. MOQ requirements, freight/shipping terms, warranty/SLA, volume discounts, payment terms, currency specifications), section headers, and horizontal divider/separator lines from line items. Notes, greetings, and commercial terms are NOT packaging line items.
+8. Return an IntakeExtractionResult instance.
 """
 
 
@@ -62,6 +67,8 @@ def _parse_single_packaging_clause(
 ) -> PackagingRequirement:
     """Parse an individual packaging requirement clause into a typed PackagingRequirement."""
     clean_clause = clause.strip(" ,.")
+    # Strip leading list markers (e.g. "1. ", "2) ", "[3] ", "- ", "* ")
+    clean_clause = re.sub(r"^\s*(?:\d+[\.\)]|\[\d+\]|[-*•–])\s+", "", clean_clause).strip(" ,.")
 
     # 1. Delivery date specific to clause or default
     delivery_date = default_delivery_date
@@ -285,6 +292,7 @@ def deterministic_extract_packaging(text: str) -> IntakeExtractionResult:
 
     Acts as a reliable, offline-compatible engine and fallback for the AI agent.
     Never hallucinates missing fields; marks them explicitly.
+    Filters out separator lines, commercial terms headers, and commercial condition clauses.
     """
     clean_text = text.strip()
     non_packaging = find_non_packaging_terms(clean_text)
@@ -304,7 +312,10 @@ def deterministic_extract_packaging(text: str) -> IntakeExtractionResult:
             ),
         )
 
-    # 1. Global delivery date
+    # 1. Extract commercial terms and global metadata
+    comm_terms = extract_commercial_terms(clean_text)
+
+    # Global delivery date
     delivery_date: str | None = None
     date_match = re.search(
         r"(?:delivery\s+(?:required\s+)?by|by|before|required\s+date\s*:?)\s+([0-9]{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]+|[0-9]{4}-[0-9]{2}-[0-9]{2}|[A-Za-z]+\s+[0-9]{1,2}(?:,\s*[0-9]{4})?)",
@@ -316,7 +327,7 @@ def deterministic_extract_packaging(text: str) -> IntakeExtractionResult:
 
     # Global target price and currency
     target_price: float | None = None
-    currency = "INR"
+    currency = comm_terms.get("currency") or "INR"
     price_match = re.search(
         r"(?:target\s+price|budget|price|cost|rate)\s*(?:of|:)?\s*(?:INR|USD|Rs\.?|₹|\$)?\s*(\d+(?:,\d+)*(?:\.\d+)?)",
         clean_text,
@@ -349,18 +360,29 @@ def deterministic_extract_packaging(text: str) -> IntakeExtractionResult:
         clauses = [clean_text]
 
     requirements: list[PackagingRequirement] = []
-    for idx, clause in enumerate(clauses, start=1):
+    item_counter = 1
+    for clause in clauses:
+        # Strictly ignore separator lines and commercial terms clauses
+        if is_separator_line(clause) or is_commercial_term_or_header(clause):
+            continue
+
         req = _parse_single_packaging_clause(
             clause=clause,
-            item_num=idx,
+            item_num=item_counter,
             default_delivery_date=delivery_date,
             default_currency=currency,
             default_target_price=target_price,
         )
+
+        # Skip if the description is pure punctuation or still matches a terms header
+        if is_separator_line(req.item_description) or is_commercial_term_or_header(req.item_description):
+            continue
+
         missing = identify_missing_fields(req)
         req.missing_fields = missing
         apply_traceable_defaults(req)
         requirements.append(req)
+        item_counter += 1
 
     # Check RFI readiness
     is_ready, _ = check_rfi_readiness(requirements)
@@ -371,16 +393,20 @@ def deterministic_extract_packaging(text: str) -> IntakeExtractionResult:
         detected_category = categories[0]
     elif len(categories) == 2:
         detected_category = f"{categories[0]} & {categories[1]}"
-    else:
+    elif categories:
         detected_category = "Packaging & Dispatch Supplies"
+    else:
+        detected_category = "Corrugated packaging"
 
     # Title
     if len(requirements) == 1:
         qty_val = f"{int(requirements[0].quantity)} " if requirements[0].quantity else ""
         title = f"{qty_val}{requirements[0].item_description}".strip().capitalize()
-    else:
+    elif len(requirements) > 1:
         qty_val = f"{int(requirements[0].quantity)} " if requirements[0].quantity else ""
         title = f"RFI for {qty_val}{requirements[0].item_description} and {len(requirements) - 1} other item{'s' if len(requirements) > 2 else ''}".strip()
+    else:
+        title = "Packaging Procurement RFI"
 
     all_missing = list(dict.fromkeys(m for r in requirements for m in r.missing_fields))
     all_defaults = {}
@@ -409,11 +435,18 @@ async def extract_requirements(
             result = await agent.run(text)
             output = result.output
             if isinstance(output, IntakeExtractionResult) and output.requirements:
-                # Apply validation & traceable defaults to AI output
+                # Filter out any separator or commercial term items from LLM output
+                filtered_reqs: list[PackagingRequirement] = []
                 for req in output.requirements:
+                    if is_separator_line(req.item_description) or is_commercial_term_or_header(req.item_description):
+                        continue
+                    req.item_number = len(filtered_reqs) + 1
                     req.missing_fields = identify_missing_fields(req)
                     defaults = apply_traceable_defaults(req)
                     output.defaults_applied.update(defaults)
+                    filtered_reqs.append(req)
+
+                output.requirements = filtered_reqs
                 is_ready, _ = check_rfi_readiness(output.requirements)
                 output.ready_for_rfi = is_ready
                 return output

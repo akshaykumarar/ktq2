@@ -75,10 +75,17 @@ flowchart TD
 ### 2. Conversational RFI Workflow & Guardrails (`backend/app/agents/master.py`)
 - **Session Management (`ChatSessionState`)**: Tracks conversation mode (`is_rfi_workflow`), active draft RFI ID (`active_rfi_id`), pending confirmation state (`pending_confirmation`), and message turn count per `conversation_id`.
 - **Single RFI Draft Lifecycle**:
-  - Starter command (`Create an RFI`) guides requirement intake without prematurely creating records.
+  - Starter command (`Create an RFI`) guides requirement intake without prematurely creating records. Direct packaging submissions automatically initialize draft creation.
   - Initial requirement intake creates the active RFI draft record and persists it to `RFIRepository`.
   - Subsequent inputs work on the **same active RFI** rather than creating new RFI records.
-  - Items can be added incrementally or removed via explicit command (`remove item [id/name]`).
+  - **Commercial Terms Auto-Separation**: Commercial clause blocks (e.g. `Mandatory Commercial Terms To Include:`, `Clear Indication of MOQ`, `Freight / Shipping Cost`, `Warranty SLA`, `Payment Terms`, `Currency: INR`) and separator lines are automatically isolated from line items and saved directly to RFI terms metadata (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`).
+  - **Dynamic Range & Multi-Item Modifications**:
+    - Batch range removals (e.g., `remove items 33 to 39`, `remove 33-39`, `delete 1-5`).
+    - Comma-separated list removals (e.g., `remove items 2, 4, 6`).
+    - Relative removals (`remove last item`, `remove last 7 items`).
+    - Keyword/code removals (`remove [Pkg-029]`, `remove brown tape`).
+    - Parameter updates (`update item 1 quantity to 1500`, `change item 2 price to 20`).
+    - **Contiguous Re-indexing**: `RFIRepository.remove_items()` re-sequences remaining line item numbers consecutively (`1..N`) via PostgreSQL `ROW_NUMBER()`.
   - **Duplicate Detection & Confirmation**: If an incoming line item matches an existing item in the draft, the workflow prompts for explicit confirmation before adding or updating.
 - **Strict Guardrails**:
   - Inquiries for status of existing RFIs (e.g. `What is the status of RFX-101?`, `Check vendor response`) are discouraged and redirected to completing RFI creation.

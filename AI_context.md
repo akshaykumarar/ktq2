@@ -150,3 +150,20 @@
   - **Decision-Support Scope Boundary**:
     - The chat assistant and analyst screens function strictly as **decision-support and evaluation tools** for buyers to compare quotations and simulate allocation scenarios.
     - The system does not execute binding line item awards or change RFX lifecycle status to awarded; formal award issuance and status changes remain future scope.
+
+## Step 6: Commercial Terms Filtering & Dynamic Line Item Operations
+- **Commercial Terms Auto-Separation & Filtering**:
+  - Identified and resolved issue where pasted commercial terms sections (e.g. `Mandatory Commercial Terms To Include:`, `Clear Indication of MOQ`, `Freight / Shipping Cost`, `Warranty SLA & Transit damage replacement guarantee`, `Payment Terms`, `Currency: INR/USD`) and separator lines (`--------------------`, `====`, `____`) were erroneously parsed as line items.
+  - Implemented `is_separator_line()`, `is_commercial_term_or_header()`, and `extract_commercial_terms()` in `backend/app/intake/validation.py`.
+  - Filtered line items in PydanticAI parser instructions, deterministic extractor (`backend/app/intake/agent.py`), Excel/CSV importer (`backend/app/intake/excel_parser.py`), and Master agent orchestration (`backend/app/agents/master.py`).
+  - Extracted commercial conditions are directly mapped to RFI header fields (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`/`notes`) without creating dummy line items.
+- **Dynamic Natural Language Line Item Operations**:
+  - Added support for batch range deletions (e.g., "remove items 33 to 39", "remove 33-39", "delete items from 33 to 39").
+  - Added support for comma-separated multiple item deletions (e.g., "remove items 2, 4, 6", "delete 1, 3").
+  - Added support for relative item deletions (e.g., "remove last item", "delete last 7 items").
+  - Added support for name/code removals (e.g., "remove [Pkg-029]", "remove brown tape").
+  - Added support for natural language item updates (e.g., "update item 1 quantity to 1500", "change item 2 price to 20").
+  - Enhanced `RFIRepository.remove_items()` and `RFIRepository.update_item()` with atomic batch execution and automatic contiguous `1..N` re-indexing in both PostgreSQL (`ROW_NUMBER()`) and memory fallback.
+- **Direct Intake Intent Routing**:
+  - Direct packaging text inputs (even without typing "Create an RFI" first) are recognized via packaging domain heuristics and routed directly to `handle_rfi_workflow_turn()`.
+
