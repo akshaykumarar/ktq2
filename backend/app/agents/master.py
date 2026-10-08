@@ -357,11 +357,15 @@ async def handle_rfi_workflow_turn(
         title = rfi_record.get("title", f"RFI-#{rfi_id}")
         status = rfi_record.get("status", "draft").title()
         category = rfi_record.get("category", "Packaging & Dispatch Supplies")
-        deliv_terms = rfi_record.get("delivery_terms") or "DDP (Bangalore)"
+        deliv_terms = rfi_record.get("delivery_terms") or "Delivered to Bangalore (DDP)"
         deliv_dest = "Bangalore"
-        m = re.search(r"\(([^)]+)\)", deliv_terms)
-        if m:
-            deliv_dest = m.group(1)
+        m_to = re.search(r"(?:to|at)\s+([a-zA-Z0-9\s,-]+?)(?:\s*\(|$)", deliv_terms, re.I)
+        if m_to:
+            deliv_dest = m_to.group(1).strip().title()
+        elif "(" in deliv_terms:
+            deliv_dest = re.sub(r"\([^)]*\)", "", deliv_terms).strip().title()
+        elif deliv_terms:
+            deliv_dest = deliv_terms.title()
 
         items = rfi_record.get("items", [])
         item_rows = []
@@ -397,7 +401,8 @@ async def handle_rfi_workflow_turn(
             f"#### 📑 Commercial Terms\n"
             f"- **Payment Terms**: {rfi_record.get('payment_terms', 'Net 30 Days')}\n"
             f"- **Delivery Terms**: {deliv_terms}\n"
-            f"- **Quote Validity**: {rfi_record.get('validity_days', 30)} Days\n\n"
+            f"- **Quote Validity**: {rfi_record.get('validity_days', 30)} Days\n"
+            f"- **Currency**: {rfi_record.get('currency', 'INR')}\n\n"
             f"---\n"
             f"**Next Steps for RFI Creation**:\n"
             f"- Reply to add more packaging items or modify quantities.\n"

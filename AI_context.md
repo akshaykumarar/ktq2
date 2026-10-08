@@ -152,11 +152,11 @@
     - The system does not execute binding line item awards or change RFX lifecycle status to awarded; formal award issuance and status changes remain future scope.
 
 ## Step 6: Commercial Terms Filtering & Dynamic Line Item Operations
-- **Commercial Terms Auto-Separation & Filtering**:
-  - Identified and resolved issue where pasted commercial terms sections (e.g. `Mandatory Commercial Terms To Include:`, `Clear Indication of MOQ`, `Freight / Shipping Cost`, `Warranty SLA & Transit damage replacement guarantee`, `Payment Terms`, `Currency: INR/USD`) and separator lines (`--------------------`, `====`, `____`) were erroneously parsed as line items.
-  - Implemented `is_separator_line()`, `is_commercial_term_or_header()`, and `extract_commercial_terms()` in `backend/app/intake/validation.py`.
-  - Filtered line items in PydanticAI parser instructions, deterministic extractor (`backend/app/intake/agent.py`), Excel/CSV importer (`backend/app/intake/excel_parser.py`), and Master agent orchestration (`backend/app/agents/master.py`).
-  - Extracted commercial conditions are directly mapped to RFI header fields (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`/`notes`) without creating dummy line items.
+- **Commercial Terms & Free-Form Notes Auto-Separation**:
+  - Resolved issue where pasted commercial terms sections (e.g. `Mandatory Commercial Terms To Include:`, `Clear Indication of MOQ`, `Freight / Shipping Cost`, `Warranty SLA`), conversational email paragraphs (e.g. greetings `Hi team`, closing paragraphs with implicit conditions `Please ensure delivery is completed within 15 days...`, `Thanks and regards`), and spreadsheet remarks/footer rows (`Note: GST 18% extra...`) were erroneously parsed as line items.
+  - Implemented `is_separator_line()`, `is_conversational_or_boilerplate()`, `is_commercial_term_or_header()`, and natural language `extract_commercial_terms()` in `backend/app/intake/validation.py`.
+  - Automatically isolates non-product sentences/notes, strips leading list markers (`1. `, `2) `, `[3] `), and maps implicit terms (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`/`notes`) directly to RFI metadata.
+  - Applied consistently across PydanticAI parser instructions, deterministic extractor (`backend/app/intake/agent.py`), Excel/CSV importer (`backend/app/intake/excel_parser.py`), and Master agent orchestration (`backend/app/agents/master.py`).
 - **Dynamic Natural Language Line Item Operations**:
   - Added support for batch range deletions (e.g., "remove items 33 to 39", "remove 33-39", "delete items from 33 to 39").
   - Added support for comma-separated multiple item deletions (e.g., "remove items 2, 4, 6", "delete 1, 3").

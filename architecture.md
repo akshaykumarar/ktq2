@@ -78,7 +78,7 @@ flowchart TD
   - Starter command (`Create an RFI`) guides requirement intake without prematurely creating records. Direct packaging submissions automatically initialize draft creation.
   - Initial requirement intake creates the active RFI draft record and persists it to `RFIRepository`.
   - Subsequent inputs work on the **same active RFI** rather than creating new RFI records.
-  - **Commercial Terms Auto-Separation**: Commercial clause blocks (e.g. `Mandatory Commercial Terms To Include:`, `Clear Indication of MOQ`, `Freight / Shipping Cost`, `Warranty SLA`, `Payment Terms`, `Currency: INR`) and separator lines are automatically isolated from line items and saved directly to RFI terms metadata (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`).
+  - **Commercial Terms & Unstructured Notes Auto-Separation**: Commercial clause blocks, unstructured email paragraphs (greetings, closing instructions), and spreadsheet remarks/footer rows (e.g., `Note: Rates must include freight...`) are automatically isolated from line items and saved directly to RFI terms metadata (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`/`notes`). List numbers (`1. `, `2) `) are cleanly stripped from product quantities and descriptions.
   - **Dynamic Range & Multi-Item Modifications**:
     - Batch range removals (e.g., `remove items 33 to 39`, `remove 33-39`, `delete 1-5`).
     - Comma-separated list removals (e.g., `remove items 2, 4, 6`).

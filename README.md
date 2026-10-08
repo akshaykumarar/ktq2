@@ -123,9 +123,7 @@ Then visit:
 ### 5. Conversational RFI Workflow (`POST /api/chat` & `/ui`)
 - **Chat Outcome Loader**: Chat UI (`/ui`) displays an animated processing loader bubble in the chat view and input area whenever an outcome is expected.
 - **RFI Initial Input Flow**: When selecting "Create an RFI" from the welcome cards or entering packaging requirements directly, the assistant guides the user and initializes draft creation without creating empty dummy RFX records.
-- **Single Active RFI Continuity**: Sessions track and operate continuously on a single active draft RFI. Subsequent additions update and append to the active draft rather than spawning fragmented separate RFIs.
-- **Commercial Terms Auto-Separation**: Separator lines (`--------------------`, `====`) and commercial conditions clauses (e.g. `Mandatory Commercial Terms To Include:`, `Clear Indication of MOQ`, `Freight / Shipping Cost`, `Warranty SLA`, `Payment Terms`, `Currency: INR/USD`) are automatically parsed into RFI terms metadata (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`) rather than becoming dummy line items.
-- **Dynamic Natural Language Line Item Operations**:
+- **Commercial Terms & Unstructured Notes Auto-Separation**: Separator lines, commercial clause blocks, conversational email paragraphs (greetings, closing remarks, delivery instructions, quality/sample requirements), and Excel footer note rows (e.g. `Note: GST 18% extra. Rates must include transit insurance`) are automatically parsed into RFI terms metadata (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`/`notes`) rather than becoming dummy line items. Numbered list prefixes (`1. `, `2) `) are stripped cleanly.
   - **Range removals**: `remove items 33 to 39`, `remove 33-39`, `delete 1-5`.
   - **Multi-item lists**: `remove items 2, 4, 6`, `delete 1, 3`.
   - **Relative removals**: `remove last item`, `delete last 7 items`.
