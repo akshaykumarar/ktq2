@@ -199,5 +199,14 @@
 - **Full Test Suite Status**:
   - Full regression suite passing 100% (66 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_full_suite.log` and `artifacts/logs/test_tabular_intake.log`.
 
+## Step 12: Vercel Serverless & Full-Stack Deployment Support
+- **Vercel Serverless Architecture**:
+  - `requirements.txt`: Pinned root dependencies (`fastapi`, `uvicorn`, `pydantic`, `pydantic-ai`, `psycopg[binary]`, `openpyxl`, `httpx`, `pyyaml`, `python-dotenv`, `python-multipart`, `aiofiles`).
+  - `api/index.py`: Serverless entrypoint exposing ASGI `app` from `backend.app.main` with automatic root directory path injection into `sys.path`.
+  - `vercel.json`: Clean configuration routing all paths (`/(.*)`) to `/api/index.py` enabling unified backend API + static Chatbot UI delivery on Vercel.
+- **Verification**:
+  - Validated local ASGI import via `python -c "from api.index import app; print(app.title)"`.
+  - Full pytest regression suite executed with 32 passed unit/integration tests and logs in `artifacts/logs/test_vercel_prep.log`.
+
 
 

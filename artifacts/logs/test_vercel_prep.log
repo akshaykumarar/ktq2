@@ -1,0 +1,12 @@
+................................                                         [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/google/genai/types.py:42
+  /Users/akshaykumar/code/ktq2/.venv/lib/python3.14/site-packages/google/genai/types.py:42: DeprecationWarning: '_UnionGenericAlias' is deprecated and slated for removal in Python 3.17
+    VersionedUnionType = Union[builtin_types.UnionType, _UnionGenericAlias]
+
+tests/test_vendor_intake.py::test_api_submit_vendor_response_empty_payload
+  /Users/akshaykumar/code/ktq2/.venv/lib/python3.14/site-packages/fastapi/routing.py:360: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    return await dependant.call(**values)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+32 passed, 2 warnings in 19.38s

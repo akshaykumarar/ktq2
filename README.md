@@ -93,6 +93,30 @@ Then visit:
 
 ---
 
+## Vercel Deployment
+
+This project includes first-class support for Vercel Serverless deployment (FastAPI ASGI + Chatbot UI).
+
+### Configuration Files
+- [vercel.json](file:///Users/akshaykumar/code/ktq2/vercel.json): Routes all HTTP traffic to the Python ASGI serverless handler.
+- [api/index.py](file:///Users/akshaykumar/code/ktq2/api/index.py): Vercel Serverless entrypoint exposing the FastAPI `app`.
+- [requirements.txt](file:///Users/akshaykumar/code/ktq2/requirements.txt): Pinned dependencies required for the serverless build.
+
+### Vercel Dashboard Settings
+- **Framework Preset**: `Other`
+- **Root Directory**: `.`
+- **Build Command**: _Leave empty / Default_
+- **Output Directory**: _Leave empty / Default_
+- **Install Command**: `pip install -r requirements.txt` (or default)
+
+### Environment Variables
+Configure the following in your Vercel Project Settings:
+- `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY`
+- `DATABASE_URL` (or `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`, `DB_SSL_MODE=require`)
+- `DB_SCHEMA=ktq`
+
+---
+
 ## Packaging RFI API Endpoints
 
 ### 1. Health Checks

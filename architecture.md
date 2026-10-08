@@ -64,8 +64,9 @@ flowchart TD
 
 ## Core Modules & Design Decisions
 
-### 1. Unified Backend (`backend/app/main.py`)
+### 1. Unified Backend & Serverless Runtime (`backend/app/main.py` & `api/index.py`)
 - Built on **FastAPI** with lifespan context for startup initialization of all agents.
+- Serverless execution support on **Vercel** via [api/index.py](file:///Users/akshaykumar/code/ktq2/api/index.py) ASGI entrypoint and [vercel.json](file:///Users/akshaykumar/code/ktq2/vercel.json) rewrites.
 - CORS middleware enabled for local UI and external origins.
 - Static file serving mounted at `/ui` to serve `chatbot/index.html` directly.
 - Health check endpoints:
