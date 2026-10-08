@@ -137,9 +137,11 @@ Then visit:
   - **Field Updates**: `update item 1 dimensions to 450x350x250 mm`, `change item 1 material to 7 ply heavy kraft`, `update item 1 quantity to 1500`, `change item 2 target price to 20 INR`, `update item 1 delivery date to 2026-12-01`.
   - **Automatic Re-indexing**: Removed items trigger consecutive re-indexing (`1..N`) for all remaining line items.
 - **Duplicate Detection & Confirmation**: If an incoming requirement matches an item already in the draft, the assistant flags the duplicate and prompts the user for explicit confirmation before proceeding.
-- **Advanced Natural Language & Tabular Intake**:
+- **Advanced Natural Language & Enterprise Tabular BOQ Intake**:
   - Robustly parses compound requirements, metric & imperial cube box dimensions (`50inch cube boxes 300`), film specs (`5m stretch films 1000 pcs`), and weights (`bubble wrap 50kg`).
-  - Automatically parses pasted tabular and key-value rows (e.g. `1 [Pkg-001] 3-Ply Corrugated Box () Category: Cartons Target Qty: 433 Piece Baseline: ₹19.57`), mapping `Category`, `Target Qty`, `Baseline`, and dimensions (2D/3D) into structured fields.
+  - **Enterprise Tabular BOQs**: Automatically parses multi-column tabular spreadsheets and pasted documents (e.g. `BOQ Item #`, `SKU Code`, `Item Description`, `Category`, `Target BOQ Quantity`, `Standard UOM`, `Internal Baseline (INR)`, `Target Lead Time (Days)`), mapping 30+ items into typed line items with preserved SKU codes, quantities, UOMs, INR baseline prices, and 2D/3D dimensions.
+  - **Header & Footer Extraction**: Extracts RFI Reference (`RFI-PKG-2026-001`), Scope, Target Validity (`90 Days`), and Baseline Currency (`INR`). Filters mandatory commercial instructions into RFI metadata.
+  - **Intent Guardrails**: Strict word-boundary intent matching and multi-line safeguards prevent false-positive item modification triggers on commercial clauses (e.g. `"cash settlement terms"`).
   - Excludes RFP solicitation preambles and table headers from line items and titles.
   - Sanitizes commercial terms (e.g. rejects single-character bullets like `Payment Terms: S`).
 - **Strict Guardrails**: When in the RFI creation workflow, only solutions and progress for creating the RFI are provided. Checking existing RFI status or fetching external information (vendor directories, general questions) is politely discouraged and redirected back to RFI creation.

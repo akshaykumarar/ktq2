@@ -1,0 +1,17 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0 -- /Users/akshaykumar/code/ktq2/.venv/bin/python3.14
+cachedir: .pytest_cache
+rootdir: /Users/akshaykumar/code/ktq2
+plugins: logfire-5.1.1, platformdirs-4.12.3, anyio-4.15.1
+collecting ... collected 11 items / 9 deselected / 2 selected
+
+backend/tests/test_chat_rfi_workflow.py::test_tabular_key_value_annotated_intake PASSED [ 50%]
+backend/tests/test_chat_rfi_workflow.py::test_enterprise_strategic_sourcing_boq_intake PASSED [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/google/genai/types.py:42
+  /Users/akshaykumar/code/ktq2/.venv/lib/python3.14/site-packages/google/genai/types.py:42: DeprecationWarning: '_UnionGenericAlias' is deprecated and slated for removal in Python 3.17
+    VersionedUnionType = Union[builtin_types.UnionType, _UnionGenericAlias]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 2 passed, 9 deselected, 1 warning in 2.53s ==================

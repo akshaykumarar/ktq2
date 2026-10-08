@@ -78,7 +78,10 @@ flowchart TD
   - Starter command (`Create an RFI`) guides requirement intake without prematurely creating records. Direct packaging submissions automatically initialize draft creation.
   - Initial requirement intake creates the active RFI draft record and persists it to `RFIRepository`.
   - Subsequent inputs work on the **same active RFI** rather than creating new RFI records.
-    - **Tabular & Key-Value Intake Parsing**: Supports pasting structured data, TSV, or key-value annotated rows (e.g. `[Pkg-001] 3-Ply Corrugated Box () Category: Cartons Target Qty: 433 Piece Baseline: ₹19.57`), mapping `Category`, `Target Qty`, `Baseline`, and dimensions (2D/3D) to typed fields with clean description normalization.
+    - **Enterprise Tabular & Key-Value BOQ Parsing**: Supports pasting structured data, multi-column TSV/Excel/pipe tables, or key-value annotated rows (e.g. `BOQ Item #`, `SKU Code`, `Item Description`, `Category`, `Target BOQ Quantity`, `Standard UOM`, `Internal Baseline (INR)`, `Target Lead Time (Days)`). Maps 30+ items into typed line items with preserved SKU codes, quantities, UOMs, INR baseline prices, and 2D/3D dimensions.
+    - **Document Header & Footer Instruction Filtering**: Automatically extracts document header terms (`RFI Reference`, `Scope`, `Target Validity`, `Baseline Currency`) into RFI metadata and isolates footer commercial instructions (`MANDATORY SOURCING & COMMERCIAL INSTRUCTIONS`) from line items.
+    - **Intent Guardrails & Word Boundaries**: Strict regex word-boundary matching (`\b(update|change|modify|set|adjust|edit)\b`) and multi-line safeguards prevent false-positive item modification triggers on commercial clauses (e.g. `"cash settlement terms"`).
+    - **Session-Scoped RFI Isolation**: Eliminates cross-session bleed-over by isolating active draft IDs to the active session without falling back to historical database records.
     - **Solicitation Preamble & Table Header Filtering**: RFP preambles (e.g. `Bidding Vendors are requested to provide itemized rates...`) and table header rows are filtered out from becoming line items or RFI titles.
     - **Commercial Terms Sanitization**: Validates length and format of commercial terms to reject stray single-character tokens (e.g., `Payment Terms: S`).
     - **Dynamic Natural Language Terms & Line Item Operations**:

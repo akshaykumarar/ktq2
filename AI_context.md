@@ -183,15 +183,21 @@
 - **Full Test Suite Status**:
   - Full suite passing 100% (65 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_full_suite.log`.
 
-## Step 10: LLM First Choice for Decisions, Intent & Requirement Extraction
-- **LLM as Primary Decision Engine**:
-  - LLM agents (`master`, `rfi_parser`, `rfx`, `vendor`, `status`) act as the first-choice decision-makers for intent classification, requirement structuring, conversational delegation, and decision support.
-  - In `handle_rfi_workflow_turn()`, the `rfi_parser` LLM agent is passed directly to `extract_requirements(user_message, agent=parser_agent)` as first choice.
-  - In `run_master_orchestration()`, live LLM models are executed primarily with tools (`delegate_to_rfx`, `delegate_to_vendor`, `delegate_to_status`), delegating and reasoning dynamically.
-  - Deterministic extractors and heuristics serve strictly as high-reliability fallbacks when offline or in test environments.
-- **Enhanced Parser System Prompt**:
-  - Prompt rules explicitly guide LLM agents on key-value table extraction, 2D/3D dimension structures, baseline target price extraction, and exclusion of solicitation headers/notes.
+## Step 11: Enterprise Tabular BOQ Intake, Intent Guardrails & Clean Presentation
+- **Intent Guardrails & Substring Bug Fix**:
+  - Replaced naive substring checks (`v in q_lower`) with regex word-boundary matching `\b(update|change|modify|set|adjust|edit)\b` across `parse_modification_intent()`, `parse_terms_intent()`, and `parse_removal_intent()`.
+  - Added multi-line tabular guards preventing multi-row table pastes from triggering single-item modification intents.
+  - Eliminated false-positive item modification triggers caused by commercial terms like `"cash settlement terms"` matching `"set"`.
+- **Session Isolation & Multi-Turn Stability**:
+  - Removed `repo.list_all(limit=1)` fallback from `_get_active_rfi_id()`, ensuring new conversation sessions isolate their draft state rather than mutating historical database RFIs.
+- **Enterprise Tabular BOQ & Header/Footer Parser**:
+  - Full deterministic and LLM-aligned parser for multi-column tabular BOQ formats (TSV, pipe, or column-aligned) supporting SKU codes, clean descriptions, categories, quantities, UOMs, baseline prices with currency symbols (`₹ 19.57`, `₹ 1,451.02`), and lead times.
+  - Document header extraction: captures RFI reference (`RFI-PKG-2026-001`), scope, validity days (`90 Days`), and baseline currency (`INR`).
+  - Mandatory sourcing and commercial instructions are isolated into scope metadata and filtered from line items.
+- **Clean Markdown Line Item Table Display**:
+  - Markdown table displays clean aligned columns: `#`, `Description` (with SKU prefix), `Quantity` (with preserved UOM), `Dimensions` (formatted as `L x W x H unit` or `L x W unit`), and `Material / Specs` (with baseline prices).
 - **Full Test Suite Status**:
-  - Full suite passing 100% (65 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_full_suite.log`.
+  - Full regression suite passing 100% (66 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_full_suite.log` and `artifacts/logs/test_tabular_intake.log`.
+
 
 

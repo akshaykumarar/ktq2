@@ -315,7 +315,7 @@ def _parse_single_packaging_clause(
 
     # Remove leading desire verbs
     cleaned_desc = re.sub(
-        r"^(?:i\s+want\s+(?:a\s+)?|we\s+need\s+|need\s+|require\s+|order\s+|buy\s+|procure\s+)+",
+        r"^(?:i\s+want\s+(?:a\s+)?|i\s+need\s+|we\s+need\s+|i\s+require\s+|we\s+require\s+|need\s+|require\s+|order\s+|buy\s+|procure\s+)+",
         "",
         cleaned_desc.strip(),
         flags=re.I,
@@ -366,8 +366,197 @@ def _parse_single_packaging_clause(
     )
 
 
+def _parse_tabular_boq(
+    text: str,
+    default_currency: str = "INR",
+    default_delivery_date: str | None = None,
+    default_target_price: float | None = None,
+) -> list[PackagingRequirement] | None:
+    """Parse structured tabular BOQ text (TSV, CSV, pipe-delimited, or space-aligned columns)."""
+    raw_lines = [l.strip() for l in text.split("\n") if l.strip()]
+    header_idx = -1
+    col_map: dict[str, int] = {}
+
+    for i, line in enumerate(raw_lines):
+        # Check if line matches table header pattern
+        cells = [c.strip() for c in re.split(r"\t+|\||\s{2,}", line) if c.strip()]
+        low_cells = [c.lower() for c in cells]
+
+        has_item = any("item" in c or "boq" in c or "sl" in c or "sr" in c or "#" in c for c in low_cells)
+        has_desc = any("description" in c or "item" in c or "name" in c or "particular" in c for c in low_cells)
+        has_qty = any("qty" in c or "quantity" in c or "target boq" in c or "volume" in c for c in low_cells)
+
+        if (has_item or has_desc) and (has_qty or any("uom" in c or "price" in c or "baseline" in c or "category" in c for c in low_cells)):
+            header_idx = i
+            for c_idx, c_name in enumerate(low_cells):
+                if "sku" in c_name or ("code" in c_name and "item" not in c_name):
+                    col_map["sku"] = c_idx
+                elif "desc" in c_name or "particular" in c_name:
+                    col_map["description"] = c_idx
+                elif "category" in c_name:
+                    col_map["category"] = c_idx
+                elif "qty" in c_name or "quantity" in c_name:
+                    col_map["quantity"] = c_idx
+                elif "uom" in c_name or "unit" in c_name:
+                    col_map["uom"] = c_idx
+                elif "baseline" in c_name or "price" in c_name or "rate" in c_name or "cost" in c_name:
+                    col_map["price"] = c_idx
+                elif "lead" in c_name or "days" in c_name or "time" in c_name:
+                    col_map["lead_time"] = c_idx
+                elif ("boq" in c_name or "item" in c_name or "#" in c_name or "sl" in c_name) and "sku" not in c_name and "desc" not in c_name:
+                    col_map["item_num"] = c_idx
+            break
+
+    if header_idx == -1 or "description" not in col_map:
+        return None
+
+    requirements: list[PackagingRequirement] = []
+    item_counter = 1
+
+    for line in raw_lines[header_idx + 1:]:
+        # Stop on footer instructions or separator lines
+        if re.search(r"^(?:mandatory|commercial\s+terms|notes|instructions|terms\s*(?:&|and)|---)", line, re.I):
+            break
+
+        cells = [c.strip() for c in re.split(r"\t+|\|", line)]
+        if len(cells) < 3:
+            cells = [c.strip() for c in re.split(r"\s{2,}", line) if c.strip()]
+        if len(cells) < 3:
+            continue
+
+        sku = cells[col_map["sku"]] if "sku" in col_map and col_map["sku"] < len(cells) else None
+        desc = cells[col_map["description"]] if "description" in col_map and col_map["description"] < len(cells) else ""
+        cat_raw = cells[col_map["category"]] if "category" in col_map and col_map["category"] < len(cells) else ""
+        qty_raw = cells[col_map["quantity"]] if "quantity" in col_map and col_map["quantity"] < len(cells) else None
+        uom_raw = cells[col_map["uom"]] if "uom" in col_map and col_map["uom"] < len(cells) else "pcs"
+        price_raw = cells[col_map["price"]] if "price" in col_map and col_map["price"] < len(cells) else None
+        lead_raw = cells[col_map["lead_time"]] if "lead_time" in col_map and col_map["lead_time"] < len(cells) else None
+
+        if not desc or is_separator_line(desc) or is_commercial_term_or_header(desc):
+            continue
+
+        # Check explicit key-value annotations within the line
+        cat_kv = re.search(r"\bCategory\s*:\s*([a-zA-Z0-9\s/&_-]+?)(?=\s*(?:Target\s*Qty|Quantity|Qty|Baseline|Target\s*Price|Price|Rate|Dimensions?|Specs?|Delivery|$|\t|\|))", line, re.I)
+        qty_kv = re.search(r"\b(?:Target\s*Qty|Quantity|Qty)\s*:\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*([a-zA-Z]+)?", line, re.I)
+        price_kv = re.search(r"\b(?:Baseline|Target\s*Price|Price|Rate)\s*:\s*(?:INR|USD|Rs\.?|₹|\$)?\s*(\d+(?:,\d+)*(?:\.\d+)?)", line, re.I)
+
+        if cat_kv:
+            cat_raw = cat_kv.group(1).strip()
+
+        # Parse quantity
+        quantity: float | None = None
+        if qty_kv:
+            try:
+                quantity = float(qty_kv.group(1).replace(",", ""))
+                if qty_kv.group(2):
+                    uom_raw = qty_kv.group(2).strip()
+            except ValueError:
+                pass
+        elif qty_raw:
+            try:
+                quantity = float(re.sub(r"[^\d.]", "", qty_raw))
+            except ValueError:
+                pass
+
+        # Parse target price
+        target_price: float | None = default_target_price
+        if price_kv:
+            try:
+                target_price = float(price_kv.group(1).replace(",", ""))
+            except ValueError:
+                pass
+        elif price_raw:
+            try:
+                target_price = float(re.sub(r"[^\d.]", "", price_raw))
+            except ValueError:
+                pass
+
+        # Clean description of explicit KV tags and empty parentheses
+        desc = re.sub(r"\b(?:Category|Target\s*Qty|Quantity|Qty|Baseline|Target\s*Price|Price|Rate|Dimensions?|Specs?)\s*:\s*[^\t\|]*", " ", desc, flags=re.I)
+        desc = re.sub(r"\(\s*\)", " ", desc)
+        desc = re.sub(r"\s+", " ", desc).strip(" ,.")
+
+        # Map Category
+        cat_lower = cat_raw.lower()
+        if any(k in cat_lower for k in ["carton", "box"]):
+            category = "Corrugated packaging"
+        elif any(k in cat_lower for k in ["tape", "adhesive", "bopp"]):
+            category = "Adhesive tape"
+        elif any(k in cat_lower for k in ["film", "stretch", "shrink"]):
+            category = "Wrapping film"
+        elif any(k in cat_lower for k in ["cushioning", "bubble", "foam", "protection", "protector"]):
+            category = "Protective packaging"
+        elif any(k in cat_lower for k in ["pallet"]):
+            category = "Pallets"
+        elif any(k in cat_lower for k in ["strapping"]):
+            category = "Protective packaging"
+        elif any(k in cat_lower for k in ["bag", "pouch", "mailer"]):
+            category = "Flexible pouches"
+        elif any(k in cat_lower for k in ["label", "sticker", "barcode"]):
+            category = "Labels & stickers"
+        else:
+            category = "Packaging & Dispatch Supplies"
+
+        material = cat_raw.title() if cat_raw else category
+
+        # Extract 3D or 2D dimensions from description
+        dimensions: dict[str, Any] = {}
+        dim3 = re.search(r"(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\.\d+)?)\s*(mm|cm|inch|inches|in|m)?", desc, re.I)
+        if dim3:
+            u = dim3.group(4) or "mm"
+            dimensions = {
+                "length": float(dim3.group(1)),
+                "width": float(dim3.group(2)),
+                "height": float(dim3.group(3)),
+                "unit": u.lower(),
+            }
+        else:
+            dim2 = re.search(r"(\d+(?:\.\d+)?)\s*(mm|cm|inch|inches|in|m|mic|micron)?\s*[xX*×]\s*(\d+(?:\.\d+)?)\s*(mm|cm|inch|inches|in|m|mic|micron)?", desc, re.I)
+            if dim2:
+                u1 = dim2.group(2)
+                u2 = dim2.group(4)
+                dim_unit = u2 or u1 or "mm"
+                dimensions = {
+                    "length": float(dim2.group(1)),
+                    "width": float(dim2.group(3)),
+                    "height": 0.0,
+                    "unit": dim_unit.lower(),
+                }
+
+        # Ply
+        ply: str | None = None
+        ply_m = re.search(r"(\d+)\s*[-]?\s*ply", desc, re.I)
+        if ply_m:
+            ply = f"{ply_m.group(1)}-ply"
+
+        # Format full description with SKU code prefix if available
+        full_desc = f"[{sku}] {desc}" if sku and not desc.startswith(f"[{sku}]") else desc
+
+        req = PackagingRequirement(
+            item_number=item_counter,
+            category=category,
+            item_description=full_desc,
+            quantity=quantity,
+            unit=(uom_raw or "pcs").strip(),
+            dimensions=dimensions,
+            material=material,
+            ply=ply,
+            specification=line,
+            delivery_date=default_delivery_date or "2026-11-15",
+            target_price=target_price,
+            currency=default_currency,
+        )
+        missing = identify_missing_fields(req)
+        req.missing_fields = missing
+        apply_traceable_defaults(req)
+        requirements.append(req)
+        item_counter += 1
+
+    return requirements if requirements else None
+
+
 def deterministic_extract_packaging(text: str) -> IntakeExtractionResult:
-    """Deterministic, rule-based extraction for packaging text supporting single and multi-line items.
+    """Deterministic, rule-based extraction for packaging text supporting single, multi-line, and tabular items.
 
     Acts as a reliable, offline-compatible engine and fallback for the AI agent.
     Never hallucinates missing fields; marks them explicitly.
@@ -418,50 +607,61 @@ def deterministic_extract_packaging(text: str) -> IntakeExtractionResult:
         except ValueError:
             pass
 
-    # 2. Extract item text by trimming destination / trailing delivery phrases
-    items_text = clean_text
-    deliv_kw = re.search(r"\b(?:deliver(?:ed)?\s+to|warehouse\s+at|destination\s*:?)\b", items_text, re.I)
-    if deliv_kw:
-        items_text = items_text[:deliv_kw.start()].strip(" ,.")
-    elif date_match:
-        date_kw = re.search(r"\b(?:by|before)\s+[A-Za-z0-9]", items_text, re.I)
-        if date_kw:
-            items_text = items_text[:date_kw.start()].strip(" ,.")
-
-    # 3. Split on multi-item delimiters: ';', newlines, ', and ', ' and ', or commas preceding new packaging items / quantities
-    clauses = re.split(
-        r"(?:;\s*|\n+|\s*,\s*and\s+|\s+and\s+|\s*,\s*(?=(?:\d+(?:\.\d+)?\s*(?:pcs|pieces|boxes|cartons|rolls|bags|pouches|sheets|pallets|units|mailers|kg|kgs|mtr|meters?|metres?|m|inch|inches|in|\")?\s*(?:cube\s+)?(?:of\s+)?\[[a-zA-Z0-9_\-#]+\]|\d+(?:\.\d+)?\s*(?:pcs|pieces|boxes|cartons|rolls|bags|pouches|sheets|pallets|units|mailers|kg|kgs|mtr|meters?|metres?|m|inch|inches|in|\")\s+(?:cube\s+)?(?!x|×|\*|-?\s*ply)[a-zA-Z0-9_\-#\[\]]+|\d+\s+(?:cube\s+)?(?:boxes?|cartons?|tapes?|films?|mailers?|bags?|pallets?)|(?:boxes?|cartons?|tape|tapes|film|films|bubble\s*wrap|transparent\s*tape|brown\s*tape|mailers?|pouches?|pallets?|bags?)\b)))",
-        items_text,
-        flags=re.I,
+    # 2. Check for tabular BOQ table format first
+    tabular_reqs = _parse_tabular_boq(
+        text=clean_text,
+        default_currency=currency,
+        default_delivery_date=delivery_date,
+        default_target_price=target_price,
     )
-    clauses = [c.strip(" ,.") for c in clauses if c.strip(" ,.")]
-    if not clauses:
-        clauses = [clean_text]
 
-    requirements: list[PackagingRequirement] = []
-    item_counter = 1
-    for clause in clauses:
-        # Strictly ignore separator lines and commercial terms clauses
-        if is_separator_line(clause) or is_commercial_term_or_header(clause):
-            continue
+    if tabular_reqs:
+        requirements = tabular_reqs
+    else:
+        # 3. Extract item text by trimming destination / trailing delivery phrases
+        items_text = clean_text
+        deliv_kw = re.search(r"\b(?:deliver(?:ed)?\s+to|warehouse\s+at|destination\s*:?)\b", items_text, re.I)
+        if deliv_kw:
+            items_text = items_text[:deliv_kw.start()].strip(" ,.")
+        elif date_match:
+            date_kw = re.search(r"\b(?:by|before)\s+[A-Za-z0-9]", items_text, re.I)
+            if date_kw:
+                items_text = items_text[:date_kw.start()].strip(" ,.")
 
-        req = _parse_single_packaging_clause(
-            clause=clause,
-            item_num=item_counter,
-            default_delivery_date=delivery_date,
-            default_currency=currency,
-            default_target_price=target_price,
+        # Split on multi-item delimiters: ';', newlines, ', and ', ' and ', or commas preceding new packaging items / quantities
+        clauses = re.split(
+            r"(?:;\s*|\n+|\s*,\s*and\s+|\s+and\s+|\s*,\s*(?=(?:\d+(?:\.\d+)?\s*(?:pcs|pieces|boxes|cartons|rolls|bags|pouches|sheets|pallets|units|mailers|kg|kgs|mtr|meters?|metres?|m|inch|inches|in|\")?\s*(?:cube\s+)?(?:of\s+)?\[[a-zA-Z0-9_\-#]+\]|\d+(?:\.\d+)?\s*(?:pcs|pieces|boxes|cartons|rolls|bags|pouches|sheets|pallets|units|mailers|kg|kgs|mtr|meters?|metres?|m|inch|inches|in|\")\s+(?:cube\s+)?(?!x|×|\*|-?\s*ply)[a-zA-Z0-9_\-#\[\]]+|\d+\s+(?:cube\s+)?(?:boxes?|cartons?|tapes?|films?|mailers?|bags?|pallets?)|(?:boxes?|cartons?|tape|tapes|film|films|bubble\s*wrap|transparent\s*tape|brown\s*tape|mailers?|pouches?|pallets?|bags?)\b)))",
+            items_text,
+            flags=re.I,
         )
+        clauses = [c.strip(" ,.") for c in clauses if c.strip(" ,.")]
+        if not clauses:
+            clauses = [clean_text]
 
-        # Skip if the description is pure punctuation or still matches a terms header
-        if is_separator_line(req.item_description) or is_commercial_term_or_header(req.item_description):
-            continue
+        requirements = []
+        item_counter = 1
+        for clause in clauses:
+            # Strictly ignore separator lines, document headers, and commercial terms clauses
+            if is_separator_line(clause) or is_commercial_term_or_header(clause):
+                continue
 
-        missing = identify_missing_fields(req)
-        req.missing_fields = missing
-        apply_traceable_defaults(req)
-        requirements.append(req)
-        item_counter += 1
+            req = _parse_single_packaging_clause(
+                clause=clause,
+                item_num=item_counter,
+                default_delivery_date=delivery_date,
+                default_currency=currency,
+                default_target_price=target_price,
+            )
+
+            # Skip if the description is pure punctuation or still matches a terms header
+            if is_separator_line(req.item_description) or is_commercial_term_or_header(req.item_description):
+                continue
+
+            missing = identify_missing_fields(req)
+            req.missing_fields = missing
+            apply_traceable_defaults(req)
+            requirements.append(req)
+            item_counter += 1
 
     # Check RFI readiness
     is_ready, _ = check_rfi_readiness(requirements)
@@ -478,7 +678,15 @@ def deterministic_extract_packaging(text: str) -> IntakeExtractionResult:
         detected_category = "Corrugated packaging"
 
     # Title
-    if len(requirements) == 1:
+    ref = comm_terms.get("reference")
+    scope = comm_terms.get("scope")
+    if ref and scope:
+        title = f"RFI {ref}: {scope}"
+    elif ref:
+        title = f"RFI {ref}"
+    elif scope:
+        title = f"RFI for {scope}"
+    elif len(requirements) == 1:
         qty_val = f"{int(requirements[0].quantity)} " if requirements[0].quantity else ""
         title = f"{qty_val}{requirements[0].item_description}".strip().capitalize()
     elif len(requirements) > 1:

@@ -67,7 +67,13 @@ SEPARATOR_PATTERN = re.compile(r"^[-=_*~—\s]{3,}$")
 
 # Regex patterns for commercial terms / notes headers
 HEADER_TERMS_PATTERN = re.compile(
-    r"^(?:mandatory\s+)?(?:commercial\s+terms|terms\s*(?:and|&)\s*conditions|commercial\s*conditions|commercial\s*requirements|general\s*terms|terms\s*to\s*include|payment\s*terms|delivery\s*terms|scope\s*of\s*work|special\s*instructions|submission\s*guidelines|notes?|instructions?|general\s*notes?|important\s*notes?|remarks?)(?:\s*:|\s*$)",
+    r"^(?:mandatory\s+)?(?:sourcing\s*(?:and|&)\s*commercial\s*instructions?|commercial\s+terms|terms\s*(?:and|&)\s*conditions|commercial\s*conditions|commercial\s*requirements|general\s*terms|terms\s*to\s*include|payment\s*terms|delivery\s*terms|scope\s*of\s*work|special\s*instructions|submission\s*guidelines|notes?|instructions?|general\s*notes?|important\s*notes?|remarks?)(?:\s*:|\s*$)",
+    re.I,
+)
+
+# Document header metadata patterns (e.g. Enterprise RFI headers)
+DOCUMENT_HEADER_PATTERN = re.compile(
+    r"^(?:enterprise\s+strategic\s+sourcing|request\s+for\s+information|request\s+for\s+quotation|rfi\s*/\s*rfq\b|rfi\s+reference\s*:|scope\s*:|date\s+of\s+issue\s*:|baseline\s+currency\s*:|order\s+volume\s+scope\s*:)",
     re.I,
 )
 
@@ -85,21 +91,21 @@ CONVERSATIONAL_BOILERPLATE_PATTERN = re.compile(
     re.I,
 )
 
-# Table header pattern (e.g. "# Description Quantity Dimensions Material / Specs")
+# Table header pattern (e.g. "# Description Quantity Dimensions Material / Specs" or "BOQ Item # SKU Code Item Description...")
 TABLE_HEADER_PATTERN = re.compile(
-    r"^(?:#|sl\.?\s*no\.?|sr\.?\s*no\.?|line\s*#?)\s*[\t\|,\s]+(?:item\s*)?description\b",
+    r"^(?:#|sl\.?\s*no\.?|sr\.?\s*no\.?|line\s*#?|boq\s*(?:item\s*)?#?|item\s*#?|sku\s*code)\s*[\t\|,\s]+.*(?:description|sku|uom|quantity|qty|category|baseline|lead\s*time)",
     re.I,
 )
 
 # Regex patterns for commercial terms / condition clauses / procurement instructions
 COMMERCIAL_CLAUSE_PATTERN = re.compile(
-    r"^(?:[-*•–]\s*)?(?:clear\s+indication\s+of\s+moq|moq\b|minimum\s+order\s+quantity|freight|shipping\s+cost|ex-works|delivery\s+included|warranty|sla\b|transit\s+damage|replacement\s+guarantee|volume\s+discounts?|payment\s+terms?|currency\s*\(|net\s+\d+\s+days?|advance\s+payment|validity\s+of\s+quote|quote\s+validity|valid\s+for\s+\d+\s+days|lead\s+time|taxes?\s*(?:extra|included)|gst\b|sample\s+submission|samples?\s+required|inspection\s+at\s+warehouse|transit\s+insurance|food\s+grade|fsc\s+certified|test\s+certificate|certificate\s+of\s+analysis|coa\b|credit\s+period|payment\s+against\s+delivery|payment\s+within\s+\d+\s+days|rates?\s+must\s+include|rates?\s+should\s+be|pricing\s+should\s+be|prices?\s+must\s+be)",
+    r"^(?:[-*•–]|\d+[\.\)]|\[\d+\])?\s*(?:bidders?\s+must\s+quote|all\s+quotes\s+must|clear\s+indication\s+of\s+moq|moq\b|minimum\s+order\s+quantity|lot\s+size\s+restrictions?|freight|shipping\s+cost|ex-works|delivery\s+included|warranty|sla\b|transit\s+damage|replacement\s+guarantee|volume\s+discounts?|thresholds?\s+and\s+cash\s+settlement|cash\s+settlement|settlement\s+terms|payment\s+terms?|currency\s*\(|net\s+\d+\s+days?|advance\s+payment|validity\s+of\s+quote|target\s+validity|quote\s+validity|valid\s+for\s+\d+\s+days|lead\s+time|taxes?\s*(?:extra|included)|gst\b|sample\s+submission|samples?\s+required|inspection\s+at\s+warehouse|transit\s+insurance|food\s+grade|fsc\s+certified|test\s+certificate|certificate\s+of\s+analysis|coa\b|credit\s+period|payment\s+against\s+delivery|payment\s+within\s+\d+\s+days|rates?\s+must\s+include|rates?\s+should\s+be|pricing\s+should\s+be|prices?\s+must\s+be)",
     re.I,
 )
 
 # User conversational commands, edits, and updates (must never be parsed as product items)
 COMMAND_INSTRUCTION_PATTERN = re.compile(
-    r"^(?:please\s+)?(?:update|change|modify|set|adjust|edit|delete|remove|drop|clear|no\b|yes\b)|"
+    r"^(?:please\s+)?\b(?:update|change|modify|set|adjust|edit|delete|remove|drop|clear)\b|"
     r"^(?:and\s+)?(?:\d+\s+)?to\s+\d+|"
     r"^to\b|"
     r"^(?:with\s+)?(?:baseline|target\s+price|price|rate)\s+(?:of|to|is)\b",
@@ -126,9 +132,11 @@ def is_conversational_or_boilerplate(text: str) -> bool:
 
 
 def is_commercial_term_or_header(text: str) -> bool:
-    """Return True if text represents a commercial terms header, table header, note, command, or terms condition bullet."""
+    """Return True if text represents a document header, commercial terms header, table header, note, command, or terms condition bullet."""
     clean = text.strip()
     if not clean or is_separator_line(clean):
+        return True
+    if DOCUMENT_HEADER_PATTERN.search(clean):
         return True
     if HEADER_TERMS_PATTERN.search(clean):
         return True
@@ -201,6 +209,7 @@ def is_commercial_term_or_header(text: str) -> bool:
         "currency (inr/usd)",
         "quote validity",
         "mandatory commercial terms",
+        "mandatory sourcing",
     ]
     if any(ind in lowered for ind in terms_indicators):
         return True
@@ -208,8 +217,11 @@ def is_commercial_term_or_header(text: str) -> bool:
 
 
 def extract_commercial_terms(text: str) -> dict[str, Any]:
-    """Extract structured commercial terms (payment, delivery, validity, currency, notes) from text."""
+    """Extract structured commercial terms (payment, delivery, validity, currency, reference, scope, notes) from text."""
     terms: dict[str, Any] = {
+        "title": None,
+        "reference": None,
+        "scope": None,
         "payment_terms": None,
         "delivery_terms": None,
         "validity_days": None,
@@ -217,12 +229,35 @@ def extract_commercial_terms(text: str) -> dict[str, Any]:
         "notes": [],
     }
 
+    # Extract global key-value items from document headers if present
+    ref_match = re.search(r"RFI\s+Reference\s*:\s*([a-zA-Z0-9_-]+)", text, re.I)
+    if ref_match:
+        terms["reference"] = ref_match.group(1).strip()
+
+    scope_match = re.search(r"\bScope\s*:\s*([^\n\r\t]+?)(?=\s*(?:Baseline|Date|Target|Order|$|\t))", text, re.I)
+    if scope_match:
+        terms["scope"] = scope_match.group(1).strip()
+
+    validity_match = re.search(r"(?:Target\s+Validity|Quote\s+Validity|valid\s+for|validity)\s*:\s*(\d+)\s*days?", text, re.I)
+    if validity_match:
+        terms["validity_days"] = int(validity_match.group(1))
+
+    curr_match = re.search(r"(?:Baseline\s+Currency|Currency)\s*:\s*([a-zA-Z]+)", text, re.I)
+    if curr_match:
+        terms["currency"] = curr_match.group(1).upper()
+
+    order_vol_m = re.search(r"Order\s+Volume\s+Scope\s*:\s*([^\n\r\t]+)", text, re.I)
+    if order_vol_m:
+        vol_text = order_vol_m.group(1).strip()
+        if vol_text:
+            terms["notes"].append(f"Order Volume Scope: {vol_text}")
+
     # Split text into logical sentences or lines
     raw_lines = re.split(r"[\n\r]+|[.!?](?=\s+[A-Z0-9]|$)", text)
     lines = [line.strip() for line in raw_lines if line.strip()]
 
     for line in lines:
-        if is_separator_line(line) or HEADER_TERMS_PATTERN.search(line) or TABLE_HEADER_PATTERN.search(line):
+        if is_separator_line(line) or HEADER_TERMS_PATTERN.search(line) or TABLE_HEADER_PATTERN.search(line) or DOCUMENT_HEADER_PATTERN.search(line):
             continue
 
         lowered = line.lower()
@@ -263,13 +298,13 @@ def extract_commercial_terms(text: str) -> dict[str, Any]:
                         terms["delivery_terms"] = f"Within {time_match.group(1).strip()}"
 
         # 3. Validity
-        if "valid" in lowered or "validity" in lowered:
+        if ("valid" in lowered or "validity" in lowered) and not terms["validity_days"]:
             val_match = re.search(r"(?:valid\s+(?:for|till|until)?|validity\s*:?)\s*(\d+)\s*days?", line, re.I)
             if val_match:
                 terms["validity_days"] = int(val_match.group(1))
 
         # 4. Currency
-        if any(k in lowered for k in ["currency", "in usd", "in inr", "in eur", "in gbp", "rates in", "prices in", "quotes in"]):
+        if any(k in lowered for k in ["currency", "in usd", "in inr", "in eur", "in gbp", "rates in", "prices in", "quotes in"]) and not terms["currency"]:
             curr_match = re.search(r"\b(INR|USD|EUR|GBP)\b", line, re.I)
             if curr_match:
                 terms["currency"] = curr_match.group(1).upper()
@@ -282,7 +317,7 @@ def extract_commercial_terms(text: str) -> dict[str, Any]:
             and not is_conversational_or_boilerplate(line)
             and not COMMAND_INSTRUCTION_PATTERN.search(line)
         ):
-            clean_note = line.lstrip("-*•– ").strip()
+            clean_note = line.lstrip("-*•– 0123456789.)[]").strip()
             if clean_note and len(clean_note) > 4 and clean_note not in terms["notes"]:
                 terms["notes"].append(clean_note)
 

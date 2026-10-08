@@ -753,6 +753,102 @@ def test_tabular_key_value_annotated_intake() -> None:
     asyncio.run(_test())
 
 
+def test_enterprise_strategic_sourcing_boq_intake() -> None:
+    """Test full Enterprise Strategic Sourcing RFI/RFQ document intake with 30 items."""
+    async def _test() -> None:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with app.router.lifespan_context(app):
+                app.state.agent_registry.master.model = TestModel()
+                for s in app.state.agent_registry.specialists.values():
+                    s.model = TestModel()
+
+                session_id = "test-enterprise-sourcing-session"
+                reset_chat_session(session_id)
+
+                enterprise_rfi_text = (
+                    "ENTERPRISE STRATEGIC SOURCING CELL - REQUEST FOR INFORMATION & QUOTATION (RFI/RFQ)\t\t\t\t\t\t\t\n"
+                    "RFI Reference: RFI-PKG-2026-001\t\tDate of Issue: 08-Oct-2026\tTarget Validity: 90 Days\t\t\t\t\n"
+                    "Scope: Annual Packaging Consumables Portfolio\t\tBaseline Currency: INR (₹)\tOrder Volume Scope: 50 - 500 Units\t\t\t\t\n"
+                    "\t\t\t\t\t\t\t\n"
+                    "BOQ Item #\tSKU Code\tItem Description\tCategory\tTarget BOQ Quantity\tStandard UOM\tInternal Baseline (INR)\tTarget Lead Time (Days)\n"
+                    "BOQ-001\tPKG-001\t3-Ply Corrugated Box (10x8x6 in)\tCartons\t433\tPiece\t₹ 19.57\t7\n"
+                    "BOQ-002\tPKG-002\t5-Ply Heavy Duty Master Box (18x14x12 in)\tCartons\t269\tPiece\t₹ 46.21\t7\n"
+                    "BOQ-003\tPKG-003\t7-Ply Industrial Shipping Box (24x20x18 in)\tCartons\t113\tPiece\t₹ 99.69\t7\n"
+                    "BOQ-004\tPKG-004\tKraft Paper Tape (48mm x 50m)\tTapes\t500\tMetre\t₹ 1.43\t7\n"
+                    "BOQ-005\tPKG-005\tBOPP Clear Packing Tape 48M (48mm x 100m)\tTapes\t341\tRoll\t₹ 37.20\t7\n"
+                    "BOQ-006\tPKG-006\tCross-Weave Filament Tape (24mm x 50m)\tTapes\t442\tMetre\t₹ 2.56\t7\n"
+                    "BOQ-007\tPKG-007\tLLDPE Hand Stretch Wrap Film (23Mic x 500mm)\tFilms\t230\tKg\t₹ 156.14\t7\n"
+                    "BOQ-008\tPKG-008\tMachine Grade Stretch Film (500mm x 1500m)\tFilms\t82\tRoll\t₹ 1,451.02\t7\n"
+                    "BOQ-009\tPKG-009\tAir Bubble Wrap Roll (1m x 100m, 10mm bubble)\tCushioning\t463\tMetre\t₹ 6.40\t7\n"
+                    "BOQ-010\tPKG-010\tAnti-Static Bubble Roll Pink (1m x 50m)\tCushioning\t301\tMetre\t₹ 18.39\t7\n"
+                    "BOQ-011\tPKG-011\tEPE Foam Sheet Roll 2mm (1m x 100m)\tCushioning\t500\tMetre\t₹ 4.89\t7\n"
+                    "BOQ-012\tPKG-012\tKraft Honeycomb Paper Wrap (500mm x 250m)\tCushioning\t74\tRoll\t₹ 1,165.87\t7\n"
+                    "BOQ-013\tPKG-013\tStandard Euro Wooden Pallet (1200x800mm HT)\tPallets\t134\tPiece\t₹ 911.99\t7\n"
+                    "BOQ-014\tPKG-014\tHDPE Plastic Heavy Duty Pallet (1200x1000mm)\tPallets\t60\tPiece\t₹ 2,376.07\t7\n"
+                    "BOQ-015\tPKG-015\tPET Strapping Roll 15mm x 0.8mm x 1000m\tStrapping\t500\tMetre\t₹ 1.92\t7\n"
+                    "BOQ-016\tPKG-016\tPP Strapping Roll 12mm x 2000m (Yellow)\tStrapping\t87\tRoll\t₹ 875.90\t7\n"
+                    "BOQ-017\tPKG-017\tHeavy Duty Steel Strapping 19mm x 25kg\tStrapping\t346\tKg\t₹ 127.63\t7\n"
+                    "BOQ-018\tPKG-018\tCorrugated Edge Protectors (50x50x3x1000mm)\tProtectors\t419\tPiece\t₹ 15.44\t7\n"
+                    "BOQ-019\tPKG-019\tHeavy Duty Plastic Corner Guards (Pack 100)\tProtectors\t122\tPack\t₹ 228.19\t7\n"
+                    "BOQ-020\tPKG-020\tLDPE Transparent Poly Bags 200G (12x16 in)\tBags\t411\tKg\t₹ 174.06\t7\n"
+                    "BOQ-021\tPKG-021\tZip Lock Reclosable Bags (8x10 in, Pack 500)\tBags\t89\tPack\t₹ 443.89\t7\n"
+                    "BOQ-022\tPKG-022\tVCI Anti-Rust Poly Envelopes (18x24 in)\tBags\t241\tPiece\t₹ 25.43\t7\n"
+                    "BOQ-023\tPKG-023\tThermal Barcode Labels 4x6 in (1000/roll)\tLabels\t175\tRoll\t₹ 311.02\t7\n"
+                    "BOQ-024\tPKG-024\tFragile Advisory Stickers (Roll of 500)\tLabels\t147\tRoll\t₹ 166.92\t7\n"
+                    "BOQ-025\tPKG-025\tSilica Gel Desiccant Pouches 50g (Pack 100)\tProtection\t277\tKg\t₹ 141.17\t7\n"
+                    "BOQ-026\tPKG-026\tInflatable Air Cushion Bags (Roll of 1500)\tCushioning\t85\tRoll\t₹ 1,498.10\t7\n"
+                    "BOQ-027\tPKG-027\tCorrugated Grid Divider Inserts (12-Cell)\tCartons\t354\tPiece\t₹ 25.87\t7\n"
+                    "BOQ-028\tPKG-028\tSelf-Adhesive Packing List Envelopes A5\tLabels\t201\tPack\t₹ 194.61\t7\n"
+                    "BOQ-029\tPKG-029\tBubble Lined Kraft Mailers #4 (10x15 in)\tBags\t480\tPiece\t₹ 15.18\t7\n"
+                    "BOQ-030\tPKG-030\tBiodegradable Loose Fill Peanuts (10 cu ft)\tCushioning\t72\tPack\t₹ 791.90\t7\n"
+                    "\t\t\t\t\t\t\t\n"
+                    "MANDATORY SOURCING & COMMERCIAL INSTRUCTIONS:\t\t\t\t\t\t\t\n"
+                    "1. Bidders must quote unit prices in INR or USD (with FX rate indicated). All quotes must reference the exact BOQ SKU Code.\t\t\t\t\t\t\t\n"
+                    "2. Any Minimum Order Quantity (MOQ) or lot size restrictions must be clearly declared per line item.\t\t\t\t\t\t\t\n"
+                    "3. Freight terms (Ex-Works, Freight Included, or Freight Extra %) and replacement warranty SLAs must be specified in the proposal.\t\t\t\t\t\t\t\n"
+                    "4. Volume discount thresholds and cash settlement terms should be explicitly noted.\n"
+                )
+
+                resp = await client.post("/api/chat", json={
+                    "message": enterprise_rfi_text,
+                    "conversation_id": session_id,
+                })
+                assert resp.status_code == 200
+                msg = resp.json()["message"]
+
+                # Must NOT trigger false-positive modification intent ("I have updated item...")
+                assert "I have updated item" not in msg
+                assert "I have processed your requirements" in msg or "RFI Solution & Progress" in msg
+
+                # Check all 30 line items present
+                assert "| 1 | [PKG-001] 3-Ply Corrugated Box (10x8x6 in)" in msg
+                assert "| 1 |" in msg
+                assert "| 30 |" in msg
+                assert "| 30 | [PKG-030] Biodegradable Loose Fill Peanuts (10 cu ft)" in msg
+
+                # Check sample lines with dimensions and baseline prices
+                assert "433 Piece" in msg
+                assert "10 x 8 x 6 in" in msg
+                assert "Cartons (Baseline: ₹19.57)" in msg
+
+                assert "500 Metre" in msg
+                assert "Tapes (Baseline: ₹1.43)" in msg
+
+                assert "82 Roll" in msg
+                assert "Films (Baseline: ₹1451.02)" in msg
+
+                assert "60 Piece" in msg
+                assert "Pallets (Baseline: ₹2376.07)" in msg
+
+                # Check commercial terms extracted from header
+                assert "**Quote Validity**: 90 Days" in msg
+                assert "**Currency**: INR" in msg
+
+    asyncio.run(_test())
+
+
+
 
 
 

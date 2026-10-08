@@ -29,15 +29,18 @@ logger = logging.getLogger(__name__)
 
 def parse_removal_intent(user_text: str, total_items: int = 0) -> tuple[list[int | str], str] | None:
     """Parse user command to remove items by range, list of indices, relative offset, or keyword."""
+    # Guard against multi-row tables or large documents
+    if "\t" in user_text or user_text.count("\n") > 2 or "BOQ-" in user_text:
+        return None
     q_lower = user_text.strip().lower()
 
-    # Check if there is a removal verb: remove, delete, drop, clear, omit, exclude
-    if not any(v in q_lower for v in ["remove", "delete", "drop", "clear", "omit", "exclude"]):
+    # Check if there is a removal verb with word boundary
+    if not re.search(r"\b(?:remove|delete|drop|clear|omit|exclude)\b", q_lower):
         return None
 
     # 1. Terms / Separator line items: "remove commercial terms", "delete terms", "remove separator items", "remove all terms"
     if re.search(
-        r"(?:remove|delete|drop|clear|omit)\s+(?:the\s+)?(?:all\s+)?(commercial\s*terms|terms\s*(?:and|&)\s*conditions|terms|notes|separators?|divider\s*lines?|headings?|terms\s*and\s*conditions\s*items?|non-product\s*items?)",
+        r"\b(?:remove|delete|drop|clear|omit)\s+(?:the\s+)?(?:all\s+)?(commercial\s*terms|terms\s*(?:and|&)\s*conditions|terms|notes|separators?|divider\s*lines?|headings?|terms\s*and\s*conditions\s*items?|non-product\s*items?)",
         q_lower,
     ):
         patterns = [
@@ -47,19 +50,19 @@ def parse_removal_intent(user_text: str, total_items: int = 0) -> tuple[list[int
         return patterns, "commercial terms and separator items"
 
     # 2. Relative offset: "remove last 3 items", "delete the last item", "remove last 7"
-    rel_match = re.search(r"(?:remove|delete|drop)\s+(?:the\s+)?last\s+(\d+)\s+(?:items?|lines?|rows?)?", q_lower)
+    rel_match = re.search(r"\b(?:remove|delete|drop)\s+(?:the\s+)?last\s+(\d+)\s+(?:items?|lines?|rows?)?", q_lower)
     if rel_match and total_items > 0:
         count = int(rel_match.group(1))
         start_idx = max(1, total_items - count + 1)
         targets: list[int | str] = list(range(start_idx, total_items + 1))
         return targets, f"the last {len(targets)} item(s) (items {start_idx} to {total_items})"
 
-    if re.search(r"(?:remove|delete|drop)\s+(?:the\s+)?last\s+(?:item|line|row)", q_lower) and total_items > 0:
+    if re.search(r"\b(?:remove|delete|drop)\s+(?:the\s+)?last\s+(?:item|line|row)", q_lower) and total_items > 0:
         return [total_items], f"the last item (#{total_items})"
 
     # 3. Explicit Range: "remove items 33 to 39", "remove 33-39", "delete items from 33 to 39", "delete lines 33 through 39", "remove items between 33 and 39"
     range_match1 = re.search(
-        r"(?:remove|delete|drop|clear)\s+(?:items?|lines?|rows?|line\s*items?|item\s*numbers?)?\s*(?:from\s+)?(\d+)\s*(?:to|-|through|until|\.\.)\s*(\d+)",
+        r"\b(?:remove|delete|drop|clear)\s+(?:items?|lines?|rows?|line\s*items?|item\s*numbers?)?\s*(?:from\s+)?(\d+)\s*(?:to|-|through|until|\.\.)\s*(\d+)",
         q_lower,
     )
     if range_match1:
@@ -71,7 +74,7 @@ def parse_removal_intent(user_text: str, total_items: int = 0) -> tuple[list[int
         return targets, f"items {start_num} to {end_num}"
 
     range_match2 = re.search(
-        r"(?:remove|delete|drop|clear)\s+(?:items?|lines?|rows?|line\s*items?|item\s*numbers?)?\s*between\s+(\d+)\s+and\s+(\d+)",
+        r"\b(?:remove|delete|drop|clear)\s+(?:items?|lines?|rows?|line\s*items?|item\s*numbers?)?\s*between\s+(\d+)\s+and\s+(\d+)",
         q_lower,
     )
     if range_match2:
@@ -84,7 +87,7 @@ def parse_removal_intent(user_text: str, total_items: int = 0) -> tuple[list[int
 
     # 4. Comma / 'and' separated numbers: "remove items 33, 34, 35", "delete line 1, 2 and 3", "remove item 2 and item 4"
     multi_match = re.search(
-        r"(?:remove|delete|drop|clear)\s+(?:items?|lines?|rows?|line\s*items?|#)?\s*(\d+(?:\s*(?:,|and|&)\s*(?:items?|lines?|#)?\s*\d+)+)",
+        r"\b(?:remove|delete|drop|clear)\s+(?:items?|lines?|rows?|line\s*items?|#)?\s*(\d+(?:\s*(?:,|and|&)\s*(?:items?|lines?|#)?\s*\d+)+)",
         q_lower,
     )
     if multi_match:
@@ -94,7 +97,7 @@ def parse_removal_intent(user_text: str, total_items: int = 0) -> tuple[list[int
             return unique_targets, f"items {', '.join(map(str, unique_targets))}"
 
     # 5. Single item by number: "remove item 3", "delete 3", "drop line #3", "remove item #3"
-    single_num_match = re.search(r"(?:remove|delete|drop)\s+(?:item\s+|line\s+|#|row\s+)?(\d+)\b", q_lower)
+    single_num_match = re.search(r"\b(?:remove|delete|drop)\s+(?:item\s+|line\s+|#|row\s+)?(\d+)\b", q_lower)
     if single_num_match:
         target_n = int(single_num_match.group(1))
         return [target_n], f"item {target_n}"
@@ -105,7 +108,7 @@ def parse_removal_intent(user_text: str, total_items: int = 0) -> tuple[list[int
         "delivery", "validity", "quote validity", "currency", "terms", "commercial terms",
         "all terms", "note", "notes", "scope", "rfi",
     }
-    name_match = re.search(r"(?:remove|delete|drop)\s+(?:item\s+|line\s+|product\s+|#)?([a-zA-Z0-9\s#\[\]_-]+)", q_lower)
+    name_match = re.search(r"\b(?:remove|delete|drop)\s+(?:item\s+|line\s+|product\s+|#)?([a-zA-Z0-9\s#\[\]_-]+)", q_lower)
     if name_match:
         target_name = name_match.group(1).strip()
         # Clean up any trailing filler words
@@ -118,20 +121,23 @@ def parse_removal_intent(user_text: str, total_items: int = 0) -> tuple[list[int
 
 def parse_terms_intent(user_text: str) -> dict[str, Any] | None:
     """Parse user natural language command to modify or reset RFI commercial terms, delivery, validity, currency, or notes."""
+    # Guard against multi-row tables or large documents
+    if "\t" in user_text or user_text.count("\n") > 2 or "BOQ-" in user_text:
+        return None
     q_clean = user_text.strip()
     q_lower = q_clean.lower()
 
     # 1. Reset / Remove specific terms: "remove payment terms", "reset delivery terms", "remove terms", "clear notes"
-    if any(verb in q_lower for verb in ["remove", "reset", "clear", "delete", "omit"]):
-        if re.search(r"(?:remove|reset|clear|delete|omit)\s+(?:the\s+)?payment\s*terms?", q_lower):
+    if re.search(r"\b(?:remove|reset|clear|delete|omit)\b", q_lower):
+        if re.search(r"\b(?:remove|reset|clear|delete|omit)\s+(?:the\s+)?payment\s*terms?", q_lower):
             return {"payment_terms": "Net 30 Days"}
-        if re.search(r"(?:remove|reset|clear|delete|omit)\s+(?:the\s+)?(?:delivery\s*terms?|delivery\s*location|delivery\s*destination)", q_lower):
+        if re.search(r"\b(?:remove|reset|clear|delete|omit)\s+(?:the\s+)?(?:delivery\s*terms?|delivery\s*location|delivery\s*destination)", q_lower):
             return {"delivery_terms": "Delivered to Bangalore (DDP)"}
-        if re.search(r"(?:remove|reset|clear|delete|omit)\s+(?:the\s+)?(?:currency)", q_lower):
+        if re.search(r"\b(?:remove|reset|clear|delete|omit)\s+(?:the\s+)?(?:currency)", q_lower):
             return {"currency": "INR"}
-        if re.search(r"(?:remove|reset|clear|delete|omit)\s+(?:the\s+)?(?:validity|quote\s*validity)", q_lower):
+        if re.search(r"\b(?:remove|reset|clear|delete|omit)\s+(?:the\s+)?(?:validity|quote\s*validity)", q_lower):
             return {"validity_days": 30}
-        if re.search(r"(?:remove|reset|clear|delete|omit)\s+(?:the\s+)?(?:all\s+)?(?:commercial\s*terms|terms|notes|remarks)", q_lower):
+        if re.search(r"\b(?:remove|reset|clear|delete|omit)\s+(?:the\s+)?(?:all\s+)?(?:commercial\s*terms|terms|notes|remarks)", q_lower):
             return {"scope": "Standard Packaging RFI", "payment_terms": "Net 30 Days", "validity_days": 30}
         return None
 
@@ -180,7 +186,7 @@ def parse_terms_intent(user_text: str) -> dict[str, Any] | None:
         updates["currency"] = curr_match.group(1).upper()
 
     # 6. Title updates
-    title_match = re.search(r"(?:update|change|set|modify)\s+(?:the\s+)?(?:rfi\s+)?title\s*(?:to|=|as|:)\s*([a-zA-Z0-9\s.,-]+)", q_clean, re.I)
+    title_match = re.search(r"\b(?:update|change|set|modify)\s+(?:the\s+)?(?:rfi\s+)?title\s*(?:to|=|as|:)\s*([a-zA-Z0-9\s.,-]+)", q_clean, re.I)
     if title_match:
         val = title_match.group(1).strip(" .")
         if val:
@@ -206,10 +212,13 @@ def parse_terms_intent(user_text: str) -> dict[str, Any] | None:
 
 def parse_modification_intent(user_text: str) -> list[tuple[int | str, dict[str, Any]]] | None:
     """Parse user command to modify one or more existing items' quantity, price, dimensions, material, or specifications."""
+    # Guard against multi-row tables or large documents
+    if "\t" in user_text or user_text.count("\n") > 2 or "BOQ-" in user_text:
+        return None
     q_clean = user_text.strip()
     q_lower = q_clean.lower()
 
-    if not any(v in q_lower for v in ["change", "update", "modify", "set", "adjust", "edit"]):
+    if not re.search(r"\b(?:change|update|modify|set|adjust|edit)\b", q_lower):
         return None
 
     # Exclude pure commercial terms updates
@@ -581,12 +590,7 @@ async def handle_rfi_workflow_turn(
     repo = RFIRepository(secrets or AppSecrets())
 
     def _get_active_rfi_id() -> int | str | None:
-        if session.active_rfi_id:
-            return session.active_rfi_id
-        all_rfis = repo.list_all(limit=1)
-        if all_rfis:
-            return all_rfis[0]["id"]
-        return None
+        return session.active_rfi_id
 
     # Helper function to format RFI summary card
     def _format_rfi_card(rfi_record: dict[str, Any], intro_msg: str = "I have processed your requirements and progressed your RFI creation:") -> str:
@@ -612,19 +616,20 @@ async def handle_rfi_workflow_turn(
             d = it.get("dimensions") or {}
             if isinstance(d, dict) and d.get("length"):
                 if d.get("height", 0) and d.get("height", 0) > 0:
-                    dim_str = f"{d.get('length', 0):.0f} x {d.get('width', 0):.0f} x {d.get('height', 0):.0f} {d.get('unit', 'mm')}"
+                    dim_str = f"{d.get('length', 0):g} x {d.get('width', 0):g} x {d.get('height', 0):g} {d.get('unit', 'mm')}"
                 else:
-                    dim_str = f"{d.get('length', 0):.0f} x {d.get('width', 0):.0f} {d.get('unit', 'mm')}"
+                    dim_str = f"{d.get('length', 0):g} x {d.get('width', 0):g} {d.get('unit', 'mm')}"
             qty_val = it.get("quantity")
             if qty_val is not None:
-                qty_disp = f"{int(qty_val) if float(qty_val).is_integer() else qty_val} {it.get('unit', 'pcs')}"
+                unit_val = it.get("unit") or "pcs"
+                qty_disp = f"{int(qty_val) if float(qty_val).is_integer() else qty_val} {unit_val}"
             else:
                 qty_disp = "-"
             mat_disp = (it.get("material") or "Standard").title()
             target_price = it.get("target_price")
             if target_price is not None:
                 mat_disp = f"{mat_disp} (Baseline: ₹{target_price:g})"
-            desc_disp = str(it.get("description", f"Item {idx}")).title()
+            desc_disp = str(it.get("description", f"Item {idx}"))
             item_rows.append(f"| {idx} | {desc_disp} | {qty_disp} | {dim_str} | {mat_disp} |")
             if it.get("required_date"):
                 target_date = it.get("required_date")
@@ -852,9 +857,9 @@ async def handle_rfi_workflow_turn(
         validity_days = comm_terms.get("validity_days") or 30
         currency = comm_terms.get("currency") or "INR"
 
-        scope_text = f"Packaging procurement of {len(ext_res.requirements)} line item(s) ({items_summary}) delivered to {location.title()}"
+        scope_text = comm_terms.get("scope") or f"Packaging procurement of {len(ext_res.requirements)} line item(s) ({items_summary}) delivered to {location.title()}"
         if comm_terms.get("notes"):
-            scope_text += f" | Terms: {'; '.join(comm_terms['notes'])}"
+            scope_text += f" | Notes: {'; '.join(comm_terms['notes'])}"
 
         rfi_payload = {
             "title": rfi_title,
