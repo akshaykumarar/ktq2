@@ -483,5 +483,276 @@ Supply Chain & Operations
     asyncio.run(_test())
 
 
+def test_natural_language_terms_and_item_modifications() -> None:
+    """Test comprehensive natural language modifications for terms, dimensions, materials, and prices:
+    - User input: 'payment terms update it to 10 days after delivery'
+    - User input: 'update item 1 dimensions to 450x350x250 mm'
+    - User input: 'change item 1 material to 7 ply heavy kraft'
+    - User input: 'delivery terms update it to Pune plant (DDP)'
+    - User input: 'change currency to USD'
+    - User input: 'remove payment terms' (resets to default Net 30 Days)
+    """
+    async def _test() -> None:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with app.router.lifespan_context(app):
+                app.state.agent_registry.master.model = TestModel()
+                for s in app.state.agent_registry.specialists.values():
+                    s.model = TestModel()
+
+                session_id = "test-nl-terms-and-mods-session"
+                reset_chat_session(session_id)
+
+                # Step 1: Create initial RFI
+                init_resp = await client.post("/api/chat", json={
+                    "message": "1000 corrugated boxes 300x200x150 mm and 500 rolls brown tape",
+                    "conversation_id": session_id,
+                })
+                assert init_resp.status_code == 200
+                init_msg = init_resp.json()["message"]
+                assert "| 1 |" in init_msg
+                assert "| 2 |" in init_msg
+
+                # Step 2: Exact user query: "payment terms update it to 10 days after delivery"
+                resp1 = await client.post("/api/chat", json={
+                    "message": "payment terms update it to 10 days after delivery",
+                    "conversation_id": session_id,
+                })
+                assert resp1.status_code == 200
+                msg1 = resp1.json()["message"]
+                assert "10 Days After Delivery" in msg1
+
+                # Step 3: Modify item 1 dimensions: "update item 1 dimensions to 450x350x250 mm"
+                resp2 = await client.post("/api/chat", json={
+                    "message": "update item 1 dimensions to 450x350x250 mm",
+                    "conversation_id": session_id,
+                })
+                assert resp2.status_code == 200
+                msg2 = resp2.json()["message"]
+                assert "450 x 350 x 250 mm" in msg2
+
+                # Step 4: Modify item 1 material: "change item 1 material to 7 ply heavy kraft"
+                resp3 = await client.post("/api/chat", json={
+                    "message": "change item 1 material to 7 ply heavy kraft",
+                    "conversation_id": session_id,
+                })
+                assert resp3.status_code == 200
+                msg3 = resp3.json()["message"]
+                assert "7 Ply Heavy Kraft" in msg3
+
+                # Step 5: Modify delivery terms: "delivery terms update it to Pune plant (DDP)"
+                resp4 = await client.post("/api/chat", json={
+                    "message": "delivery terms update it to Pune plant (DDP)",
+                    "conversation_id": session_id,
+                })
+                assert resp4.status_code == 200
+                msg4 = resp4.json()["message"]
+                assert "Pune Plant (Ddp)" in msg4 or "Pune plant" in msg4.lower()
+
+                # Step 6: Modify currency: "change currency to USD"
+                resp5 = await client.post("/api/chat", json={
+                    "message": "change currency to USD",
+                    "conversation_id": session_id,
+                })
+                assert resp5.status_code == 200
+                msg5 = resp5.json()["message"]
+                assert "USD" in msg5
+
+                # Step 7: Reset payment terms: "remove payment terms"
+                resp6 = await client.post("/api/chat", json={
+                    "message": "remove payment terms",
+                    "conversation_id": session_id,
+                })
+                assert resp6.status_code == 200
+                msg6 = resp6.json()["message"]
+                assert "Net 30 Days" in msg6
+
+    asyncio.run(_test())
+
+
+def test_user_transcript_multi_item_modifications_and_phrasings() -> None:
+    """Test all specific failure cases from the user transcript:
+    1. Multi-item update: 'update quantity of 1 to 350, and 2 to 300 and 3 to 500 with baseline of ₹80'
+    2. 'quantity of' phrasing: 'update quantity of 1 to 350'
+    3. 'line item' prefix: 'update line item 1 quantity to 300'
+    4. Code/bracket phrasing: 'update Pkg-001] 3-Ply Corrugated Box () to 300 pieces'
+    5. Negative confirmation with update: 'no, update existing item'
+    """
+    async def _test() -> None:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with app.router.lifespan_context(app):
+                app.state.agent_registry.master.model = TestModel()
+                for s in app.state.agent_registry.specialists.values():
+                    s.model = TestModel()
+
+                session_id = "test-transcript-chat-session"
+                reset_chat_session(session_id)
+
+                # Step 1: Create 4-item initial RFI
+                init_resp = await client.post("/api/chat", json={
+                    "message": "433 pcs [Pkg-001] 3-Ply Corrugated Box, 269 pcs [Pkg-002] 5-Ply Heavy Duty Master Box, 113 pcs [Pkg-003] 7-Ply Industrial Shipping Box, and 500m [Pkg-004] Kraft Paper Tape",
+                    "conversation_id": session_id,
+                })
+                assert init_resp.status_code == 200
+                init_msg = init_resp.json()["message"]
+                assert "| 1 |" in init_msg
+                assert "| 2 |" in init_msg
+                assert "| 3 |" in init_msg
+                assert "| 4 |" in init_msg
+                assert "433" in init_msg
+                assert "269" in init_msg
+                assert "113" in init_msg
+
+                # Step 2: Multi-item update: "update quantity of 1 to 350, and 2 to 300 and 3 to 500 with baseline of ₹80"
+                resp1 = await client.post("/api/chat", json={
+                    "message": "update quantity of 1 to 350, and 2 to 300 and 3 to 500 with baseline of ₹80",
+                    "conversation_id": session_id,
+                })
+                assert resp1.status_code == 200
+                msg1 = resp1.json()["message"]
+                # Must NOT trigger duplicate warning or create items 5..7
+                assert "Duplicate Item Detected" not in msg1
+                assert "| 5 |" not in msg1
+                assert "350 pcs" in msg1
+                assert "300 pcs" in msg1
+                assert "500 pcs" in msg1
+
+                # Step 3: Phrasing: "update quantity of 1 to 350"
+                resp2 = await client.post("/api/chat", json={
+                    "message": "update quantity of 1 to 350",
+                    "conversation_id": session_id,
+                })
+                assert resp2.status_code == 200
+                msg2 = resp2.json()["message"]
+                assert "Duplicate Item Detected" not in msg2
+                assert "| 5 |" not in msg2
+                assert "350 pcs" in msg2
+
+                # Step 4: Phrasing: "update line item 1 quantity to 300"
+                resp3 = await client.post("/api/chat", json={
+                    "message": "update line item 1 quantity to 300",
+                    "conversation_id": session_id,
+                })
+                assert resp3.status_code == 200
+                msg3 = resp3.json()["message"]
+                assert "Duplicate Item Detected" not in msg3
+                assert "| 5 |" not in msg3
+                assert "300 pcs" in msg3
+
+                # Step 5: Phrasing: "update Pkg-001] 3-Ply Corrugated Box () to 300 pieces"
+                resp4 = await client.post("/api/chat", json={
+                    "message": "update Pkg-001] 3-Ply Corrugated Box () to 300 pieces",
+                    "conversation_id": session_id,
+                })
+                assert resp4.status_code == 200
+                msg4 = resp4.json()["message"]
+                assert "Duplicate Item Detected" not in msg4
+                assert "| 5 |" not in msg4
+                assert "300 pieces" in msg4 or "300 pcs" in msg4
+
+                # Step 6: Negative confirmation: "no, update existing item"
+                # First create duplicate condition
+                dup_resp = await client.post("/api/chat", json={
+                    "message": "100 pcs [Pkg-001] 3-Ply Corrugated Box",
+                    "conversation_id": session_id,
+                })
+                assert dup_resp.status_code == 200
+                dup_msg = dup_resp.json()["message"]
+                assert "Duplicate Item Detected" in dup_msg
+
+                # User says: "no, update existing item"
+                no_resp = await client.post("/api/chat", json={
+                    "message": "no, update existing item",
+                    "conversation_id": session_id,
+                })
+                assert no_resp.status_code == 200
+                no_msg = no_resp.json()["message"]
+                # Duplicate must NOT be added
+                assert "| 5 |" not in no_msg
+                assert "Understood" in no_msg
+
+    asyncio.run(_test())
+
+
+def test_tabular_key_value_annotated_intake() -> None:
+    """Test intake when pasting tabular/key-value annotated data with preambles and commercial terms:
+    1. Preambles like 'Bidding Vendors are requested...' and headers '# Description Quantity...' are filtered.
+    2. Column values (Category, Target Qty, Baseline) are correctly mapped to semantic fields.
+    3. Empty () in descriptions are cleaned.
+    4. 2D dimensions (e.g. 48Mm X 50M, 1200X800Mm, 18X24 In) are extracted.
+    5. Baseline prices and quantities are properly set.
+    6. Commercial terms are extracted without single-letter noise.
+    """
+    async def _test() -> None:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with app.router.lifespan_context(app):
+                app.state.agent_registry.master.model = TestModel()
+                for s in app.state.agent_registry.specialists.values():
+                    s.model = TestModel()
+
+                session_id = "test-tabular-intake-session"
+                reset_chat_session(session_id)
+
+                pasted_text = (
+                    "Bidding Vendors are requested to provide itemized rates for the following Packaging Consumables:\n"
+                    "#\tDescription\tQuantity\tDimensions\tMaterial / Specs\n"
+                    "1\t[Pkg-001] 3-Ply Corrugated Box ()\tCategory: Cartons\tTarget Qty: 433 Piece\tBaseline: ₹19.57\n"
+                    "2\t[Pkg-002] 5-Ply Heavy Duty Master Box ()\tCategory: Cartons\tTarget Qty: 269 Piece\tBaseline: ₹46.21\n"
+                    "3\t[Pkg-003] 7-Ply Industrial Shipping Box ()\tCategory: Cartons\tTarget Qty: 113 Piece\tBaseline: ₹99.69\n"
+                    "4\t[Pkg-004] Kraft Paper Tape (48Mm X 50M)\tCategory: Tape\tTarget Qty: 500 Metre\tBaseline: ₹1.43\n"
+                    "5\t[Pkg-005] Bopp Clear Packing Tape 48M (48Mm X 100M)\tCategory: Tape\tTarget Qty: 341 Roll\tBaseline: ₹37.2\n"
+                    "6\t[Pkg-006] Cross-Weave Filament Tape (24Mm X 50M)\tCategory: Tape\tTarget Qty: 442 Metre\tBaseline: ₹2.56\n"
+                    "7\t[Pkg-007] Lldpe Hand Stretch Wrap Film (23Mic X 500Mm)\tCategory: Film\tTarget Qty:\tBaseline: ₹156.14\n"
+                    "8\t[Pkg-008] Machine Grade Stretch Film (500Mm X 1500M)\tCategory: Film\tTarget Qty: 82 Roll\tBaseline: ₹1451.02\n"
+                    "9\t[Pkg-009] Air Bubble Wrap Roll (1M X 100M, 10Mm Bubble)\tCategory: Cushioning\tTarget Qty: 463 Metre\tBaseline: ₹6.4\n"
+                    "10\t[Pkg-010] Anti-Static Bubble Roll Pink (1M X 50M)\tCategory: Cushioning\tTarget Qty: 301 Metre\tBaseline: ₹18.39\n"
+                    "11\t[Pkg-011] Epe Foam Sheet Roll 2Mm (1M X 100M)\tCategory: Cushioning\tTarget Qty: 500 Metre\tBaseline: ₹4.89\n"
+                    "12\t[Pkg-012] Kraft Honeycomb Paper Wrap (500Mm X 250M)\tCategory: Cushioning\tTarget Qty: 74 Roll\tBaseline: ₹1165.87\n"
+                    "13\t[Pkg-013] Standard Euro Wooden Pallet (1200X800Mm Ht)\tCategory: Pallets\tTarget Qty: 134 Piece\tBaseline: ₹911.99\n"
+                    "14\t[Pkg-014] Hdpe Plastic Heavy Duty Pallet (1200X1000Mm)\tCategory: Pallets\tTarget Qty: 60 Piece\tBaseline: ₹2376.07\n"
+                    "15\t[Pkg-015] Pet Strapping Roll 15Mm X 0.8Mm X 1000M\tCategory: Strapping\tTarget Qty: 500 Metre\tBaseline: ₹1.92\n"
+                    "16\t[Pkg-016] Pp Strapping Roll 12Mm X 2000M (Yellow)\tCategory: Strapping\tTarget Qty: 87 Roll\tBaseline: ₹875.9\n"
+                    "17\t[Pkg-017] Heavy Duty Steel Strapping 19Mm X\tCategory: Strapping\tTarget Qty:\tBaseline: ₹127.63\n"
+                    "18\t[Pkg-018] Corrugated Edge Protectors (X1000Mm)\tCategory: Protectors\tTarget Qty: 419 Piece\tBaseline: ₹15.44\n"
+                    "19\t[Pkg-019] Heavy Duty Plastic Corner Guards (Pack 100)\tCategory: Protectors\tTarget Qty:\tBaseline: ₹228.19\n"
+                    "20\t[Pkg-020] Ldpe Transparent Poly Bags 200G (12X16 In)\tCategory: Bags\tTarget Qty:\tBaseline: ₹174.06\n"
+                    "21\t[Pkg-021] Zip Lock Reclosable Bags (8X10 In, Pack 500)\tCategory: Bags\tTarget Qty:\tBaseline: ₹443.89\n"
+                    "22\t[Pkg-022] Vci Anti-Rust Poly Envelopes (18X24 In)\tCategory: Bags\tTarget Qty: 241 Piece\tBaseline: ₹25.43\n"
+                    "23\t[Pkg-023] Thermal Barcode Labels 4X6 In (1000/Roll)\tCategory: Labels\tTarget Qty: 175 Roll\tBaseline: ₹311.02\n"
+                    "24\t[Pkg-024] Fragile Advisory Stickers (Roll Of 500)\tCategory: Labels\tTarget Qty: 147 Roll\tBaseline: ₹166.92\n"
+                    "25\t[Pkg-025] Silica Gel Desiccant Pouches 50G (Pack 100)\tCategory: Protection\tTarget Qty:\tBaseline: ₹141.17\n"
+                    "26\t[Pkg-026] Inflatable Air Cushion Bags (Roll Of 1500)\tCategory: Cushioning\tTarget Qty: 85 Roll\tBaseline: ₹1498.1\n"
+                    "27\t[Pkg-027] Corrugated Grid Divider Inserts (12-Cell)\tCategory: Cartons\tTarget Qty: 354 Piece\tBaseline: ₹25.87\n"
+                    "28\t[Pkg-028] Self-Adhesive Packing List Envelopes A5\tCategory: Labels\tTarget Qty:\tBaseline: ₹194.61\n"
+                    "29\t[Pkg-029] Bubble Lined Kraft Mailers #4 (10X15 In)\tCategory: Bags\tTarget Qty: 480 Piece\tBaseline: ₹15.18\n"
+                    "30\t[Pkg-030] Biodegradable Loose Fill Peanuts (10 Cu Ft)\tCategory: Cushioning\tTarget Qty:\tBaseline: ₹791.9\n"
+                    "Commercial Terms:\n"
+                    "Payment Terms: Net 30 Days\n"
+                    "Delivery Terms: Delivered to Bangalore (DDP)\n"
+                    "Quote Validity: 30 Days\n"
+                    "Currency: INR"
+                )
+
+                resp = await client.post("/api/chat", json={
+                    "message": pasted_text,
+                    "conversation_id": session_id,
+                })
+                assert resp.status_code == 200
+                msg = resp.json()["message"]
+
+                # Preamble must NOT be in Title
+                assert "Bidding Vendors are requested" not in msg
+
+                # Check line item parsing and column values
+                assert "| 1 | [Pkg-001] 3-Ply Corrugated Box | 433 Piece | Standard | Cartons (Baseline: ₹19.57) |" in msg
+                assert "**Payment Terms**: Net 30 Days" in msg
+                assert "Delivered to Bangalore (DDP)" in msg
+
+    asyncio.run(_test())
+
+
+
 
 

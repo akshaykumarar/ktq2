@@ -78,15 +78,22 @@ flowchart TD
   - Starter command (`Create an RFI`) guides requirement intake without prematurely creating records. Direct packaging submissions automatically initialize draft creation.
   - Initial requirement intake creates the active RFI draft record and persists it to `RFIRepository`.
   - Subsequent inputs work on the **same active RFI** rather than creating new RFI records.
-  - **Commercial Terms & Unstructured Notes Auto-Separation**: Commercial clause blocks, unstructured email paragraphs (greetings, closing instructions), and spreadsheet remarks/footer rows (e.g., `Note: Rates must include freight...`) are automatically isolated from line items and saved directly to RFI terms metadata (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`/`notes`). List numbers (`1. `, `2) `) are cleanly stripped from product quantities and descriptions.
-  - **Dynamic Range & Multi-Item Modifications**:
-    - Batch range removals (e.g., `remove items 33 to 39`, `remove 33-39`, `delete 1-5`).
-    - Comma-separated list removals (e.g., `remove items 2, 4, 6`).
-    - Relative removals (`remove last item`, `remove last 7 items`).
-    - Keyword/code removals (`remove [Pkg-029]`, `remove brown tape`).
-    - Parameter updates (`update item 1 quantity to 1500`, `change item 2 price to 20`).
-    - **Contiguous Re-indexing**: `RFIRepository.remove_items()` re-sequences remaining line item numbers consecutively (`1..N`) via PostgreSQL `ROW_NUMBER()`.
-  - **Duplicate Detection & Confirmation**: If an incoming line item matches an existing item in the draft, the workflow prompts for explicit confirmation before adding or updating.
+    - **Tabular & Key-Value Intake Parsing**: Supports pasting structured data, TSV, or key-value annotated rows (e.g. `[Pkg-001] 3-Ply Corrugated Box () Category: Cartons Target Qty: 433 Piece Baseline: ₹19.57`), mapping `Category`, `Target Qty`, `Baseline`, and dimensions (2D/3D) to typed fields with clean description normalization.
+    - **Solicitation Preamble & Table Header Filtering**: RFP preambles (e.g. `Bidding Vendors are requested to provide itemized rates...`) and table header rows are filtered out from becoming line items or RFI titles.
+    - **Commercial Terms Sanitization**: Validates length and format of commercial terms to reject stray single-character tokens (e.g., `Payment Terms: S`).
+    - **Dynamic Natural Language Terms & Line Item Operations**:
+      - **Commercial Terms Updates & Resets**: Evaluated prior to item modifications; extracts terms adjustments (e.g., `"payment terms update it to 10 days after delivery"`, `"delivery terms update it to Pune plant (DDP)"`, `"change currency to USD"`, `"update quote validity to 45 days"`) and resets (e.g., `"remove payment terms"`, `"clear delivery terms"`) without unintended line item deletion.
+      - **Multi-Item & Compound Modifications**: Supports compound sentences modifying multiple items simultaneously (e.g. `"update quantity of 1 to 350, and 2 to 300 and 3 to 500 with baseline of ₹80"`).
+      - **Flexible Phrasing & Code Normalization**: Tolerates phrasing variations (`"update quantity of 1 to 350"`, `"update line item 1 quantity to 300"`, `"update Pkg-001] 3-Ply Corrugated Box () to 300 pieces"`), normalizes item codes, and handles target baseline prices.
+      - **Negative Confirmation Precedence**: When users say `"no, update existing item"`, the pending duplicate addition is cancelled and the update is applied immediately.
+      - **Command Filtering in Intake**: Input command clauses and fragments are strictly filtered from becoming bogus packaging line items.
+      - **Batch Range Removals**: e.g., `remove items 33 to 39`, `remove 33-39`, `delete 1-5`, `delete items from 3 to 5`.
+      - **Comma-Separated & Conjunction Lists**: e.g., `remove items 2, 4, 6`, `delete 1, 3`, `remove item 2 and item 4`.
+      - **Relative Removals**: `remove last item`, `remove last 7 items`.
+      - **Keyword/Code Removals**: `remove [Pkg-029]`, `remove brown tape`.
+      - **Attribute Modifications**: `update item 1 dimensions to 450x350x250 mm`, `change item 1 material to 7 ply heavy kraft`, `update item 1 quantity to 1500`, `change item 2 target price to 20 INR`, `update item 1 delivery date to 2026-12-01`.
+      - **Contiguous Re-indexing**: `RFIRepository.remove_items()` re-sequences remaining line item numbers consecutively (`1..N`) via PostgreSQL `ROW_NUMBER()` and memory fallback.
+    - **Duplicate Detection & Confirmation**: If an incoming line item matches an existing item in the draft, the workflow prompts for explicit confirmation before adding or updating.
 - **Strict Guardrails**:
   - Inquiries for status of existing RFIs (e.g. `What is the status of RFX-101?`, `Check vendor response`) are discouraged and redirected to completing RFI creation.
   - External inquiries (vendor lookups, directory searches, general questions) are discouraged and redirected to RFI creation.
@@ -108,12 +115,13 @@ flowchart TD
 - **Strict Credential Validation**: Default `fallback_to_mock=False` ensures missing API keys raise an explicit `ValueError` rather than silently returning mock models in production.
 - Explicit mock/test models (`provider: "test"` or `fallback_to_mock=True`) are preserved for unit testing.
 
-### 5. PydanticAI Agent & Deterministic Extractor (`backend/app/intake/agent.py`)
+### 5. PydanticAI Agent & LLM-First Extraction (`backend/app/intake/agent.py`)
 - PydanticAI `rfi_parser` configured via `config/agents.yaml`.
+- **LLM as First Choice**: The PydanticAI LLM agent is the primary engine for requirement extraction, category classification, dimension parsing, and commercial terms isolation.
 - Produces strict `IntakeExtractionResult` and `PackagingRequirement` models rather than free-form text.
 - **Multi-Line Item Support**: Robustly segments multi-item compound requirements (e.g., `1000 corrugated boxes, 300 x 200 x 150 mm, and 300 rolls of brown tape`) into multiple typed `PackagingRequirement` line items with independent dimensions, units, and materials.
 - Extracts dimensions into structured dictionaries (`length`, `width`, `height`, `unit`).
-- Deterministic regex fallback guarantees 100% test reliability and offline execution without requiring live API keys.
+- Deterministic regex fallback acts as a high-reliability fallback for offline testing or unconfigured API keys.
 - **No Hallucination**: Missing quantities, dimensions, prices, or dates are flagged explicitly rather than invented.
 
 ### 6. Excel Intake Parser (`backend/app/intake/excel_parser.py`)

@@ -23,7 +23,7 @@ User / Warehouse Executive
                                                             (Edit terms/status)   (DRAFT/READY -> TRIGGERED)
 ```
 
-- **PydanticAI**: Primary agent & orchestration layer for packaging requirement extraction, classification, and normalization.
+- **PydanticAI & LLM-First Decision Engine**: LLM agents (`master`, `rfi_parser`, `rfx`, `vendor`, `status`) serve as the primary, first-choice engines for intent understanding, requirement extraction, conversational routing, and decision support, with deterministic fallbacks for offline testing.
 - **WrenAI**: Preserved as secondary intelligence layer for semantic database analytics and natural language business intelligence queries over PostgreSQL.
 - **PostgreSQL**: Source of truth storing RFIs (`ktq.rfx`), line items (`ktq.rfx_items`), and audit history (`ktq.rfx_activity`) under the dynamically configured schema (`DB_SCHEMA`, default `ktq`).
 - **Pydantic Models**: Canonical, type-safe contracts across parsing, AI extraction, REST APIs, and database persistence.
@@ -124,18 +124,24 @@ Then visit:
 - **Chat Outcome Loader**: Chat UI (`/ui`) displays an animated processing loader bubble in the chat view and input area whenever an outcome is expected.
 - **RFI Initial Input Flow**: When selecting "Create an RFI" from the welcome cards or entering packaging requirements directly, the assistant guides the user and initializes draft creation without creating empty dummy RFX records.
 - **Commercial Terms & Unstructured Notes Auto-Separation**: Separator lines, commercial clause blocks, conversational email paragraphs (greetings, closing remarks, delivery instructions, quality/sample requirements), and Excel footer note rows (e.g. `Note: GST 18% extra. Rates must include transit insurance`) are automatically parsed into RFI terms metadata (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`/`notes`) rather than becoming dummy line items. Numbered list prefixes (`1. `, `2) `) are stripped cleanly.
-  - **Range removals**: `remove items 33 to 39`, `remove 33-39`, `delete 1-5`.
-  - **Multi-item lists**: `remove items 2, 4, 6`, `delete 1, 3`.
-  - **Relative removals**: `remove last item`, `delete last 7 items`.
-  - **Product names/codes**: `remove [Pkg-029]`, `remove brown tape`.
-  - **Field updates**: `update item 1 quantity to 1500`, `change item 2 target price to 20`.
+- **Dynamic Natural Language Line Item & Terms Operations**:
+  - **Commercial Terms Updates & Resets**: Direct natural language modification of terms (e.g. `"payment terms update it to 10 days after delivery"`, `"delivery terms update it to Pune plant (DDP)"`, `"change currency to USD"`, `"update quote validity to 45 days"`, `"remove payment terms"`). Terms resets immediately revert fields to default parameters without deleting product line items.
+  - **Multi-Item & Compound Modifications**: Supports updating multiple items and multiple attributes in a single natural language sentence (e.g. `"update quantity of 1 to 350, and 2 to 300 and 3 to 500 with baseline of ₹80"`).
+  - **Flexible Phrasing & Prefixes**: Handles natural language variations (`"update quantity of 1 to 350"`, `"update line item 1 quantity to 300"`, `"update Pkg-001] 3-Ply Corrugated Box () to 300 pieces"`, `"with baseline of ₹80"`).
+  - **Negative Confirmation Precedence**: Commands like `"no, update existing item"` reject duplicate additions and execute item modifications directly.
+  - **Command Fallthrough Protection**: Commands, prepositions, or update instructions are never mistakenly converted into bogus line items.
+  - **Batch Range Deletions**: `remove items 33 to 39`, `remove 33-39`, `delete 1-5`, `delete items from 3 to 5`.
+  - **Multi-Item Lists**: `remove items 2, 4, 6`, `delete 1, 3`, `remove item 2 and item 4`.
+  - **Relative Removals**: `remove last item`, `delete last 7 items`.
+  - **Product Names/Codes**: `remove [Pkg-029]`, `remove brown tape`.
+  - **Field Updates**: `update item 1 dimensions to 450x350x250 mm`, `change item 1 material to 7 ply heavy kraft`, `update item 1 quantity to 1500`, `change item 2 target price to 20 INR`, `update item 1 delivery date to 2026-12-01`.
   - **Automatic Re-indexing**: Removed items trigger consecutive re-indexing (`1..N`) for all remaining line items.
 - **Duplicate Detection & Confirmation**: If an incoming requirement matches an item already in the draft, the assistant flags the duplicate and prompts the user for explicit confirmation before proceeding.
-- **Advanced Natural Language Parsing**: Robustly parses compound requirements:
-  - Metric & imperial cube box dimensions (`50inch cube boxes 300` -> 300 boxes of 50x50x50 inch).
-  - Film roll length and thickness specifications (`5m stretch films 1000 pcs` -> 1000 pcs of 5m stretch film).
-  - Weight units (`bubble wrap 50kg` -> 50 kg).
-  - Multi-item boundary segmentation separating items even without standard conjunctions.
+- **Advanced Natural Language & Tabular Intake**:
+  - Robustly parses compound requirements, metric & imperial cube box dimensions (`50inch cube boxes 300`), film specs (`5m stretch films 1000 pcs`), and weights (`bubble wrap 50kg`).
+  - Automatically parses pasted tabular and key-value rows (e.g. `1 [Pkg-001] 3-Ply Corrugated Box () Category: Cartons Target Qty: 433 Piece Baseline: ₹19.57`), mapping `Category`, `Target Qty`, `Baseline`, and dimensions (2D/3D) into structured fields.
+  - Excludes RFP solicitation preambles and table headers from line items and titles.
+  - Sanitizes commercial terms (e.g. rejects single-character bullets like `Payment Terms: S`).
 - **Strict Guardrails**: When in the RFI creation workflow, only solutions and progress for creating the RFI are provided. Checking existing RFI status or fetching external information (vendor directories, general questions) is politely discouraged and redirected back to RFI creation.
 - **RFI Progression**: Users can review line items, amend terms, or say `"Trigger RFI"` to finalize and issue quote requests to qualified suppliers.
 

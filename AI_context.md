@@ -167,3 +167,31 @@
 - **Direct Intake Intent Routing**:
   - Direct packaging text inputs (even without typing "Create an RFI" first) are recognized via packaging domain heuristics and routed directly to `handle_rfi_workflow_turn()`.
 
+## Step 9: Tabular Key-Value Row Parsing, Solicitation Filtering & Terms Sanitization
+- **Tabular & Key-Value Row Intake**:
+  - Structured and key-value annotated text (e.g. `1 [Pkg-001] 3-Ply Corrugated Box () Category: Cartons Target Qty: 433 Piece Baseline: ₹19.57`) is parsed into typed semantic fields regardless of tab, space, or pipe alignment.
+  - Key-value tokens (`Category: ...`, `Target Qty: ...`, `Baseline: ₹...`, `Target Price: ...`) are mapped directly to `category`, `material`, `quantity`, `unit`, and `target_price`.
+  - Cleans empty parentheses `()` and trailing punctuation from item descriptions.
+  - Extracts 2D dimensions (`48Mm X 50M`, `1200X800Mm`, `18X24 In`, `23Mic X 500Mm`) in addition to 3D dimensions.
+- **Solicitation Preamble & Table Header Filtering**:
+  - Excludes solicitation sentences (e.g., `"Bidding Vendors are requested to provide itemized rates for the following Packaging Consumables:"`) from line items and RFI titles.
+  - Ignores table headers (`# Description Quantity Dimensions Material / Specs`, `Sl. No. Item Description...`).
+- **Commercial Terms Sanitization**:
+  - Prevents single-character or noisy bullet extractions (e.g., `Payment Terms: S`) by requiring valid length and formatting.
+- **RFI Table Formatting**:
+  - Renders markdown tables with aligned columns: Description, Quantity, Dimensions (2D/3D), and Material/Specs with Baseline target prices.
+- **Full Test Suite Status**:
+  - Full suite passing 100% (65 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_full_suite.log`.
+
+## Step 10: LLM First Choice for Decisions, Intent & Requirement Extraction
+- **LLM as Primary Decision Engine**:
+  - LLM agents (`master`, `rfi_parser`, `rfx`, `vendor`, `status`) act as the first-choice decision-makers for intent classification, requirement structuring, conversational delegation, and decision support.
+  - In `handle_rfi_workflow_turn()`, the `rfi_parser` LLM agent is passed directly to `extract_requirements(user_message, agent=parser_agent)` as first choice.
+  - In `run_master_orchestration()`, live LLM models are executed primarily with tools (`delegate_to_rfx`, `delegate_to_vendor`, `delegate_to_status`), delegating and reasoning dynamically.
+  - Deterministic extractors and heuristics serve strictly as high-reliability fallbacks when offline or in test environments.
+- **Enhanced Parser System Prompt**:
+  - Prompt rules explicitly guide LLM agents on key-value table extraction, 2D/3D dimension structures, baseline target price extraction, and exclusion of solicitation headers/notes.
+- **Full Test Suite Status**:
+  - Full suite passing 100% (65 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_full_suite.log`.
+
+

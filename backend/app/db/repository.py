@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import date, datetime, timezone
 from typing import Any
 
@@ -670,8 +671,15 @@ class RFIRepository:
                             sql = f"UPDATE rfx_items SET {', '.join(set_clauses)} WHERE rfx_id = %s AND item_number = %s RETURNING id;"
                             params.extend([rfi_id, target_num])
                         else:
-                            sql = f"UPDATE rfx_items SET {', '.join(set_clauses)} WHERE rfx_id = %s AND LOWER(description) LIKE %s RETURNING id;"
-                            params.extend([rfi_id, f"%{str(item_identifier).lower()}%"])
+                            clean_text = re.sub(r"[\[\]\(\)]", "", str(item_identifier)).strip().lower()
+                            code_match = re.search(r"pkg-\d+", str(item_identifier), re.I)
+                            code_str = code_match.group(0).lower() if code_match else ""
+                            if code_str:
+                                sql = f"UPDATE rfx_items SET {', '.join(set_clauses)} WHERE rfx_id = %s AND (LOWER(description) LIKE %s OR LOWER(description) LIKE %s) RETURNING id;"
+                                params.extend([rfi_id, f"%{clean_text}%", f"%{code_str}%"])
+                            else:
+                                sql = f"UPDATE rfx_items SET {', '.join(set_clauses)} WHERE rfx_id = %s AND LOWER(description) LIKE %s RETURNING id;"
+                                params.extend([rfi_id, f"%{clean_text}%"])
 
                         cur.execute(sql, params)
                         if cur.fetchone():
@@ -689,12 +697,23 @@ class RFIRepository:
 
         if rfi_id in _MEMORY_RFIS:
             record = _MEMORY_RFIS[rfi_id]
+            clean_id = re.sub(r"[\[\]\(\)]", "", str(item_identifier)).strip().lower()
+            code_match = re.search(r"pkg-\d+", str(item_identifier), re.I)
+            code_str = code_match.group(0).lower() if code_match else ""
+
             for it in record.get("items", []):
                 matched = False
                 if target_num is not None:
                     matched = (it.get("item_number") == target_num)
                 else:
-                    matched = (str(item_identifier).lower() in str(it.get("description", "")).lower())
+                    desc_raw = str(it.get("description", "")).lower()
+                    desc_clean = re.sub(r"[\[\]\(\)]", "", str(it.get("description", ""))).strip().lower()
+                    matched = (
+                        str(item_identifier).lower() in desc_raw
+                        or clean_id in desc_clean
+                        or (bool(code_str) and code_str in desc_raw)
+                        or desc_clean in clean_id
+                    )
                 if matched:
                     for k, v in filtered.items():
                         it[k] = v

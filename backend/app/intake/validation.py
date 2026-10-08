@@ -75,13 +75,34 @@ HEADER_TERMS_PATTERN = re.compile(
 CONVERSATIONAL_BOILERPLATE_PATTERN = re.compile(
     r"^(?:hi|hello|dear)\s+(?:team|all|vendor|supplier|sir|madam|everyone|buyer|procurement)|"
     r"^(?:thanks|thank\s+you|regards|best\s+regards|warm\s+regards|kind\s+regards|sincerely|cheers)|"
+    r"^(?:bidding\s+vendors?\s+(?:are\s+)?(?:requested|invited|asked)\s+to|"
+    r"vendors?\s+(?:are\s+)?(?:requested|invited|asked)\s+to|"
+    r"please\s+provide\s+itemized\s+rates|"
+    r"provide\s+itemized\s+rates\s+for|"
+    r"the\s+following\s+packaging\s+(?:consumables|materials|items)\s+are\s+required|"
+    r"request\s+for\s+quotation\s+for\s+the\s+following)|"
     r"^(?:looking\s+forward|please\s+find|please\s+review|let\s+me\s+know|hope\s+this\s+helps|sent\s+from\s+my|supply\s+chain\s+team)",
+    re.I,
+)
+
+# Table header pattern (e.g. "# Description Quantity Dimensions Material / Specs")
+TABLE_HEADER_PATTERN = re.compile(
+    r"^(?:#|sl\.?\s*no\.?|sr\.?\s*no\.?|line\s*#?)\s*[\t\|,\s]+(?:item\s*)?description\b",
     re.I,
 )
 
 # Regex patterns for commercial terms / condition clauses / procurement instructions
 COMMERCIAL_CLAUSE_PATTERN = re.compile(
     r"^(?:[-*•–]\s*)?(?:clear\s+indication\s+of\s+moq|moq\b|minimum\s+order\s+quantity|freight|shipping\s+cost|ex-works|delivery\s+included|warranty|sla\b|transit\s+damage|replacement\s+guarantee|volume\s+discounts?|payment\s+terms?|currency\s*\(|net\s+\d+\s+days?|advance\s+payment|validity\s+of\s+quote|quote\s+validity|valid\s+for\s+\d+\s+days|lead\s+time|taxes?\s*(?:extra|included)|gst\b|sample\s+submission|samples?\s+required|inspection\s+at\s+warehouse|transit\s+insurance|food\s+grade|fsc\s+certified|test\s+certificate|certificate\s+of\s+analysis|coa\b|credit\s+period|payment\s+against\s+delivery|payment\s+within\s+\d+\s+days|rates?\s+must\s+include|rates?\s+should\s+be|pricing\s+should\s+be|prices?\s+must\s+be)",
+    re.I,
+)
+
+# User conversational commands, edits, and updates (must never be parsed as product items)
+COMMAND_INSTRUCTION_PATTERN = re.compile(
+    r"^(?:please\s+)?(?:update|change|modify|set|adjust|edit|delete|remove|drop|clear|no\b|yes\b)|"
+    r"^(?:and\s+)?(?:\d+\s+)?to\s+\d+|"
+    r"^to\b|"
+    r"^(?:with\s+)?(?:baseline|target\s+price|price|rate)\s+(?:of|to|is)\b",
     re.I,
 )
 
@@ -105,13 +126,17 @@ def is_conversational_or_boilerplate(text: str) -> bool:
 
 
 def is_commercial_term_or_header(text: str) -> bool:
-    """Return True if text represents a commercial terms header, note, or terms condition bullet."""
+    """Return True if text represents a commercial terms header, table header, note, command, or terms condition bullet."""
     clean = text.strip()
     if not clean or is_separator_line(clean):
         return True
     if HEADER_TERMS_PATTERN.search(clean):
         return True
+    if TABLE_HEADER_PATTERN.search(clean):
+        return True
     if COMMERCIAL_CLAUSE_PATTERN.search(clean):
+        return True
+    if COMMAND_INSTRUCTION_PATTERN.search(clean):
         return True
     if is_conversational_or_boilerplate(clean):
         return True
@@ -197,7 +222,7 @@ def extract_commercial_terms(text: str) -> dict[str, Any]:
     lines = [line.strip() for line in raw_lines if line.strip()]
 
     for line in lines:
-        if is_separator_line(line) or HEADER_TERMS_PATTERN.search(line):
+        if is_separator_line(line) or HEADER_TERMS_PATTERN.search(line) or TABLE_HEADER_PATTERN.search(line):
             continue
 
         lowered = line.lower()
@@ -220,7 +245,7 @@ def extract_commercial_terms(text: str) -> dict[str, Any]:
                 terms["payment_terms"] = after_match.group(1).title()
             elif pay_match:
                 val = pay_match.group(1).strip()
-                if not any(stop in val.lower() for stop in ["will be", "is to be", "should be"]):
+                if len(val) >= 3 and not any(stop in val.lower() for stop in ["will be", "is to be", "should be"]):
                     terms["payment_terms"] = val.title()
 
         # 2. Delivery Terms & Destinations
@@ -252,7 +277,11 @@ def extract_commercial_terms(text: str) -> dict[str, Any]:
                 terms["currency"] = "INR / USD"
 
         # 5. Scope Notes & Remarks
-        if is_commercial_term_or_header(line) and not is_conversational_or_boilerplate(line):
+        if (
+            is_commercial_term_or_header(line)
+            and not is_conversational_or_boilerplate(line)
+            and not COMMAND_INSTRUCTION_PATTERN.search(line)
+        ):
             clean_note = line.lstrip("-*•– ").strip()
             if clean_note and len(clean_note) > 4 and clean_note not in terms["notes"]:
                 terms["notes"].append(clean_note)

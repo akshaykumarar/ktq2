@@ -29,20 +29,25 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PARSER_INSTRUCTIONS = """
 You are an expert Packaging Requirement Extraction Agent for warehouse dispatch and logistics.
-Your task is to parse unstructured text from procurement officers and warehouse managers,
+Your task is to parse unstructured or semi-structured text from procurement officers and warehouse managers,
 and extract strictly typed PackagingRequirement objects.
 
 Rules:
 1. Extract line items with item_description, quantity, unit, dimensions, material, ply, gsm, bf,
    specification, delivery_date, and target_price.
 2. Structure dimensions into a dictionary: {"length": ..., "width": ..., "height": ..., "unit": ...}.
-3. Normalize category to packaging categories (e.g. "Corrugated packaging", "Protective packaging", "Adhesive tape", "Labels").
-4. Identify missing critical fields (e.g. quantity, dimensions, delivery date).
-5. Identify ambiguous fields if multiple interpretations exist.
-6. NEVER invent, hallucinate, or assume critical values (quantity, dimensions, material, target price).
+   For 2D dimensions (e.g. 48mm x 50m, 1200x800mm, 18x24 in), set height to 0.0.
+3. Normalize category to packaging categories (e.g. "Corrugated packaging", "Protective packaging", "Adhesive tape", "Wrapping film", "Flexible pouches", "Labels & stickers", "Pallets").
+4. Extract explicit key-value annotations if present in rows:
+   - "Category: <val>" -> set category and material.
+   - "Target Qty: <val> <unit>" -> set quantity and unit.
+   - "Baseline: ₹<val>" or "Target Price: <val>" -> set target_price.
+5. Clean empty parentheses () and row labels from item_description so it is clean.
+6. Identify missing critical fields (e.g. quantity, dimensions, delivery date).
+7. NEVER invent, hallucinate, or assume critical values (quantity, dimensions, material, target price).
    If not specified in the input text, leave them as None and add to missing_fields.
-7. Strictly EXCLUDE conversational greetings/closings (e.g. "Hi team", "Regards"), general paragraphs, commercial terms, notes, and terms and conditions (e.g. MOQ requirements, freight/shipping terms, warranty/SLA, volume discounts, payment terms, currency specifications), section headers, and horizontal divider/separator lines from line items. Notes, greetings, and commercial terms are NOT packaging line items.
-8. Return an IntakeExtractionResult instance.
+8. Strictly EXCLUDE solicitation preambles (e.g. "Bidding Vendors are requested to provide itemized rates..."), table headers (e.g. "# Description Quantity Dimensions Material / Specs"), conversational greetings/closings, general notes, and commercial terms from line items. Notes, greetings, headers, and commercial terms are NOT packaging line items.
+9. Return an IntakeExtractionResult instance.
 """
 
 
@@ -67,8 +72,8 @@ def _parse_single_packaging_clause(
 ) -> PackagingRequirement:
     """Parse an individual packaging requirement clause into a typed PackagingRequirement."""
     clean_clause = clause.strip(" ,.")
-    # Strip leading list markers (e.g. "1. ", "2) ", "[3] ", "- ", "* ")
-    clean_clause = re.sub(r"^\s*(?:\d+[\.\)]|\[\d+\]|[-*•–])\s+", "", clean_clause).strip(" ,.")
+    # Strip leading list markers or row numbering (e.g. "1. ", "2) ", "[3] ", "- ", "* ", "1\t", "1 | ", "1 [Pkg-001]")
+    clean_clause = re.sub(r"^\s*(?:\d+[\.\)]|\[\d+\]|[-*•–]|\d+\s*[\t\|]|\d+\s+(?=\[[a-zA-Z0-9_\-#]+\]))\s*", "", clean_clause).strip(" ,.")
 
     # 1. Delivery date specific to clause or default
     delivery_date = default_delivery_date
@@ -79,6 +84,32 @@ def _parse_single_packaging_clause(
     )
     if date_match:
         delivery_date = date_match.group(1).strip()
+
+    # Check for explicit Key-Value tags in row (e.g. "Category: Cartons", "Target Qty: 433 Piece", "Baseline: ₹19.57")
+    explicit_category: str | None = None
+    explicit_qty: float | None = None
+    explicit_unit: str | None = None
+    explicit_target_price: float | None = None
+
+    cat_kv = re.search(r"\bCategory\s*:\s*([a-zA-Z0-9\s/&_-]+?)(?=\s*(?:Target\s*Qty|Quantity|Qty|Baseline|Target\s*Price|Price|Rate|Dimensions?|Specs?|Delivery|$|\t|\|))", clean_clause, re.I)
+    if cat_kv:
+        explicit_category = cat_kv.group(1).strip()
+
+    qty_kv = re.search(r"\b(?:Target\s*Qty|Quantity|Qty)\s*:\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*([a-zA-Z]+)?", clean_clause, re.I)
+    if qty_kv:
+        try:
+            explicit_qty = float(qty_kv.group(1).replace(",", ""))
+            if qty_kv.group(2):
+                explicit_unit = qty_kv.group(2).strip()
+        except ValueError:
+            pass
+
+    price_kv = re.search(r"\b(?:Baseline|Target\s*Price|Price|Rate)\s*:\s*(?:INR|USD|Rs\.?|₹|\$)?\s*(\d+(?:,\d+)*(?:\.\d+)?)", clean_clause, re.I)
+    if price_kv:
+        try:
+            explicit_target_price = float(price_kv.group(1).replace(",", ""))
+        except ValueError:
+            pass
 
     text_working = clean_clause
     if date_match:
@@ -105,6 +136,23 @@ def _parse_single_packaging_clause(
             "height": float(dim_match.group(3)),
             "unit": dim_unit.lower(),
         }
+    else:
+        # 2D Dimension check (e.g. 48Mm X 50M, 1200X800Mm, 18X24 In, 8X10 In, 4X6 In, 10X15 In, 23Mic X 500Mm)
+        dim2_match = re.search(
+            r"(\d+(?:\.\d+)?)\s*(mm|cm|inch|inches|in|m|mic|micron)?\s*[xX*×]\s*(\d+(?:\.\d+)?)\s*(mm|cm|inch|inches|in|m|mic|micron)?",
+            clean_clause,
+            re.I,
+        )
+        if dim2_match:
+            u1 = dim2_match.group(2)
+            u2 = dim2_match.group(4)
+            dim_unit = u2 or u1 or "mm"
+            dimensions = {
+                "length": float(dim2_match.group(1)),
+                "width": float(dim2_match.group(3)),
+                "height": 0.0,
+                "unit": dim_unit.lower(),
+            }
 
     # Cube box dimensions (e.g. 50inch cube boxes 300, 30cm cube carton)
     cube_match = re.search(
@@ -133,9 +181,9 @@ def _parse_single_packaging_clause(
         film_spec_str = f"{film_spec_match.group(1)}{film_spec_match.group(2)}"
 
     # 3. Quantity & unit extraction
-    quantity: float | None = None
-    unit = "pcs"
-    unit_patterns = r"boxes|cartons|pcs|pieces|rolls|bags|pouches|sheets|pallets|units|mailers|kg|kgs|kilograms?|packs?|mtr|meters?"
+    quantity: float | None = explicit_qty
+    unit = explicit_unit or "pcs"
+    unit_patterns = r"boxes|cartons|pcs|pieces|piece|rolls|roll|bags|bag|pouches|pouch|sheets|sheet|pallets|pallet|units|unit|mailers|mailer|kg|kgs|kilograms?|packs?|mtr|meters?|metres?|metre|m\b"
 
     text_for_qty = text_working
     # If cube dimension matched, mask it out of text_for_qty so it doesn't get confused as quantity
@@ -146,36 +194,37 @@ def _parse_single_packaging_clause(
     if film_spec_match:
         text_for_qty = text_for_qty[:film_spec_match.start()] + " " + film_spec_match.group(3) + " " + text_for_qty[film_spec_match.end():]
 
-    qty_match = re.search(
-        rf"(?:need|require|order|buy|procure|want)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*({unit_patterns})?(?:\s+of)?",
-        text_for_qty,
-        re.I,
-    )
-    if qty_match:
-        val_str = qty_match.group(1).replace(",", "")
-        if not re.search(rf"\b{val_str}\s*(?:x|×|\*|-?\s*ply)", text_for_qty, re.I):
-            try:
-                quantity = float(val_str)
-                if qty_match.group(2):
-                    unit = qty_match.group(2).lower()
-            except ValueError:
-                pass
+    if quantity is None:
+        qty_match = re.search(
+            rf"(?:need|require|order|buy|procure|want)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*({unit_patterns})?(?:\s+of)?",
+            text_for_qty,
+            re.I,
+        )
+        if qty_match:
+            val_str = qty_match.group(1).replace(",", "")
+            if not re.search(rf"\b{val_str}\s*(?:x|×|\*|-?\s*ply)", text_for_qty, re.I):
+                try:
+                    quantity = float(val_str)
+                    if qty_match.group(2):
+                        unit = qty_match.group(2).lower()
+                except ValueError:
+                    pass
 
-    # Trailing quantity check (e.g. "50inch cube boxes 300", "bubble wrap 50kg")
-    trailing_qty = re.search(rf"\b(?:({unit_patterns})\s+)?(\d+(?:,\d+)*(?:\.\d+)?)\s*({unit_patterns})?\s*$", text_for_qty, re.I)
-    if trailing_qty:
-        t_val = trailing_qty.group(2).replace(",", "")
-        t_unit = trailing_qty.group(1) or trailing_qty.group(3)
-        # If no quantity found, or previous quantity was overridden by spec
-        if quantity is None or (cube_match and quantity == float(cube_match.group(1))):
-            try:
-                quantity = float(t_val)
-                if t_unit:
-                    unit = t_unit.lower()
-            except ValueError:
-                pass
-        elif t_unit and unit == "pcs":
-            unit = t_unit.lower()
+        # Trailing quantity check (e.g. "50inch cube boxes 300", "bubble wrap 50kg")
+        trailing_qty = re.search(rf"\b(?:({unit_patterns})\s+)?(\d+(?:,\d+)*(?:\.\d+)?)\s*({unit_patterns})?\s*$", text_for_qty, re.I)
+        if trailing_qty:
+            t_val = trailing_qty.group(2).replace(",", "")
+            t_unit = trailing_qty.group(1) or trailing_qty.group(3)
+            # If no quantity found, or previous quantity was overridden by spec
+            if quantity is None or (cube_match and quantity == float(cube_match.group(1))):
+                try:
+                    quantity = float(t_val)
+                    if t_unit:
+                        unit = t_unit.lower()
+                except ValueError:
+                    pass
+            elif t_unit and unit == "pcs":
+                unit = t_unit.lower()
 
     # 4. Ply
     ply: str | None = None
@@ -183,60 +232,87 @@ def _parse_single_packaging_clause(
     if ply_match:
         ply = f"{ply_match.group(1)}-ply"
 
-    # 5. Category
+    # 5. Category & Material
     category = "Corrugated packaging"
-    lowered = clean_clause.lower()
-    if any(k in lowered for k in ["tape", "adhesive", "bopp"]):
-        category = "Adhesive tape"
-    elif any(k in lowered for k in ["label", "barcode", "sticker"]):
-        category = "Labels & stickers"
-    elif any(k in lowered for k in ["bubble", "foam", "void fill", "air pillow"]):
-        category = "Protective packaging"
-    elif any(k in lowered for k in ["film", "stretch", "shrink"]):
-        category = "Wrapping film"
-    elif any(k in lowered for k in ["pouch", "bag", "mailer"]):
-        category = "Flexible pouches"
-    elif any(k in lowered for k in ["pallet"]):
-        category = "Pallets"
+    material: str | None = explicit_category.title() if explicit_category else None
 
-    # 6. Material
-    material: str | None = None
-    if "bubble wrap" in lowered or "bubblewrap" in lowered:
-        material = "Bubble Wrap"
-    elif "stretch film" in lowered or "stretchfilm" in lowered:
-        material = "Stretch Film"
-    elif "transparent tape" in lowered or "clear tape" in lowered:
-        material = "Transparent BOPP Tape"
-    elif "brown tape" in lowered:
-        material = "Brown BOPP Tape"
-    else:
-        for mat_pattern in [
-            r"(virgin\s+kraft|kraft\s*finish|kraft\s*paper|kraft)",
-            r"(polyethylene|bopp|pvc|duplex|shrink\s*film|lldpe)",
-            r"(brown\s*tape|packing\s*tape|adhesive\s*tape)",
-            r"(corrugated)",
-        ]:
-            mat_match = re.search(mat_pattern, clean_clause, re.I)
-            if mat_match:
-                material = mat_match.group(1).strip()
-                break
+    if explicit_category:
+        cat_lower = explicit_category.lower()
+        if any(k in cat_lower for k in ["carton", "box"]):
+            category = "Corrugated packaging"
+        elif any(k in cat_lower for k in ["tape", "adhesive", "bopp"]):
+            category = "Adhesive tape"
+        elif any(k in cat_lower for k in ["film", "stretch", "shrink"]):
+            category = "Wrapping film"
+        elif any(k in cat_lower for k in ["cushioning", "bubble", "foam", "protection", "protector"]):
+            category = "Protective packaging"
+        elif any(k in cat_lower for k in ["pallet"]):
+            category = "Pallets"
+        elif any(k in cat_lower for k in ["strapping"]):
+            category = "Protective packaging"
+        elif any(k in cat_lower for k in ["bag", "pouch", "mailer"]):
+            category = "Flexible pouches"
+        elif any(k in cat_lower for k in ["label", "sticker", "barcode"]):
+            category = "Labels & stickers"
+
+    lowered = clean_clause.lower()
+    if not explicit_category:
+        if any(k in lowered for k in ["tape", "adhesive", "bopp"]):
+            category = "Adhesive tape"
+        elif any(k in lowered for k in ["label", "barcode", "sticker"]):
+            category = "Labels & stickers"
+        elif any(k in lowered for k in ["bubble", "foam", "void fill", "air pillow"]):
+            category = "Protective packaging"
+        elif any(k in lowered for k in ["film", "stretch", "shrink"]):
+            category = "Wrapping film"
+        elif any(k in lowered for k in ["pouch", "bag", "mailer"]):
+            category = "Flexible pouches"
+        elif any(k in lowered for k in ["pallet"]):
+            category = "Pallets"
+
+    if not material:
+        if "bubble wrap" in lowered or "bubblewrap" in lowered:
+            material = "Bubble Wrap"
+        elif "stretch film" in lowered or "stretchfilm" in lowered:
+            material = "Stretch Film"
+        elif "transparent tape" in lowered or "clear tape" in lowered:
+            material = "Transparent BOPP Tape"
+        elif "brown tape" in lowered:
+            material = "Brown BOPP Tape"
+        else:
+            for mat_pattern in [
+                r"(virgin\s+kraft|kraft\s*finish|kraft\s*paper|kraft)",
+                r"(polyethylene|bopp|pvc|duplex|shrink\s*film|lldpe)",
+                r"(brown\s*tape|packing\s*tape|adhesive\s*tape)",
+                r"(corrugated)",
+            ]:
+                mat_match = re.search(mat_pattern, clean_clause, re.I)
+                if mat_match:
+                    material = mat_match.group(1).strip()
+                    break
 
     # 7. Target price
-    target_price = default_target_price
+    target_price = explicit_target_price if explicit_target_price is not None else default_target_price
     currency = default_currency
-    price_match = re.search(
-        r"(?:target\s+price|budget|price|cost|rate)\s*(?:of|:)?\s*(?:INR|USD|Rs\.?|₹|\$)?\s*(\d+(?:,\d+)*(?:\.\d+)?)",
-        clean_clause,
-        re.I,
-    )
-    if price_match:
-        try:
-            target_price = float(price_match.group(1).replace(",", ""))
-        except ValueError:
-            pass
+    if target_price is None:
+        price_match = re.search(
+            r"(?:target\s+price|budget|price|cost|rate)\s*(?:of|:)?\s*(?:INR|USD|Rs\.?|₹|\$)?\s*(\d+(?:,\d+)*(?:\.\d+)?)",
+            clean_clause,
+            re.I,
+        )
+        if price_match:
+            try:
+                target_price = float(price_match.group(1).replace(",", ""))
+            except ValueError:
+                pass
 
     # 8. Description
     cleaned_desc = text_for_qty
+    # Remove explicit key-value annotations
+    cleaned_desc = re.sub(r"\b(?:Category|Target\s*Qty|Quantity|Qty|Baseline|Target\s*Price|Price|Rate|Dimensions?|Specs?)\s*:\s*[^\t\|]*", " ", cleaned_desc, flags=re.I)
+    # Strip pipe and tab delimiters
+    cleaned_desc = re.sub(r"[\|\t]+", " ", cleaned_desc)
+
     # Remove leading desire verbs
     cleaned_desc = re.sub(
         r"^(?:i\s+want\s+(?:a\s+)?|we\s+need\s+|need\s+|require\s+|order\s+|buy\s+|procure\s+)+",
@@ -253,6 +329,9 @@ def _parse_single_packaging_clause(
     cleaned_desc = re.sub(rf"\s+\d+(?:,\d+)*(?:\.\d+)?\s*(?:{unit_patterns})?\s*$", "", cleaned_desc, flags=re.I).strip()
     cleaned_desc = re.sub(rf"^\d+(?:,\d+)*(?:\.\d+)?\s*(?:{unit_patterns})?\s*(?:of\s+)?", "", cleaned_desc, flags=re.I).strip()
     cleaned_desc = re.sub(rf"\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:{unit_patterns})\b", "", cleaned_desc, flags=re.I).strip()
+
+    # Strip empty parentheses ()
+    cleaned_desc = re.sub(r"\(\s*\)", " ", cleaned_desc)
 
     # Reconstruct canonical descriptor
     if film_spec_str and film_spec_str.lower() not in cleaned_desc.lower():
@@ -351,7 +430,7 @@ def deterministic_extract_packaging(text: str) -> IntakeExtractionResult:
 
     # 3. Split on multi-item delimiters: ';', newlines, ', and ', ' and ', or commas preceding new packaging items / quantities
     clauses = re.split(
-        r"(?:;\s*|\n+|\s*,\s*and\s+|\s+and\s+|\s*,\s*(?=(?:\d+\s*(?:inch|inches|in|m|mm|cm|\")|\d+\s*(?:boxes|cartons|rolls|pcs|pieces|pouches|sheets|pallets|units|bags|mailers|kg|kgs)?\s*)?[a-zA-Z\s]*(?:boxes?|cartons?|tape|tapes|film|films|bubble\s*wrap|wrap|mailer|pouches?|pallet|bag|bags)))",
+        r"(?:;\s*|\n+|\s*,\s*and\s+|\s+and\s+|\s*,\s*(?=(?:\d+(?:\.\d+)?\s*(?:pcs|pieces|boxes|cartons|rolls|bags|pouches|sheets|pallets|units|mailers|kg|kgs|mtr|meters?|metres?|m|inch|inches|in|\")?\s*(?:cube\s+)?(?:of\s+)?\[[a-zA-Z0-9_\-#]+\]|\d+(?:\.\d+)?\s*(?:pcs|pieces|boxes|cartons|rolls|bags|pouches|sheets|pallets|units|mailers|kg|kgs|mtr|meters?|metres?|m|inch|inches|in|\")\s+(?:cube\s+)?(?!x|×|\*|-?\s*ply)[a-zA-Z0-9_\-#\[\]]+|\d+\s+(?:cube\s+)?(?:boxes?|cartons?|tapes?|films?|mailers?|bags?|pallets?)|(?:boxes?|cartons?|tape|tapes|film|films|bubble\s*wrap|transparent\s*tape|brown\s*tape|mailers?|pouches?|pallets?|bags?)\b)))",
         items_text,
         flags=re.I,
     )
