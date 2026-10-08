@@ -98,7 +98,7 @@ Then visit:
 This project includes first-class support for Vercel Serverless deployment (FastAPI ASGI + Chatbot UI).
 
 ### Configuration Files
-- [vercel.json](file:///Users/akshaykumar/code/ktq2/vercel.json): Routes all HTTP traffic to the Python ASGI serverless handler.
+- [vercel.json](file:///Users/akshaykumar/code/ktq2/vercel.json): Configures `@vercel/python` serverless runtime and routes all incoming traffic to the ASGI app handler.
 - [api/index.py](file:///Users/akshaykumar/code/ktq2/api/index.py): Vercel Serverless entrypoint exposing the FastAPI `app`.
 - [requirements.txt](file:///Users/akshaykumar/code/ktq2/requirements.txt): Pinned dependencies required for the serverless build.
 

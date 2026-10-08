@@ -203,7 +203,7 @@
 - **Vercel Serverless Architecture**:
   - `requirements.txt`: Pinned root dependencies (`fastapi`, `uvicorn`, `pydantic`, `pydantic-ai`, `psycopg[binary]`, `openpyxl`, `httpx`, `pyyaml`, `python-dotenv`, `python-multipart`, `aiofiles`).
   - `api/index.py`: Serverless entrypoint exposing ASGI `app` from `backend.app.main` with automatic root directory path injection into `sys.path`.
-  - `vercel.json`: Clean configuration routing all paths (`/(.*)`) to `/api/index.py` enabling unified backend API + static Chatbot UI delivery on Vercel.
+  - `vercel.json`: Uses explicit `@vercel/python` build specification and `routes` (`src: "/(.*)"`, `dest: "api/index.py"`) to eliminate Vercel internal rewrite warnings while preserving original incoming request paths for FastAPI.
 - **Verification**:
   - Validated local ASGI import via `python -c "from api.index import app; print(app.title)"`.
   - Full pytest regression suite executed with 32 passed unit/integration tests and logs in `artifacts/logs/test_vercel_prep.log`.
