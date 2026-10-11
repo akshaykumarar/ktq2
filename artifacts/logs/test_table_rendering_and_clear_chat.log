@@ -1,0 +1,22 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0 -- /Users/akshaykumar/code/ktq2/.venv/bin/python3.14
+cachedir: .pytest_cache
+rootdir: /Users/akshaykumar/code/ktq2
+plugins: logfire-5.1.1, platformdirs-4.12.3, anyio-4.15.1
+collecting ... collected 7 items
+
+tests/test_analyst_feedback_cache.py::test_orchestrator_ask_cache_hit_records_trace PASSED [ 14%]
+tests/test_analyst_feedback_cache.py::test_record_feedback_creates_stub_trace_when_missing PASSED [ 28%]
+tests/test_analyst_feedback_cache.py::test_record_feedback_foreign_key_violation_fallback PASSED [ 42%]
+tests/test_analyst_chat_history.py::test_delete_session_history_repository PASSED [ 57%]
+tests/test_analyst_chat_history.py::test_clear_rfx_history_repository PASSED [ 71%]
+tests/test_analyst_chat_history.py::test_delete_session_api_endpoint PASSED [ 85%]
+tests/test_analyst_chat_history.py::test_delete_rfx_history_api_endpoint PASSED [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.14/site-packages/google/genai/types.py:42
+  /Users/akshaykumar/code/ktq2/.venv/lib/python3.14/site-packages/google/genai/types.py:42: DeprecationWarning: '_UnionGenericAlias' is deprecated and slated for removal in Python 3.17
+    VersionedUnionType = Union[builtin_types.UnionType, _UnionGenericAlias]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========================= 7 passed, 1 warning in 2.00s =========================

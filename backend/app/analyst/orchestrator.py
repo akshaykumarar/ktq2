@@ -460,17 +460,41 @@ class DecisionAnalystOrchestrator:
                 logger.info("Cache hit for RFx #%s: '%s' (0 tokens consumed)", rfx_id, question)
                 try:
                     resp_model = AnalystResponse.model_validate(cached_resp)
-                    # Update trace id and mark cached in debug
-                    resp_model.trace_id = f"cached_{trace_id}"
+                    cached_trace_id = f"cached_{trace_id}"
+                    resp_model.trace_id = cached_trace_id
                     if req.options.get("debug"):
                         resp_model.debug = {
                             "cache_hit": True,
                             "tokens_saved": True,
                             "elapsed_sec": time.time() - start_time,
                         }
+
+                    # Persist trace for cached query so session history and feedback foreign keys work
+                    tool_steps_payload: list[dict[str, Any]] = []
+                    if resp_model.how_i_got_this and resp_model.how_i_got_this.steps:
+                        tool_steps_payload = [t.model_dump() for t in resp_model.how_i_got_this.steps]
+                    sql_payload = resp_model.how_i_got_this.sql if resp_model.how_i_got_this else []
+
+                    resp_dict = resp_model.model_dump()
+                    self._repo.record_trace(
+                        trace_id=cached_trace_id,
+                        rfx_id=rfx_id,
+                        session_id=session_id,
+                        question=question,
+                        tool_steps=tool_steps_payload,
+                        sql_executed=sql_payload,
+                        path_used="cache",
+                        latencies={"total_ms": int((time.time() - start_time) * 1000)},
+                        tokens={"prompt_tokens": 0, "completion_tokens": 0},
+                        final_response=resp_dict,
+                        confidence=resp_model.confidence,
+                        confidence_reason=resp_model.confidence_reason,
+                        prompt_version="1.0.0",
+                        semantic_model_version="1.0.0",
+                    )
                     return resp_model
                 except Exception as e:
-                    logger.debug("Error deserializing cached response: %s", e)
+                    logger.warning("Error deserializing cached response: %s", e, exc_info=True)
 
         tool_records: list[ToolStepRecord] = []
         sql_executed: list[str] = []

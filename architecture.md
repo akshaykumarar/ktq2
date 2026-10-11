@@ -122,8 +122,10 @@ flowchart TD
   All client-facing tables, LLM prompt contexts, and narrative breakdowns strictly reference line items by their human-readable **Item #** (e.g. `Item #1`) and **Item Description / Name** (e.g. `3-Ply Corrugated Box`). Technical database keys (`rfx_item_id`, `vendor_id`, `response_id`, `document_id`) are stripped from presentation layers.
 - **Ground Truth Traceability Post-Check**:
   Cross-checks all numerical figures in the narrative against executed SQL row values. Ungrounded numbers automatically downgrade confidence.
-- **0-Token Artifact Caching & Validation**:
-  Persists generated tables and charts per `rfx_id` in `AnalystRepository`. Repeated identical questions return instant 0-token cached responses. Incorporates active validation (`_is_valid_cached_response`) to detect and automatically purge outdated placeholders or legacy degraded representations.
+- **0-Token Artifact Caching, Trace Telemetry & Feedback FK Resilience**:
+  Persists generated tables and charts per `rfx_id` in `AnalystRepository`. Repeated identical questions return instant 0-token cached responses while writing execution turn traces (`cached_{trace_id}`) with `path_used="cache"` to `ktq.analyst_traces`. This ensures `ktq.analyst_feedback` foreign key constraints (`analyst_feedback_trace_id_fkey`) are consistently satisfied, keeps session histories contiguous, and provides self-healing stub trace creation and fallback handling if orphaned trace IDs are submitted. Incorporates active validation (`_is_valid_cached_response`) to detect and automatically purge outdated placeholders or legacy degraded representations.
+- **In-DOM Table Compliance & Chat History Management**:
+  Standardizes chat message tables on native `.comparison-table` elements, avoiding HTML5 in-DOM parser hoisting or element stripping issues associated with component wrappers. Provides dedicated session clearing (`DELETE /api/analyst/sessions/{id}`) and RFx-wide history purging (`DELETE /api/analyst/history/{rfx_id}`) with in-memory cache invalidation.
 - **5 Ready-Made Standard SQL Widgets**:
   1. *Overall Basket KPI Banner* (Target Spend, Optimal Spend, Potential Savings, Full vs Partial Quotes).
   2. *Vendor Coverage Breakdown* (100% full quote coverage vs partial quotes, spend per vendor).

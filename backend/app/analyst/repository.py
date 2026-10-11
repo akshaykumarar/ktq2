@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 from typing import Any
 from psycopg.rows import dict_row
+from psycopg.errors import ForeignKeyViolation
 
 from backend.app.config.settings import AppSecrets
 from backend.app.db.connection import get_db_connection
@@ -251,6 +252,43 @@ class AnalystRepository:
             logger.error("Failed to get session history: %s", e, exc_info=True)
             return []
 
+    def delete_session_history(self, session_id: str) -> int:
+        """Delete all traces associated with a session ID."""
+        if not self._secrets.db_configured:
+            return 0
+        query = "DELETE FROM ktq.analyst_traces WHERE session_id = %s;"
+        try:
+            with get_db_connection(self._secrets) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(query, (session_id,))
+                    count = cur.rowcount
+                conn.commit()
+                return count
+        except Exception as e:
+            logger.error("Failed to delete session history: %s", e, exc_info=True)
+            return 0
+
+    def clear_rfx_history(self, rfx_id: int) -> int:
+        """Clear cached artifacts, in-memory caches, and traces for an RFx."""
+        _RFX_ARTIFACTS_CACHE.pop(rfx_id, None)
+        keys_to_del = [k for k in _RESPONSE_CACHE if k.startswith(f"{rfx_id}:")]
+        for k in keys_to_del:
+            _RESPONSE_CACHE.pop(k, None)
+
+        if not self._secrets.db_configured:
+            return 0
+        query = "DELETE FROM ktq.analyst_traces WHERE rfx_id = %s;"
+        try:
+            with get_db_connection(self._secrets) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(query, (rfx_id,))
+                    count = cur.rowcount
+                conn.commit()
+                return count
+        except Exception as e:
+            logger.error("Failed to clear RFx history: %s", e, exc_info=True)
+            return 0
+
     def record_feedback(self, feedback: AnalystFeedbackRequest) -> int | None:
         """Insert user feedback for a given trace."""
         if not self._secrets.db_configured:
@@ -267,6 +305,30 @@ class AnalystRepository:
         try:
             with get_db_connection(self._secrets) as conn:
                 with conn.cursor() as cur:
+                    # Check if referenced trace exists in analyst_traces
+                    cur.execute(
+                        "SELECT 1 FROM ktq.analyst_traces WHERE trace_id = %s;",
+                        (feedback.trace_id,),
+                    )
+                    if not cur.fetchone():
+                        # Auto-insert stub trace to satisfy FK for orphaned or legacy cached traces
+                        cur.execute(
+                            """
+                            INSERT INTO ktq.analyst_traces (
+                                trace_id, session_id, question, path_used, confidence_reason
+                            ) VALUES (
+                                %s, %s, %s, %s, %s
+                            ) ON CONFLICT (trace_id) DO NOTHING;
+                            """,
+                            (
+                                feedback.trace_id,
+                                "unknown_session",
+                                "Feedback trace (unrecorded/cached)",
+                                "cache" if feedback.trace_id.startswith("cached_") else "fallback",
+                                "Auto-created trace to satisfy foreign key constraint for feedback",
+                            ),
+                        )
+
                     cur.execute(
                         query,
                         (
@@ -280,6 +342,33 @@ class AnalystRepository:
                     row = cur.fetchone()
                     conn.commit()
                     return row[0] if row else None
+        except ForeignKeyViolation as fke:
+            logger.warning("ForeignKeyViolation on analyst_feedback (trace_id=%s): %s. Falling back to NULL trace_id.", feedback.trace_id, fke)
+            try:
+                with get_db_connection(self._secrets) as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            """
+                            INSERT INTO ktq.analyst_feedback (
+                                trace_id, rating, comment, corrected_sql, corrected_answer, created_at
+                            ) VALUES (
+                                NULL, %s, %s, %s, %s, NOW()
+                            )
+                            RETURNING id;
+                            """,
+                            (
+                                feedback.rating,
+                                feedback.comment,
+                                feedback.corrected_sql,
+                                feedback.corrected_answer,
+                            ),
+                        )
+                        row = cur.fetchone()
+                        conn.commit()
+                        return row[0] if row else None
+            except Exception as inner_e:
+                logger.error("Failed fallback feedback recording with NULL trace_id: %s", inner_e, exc_info=True)
+                return None
         except Exception as e:
             logger.error("Failed to record feedback: %s", e, exc_info=True)
             return None

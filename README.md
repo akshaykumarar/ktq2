@@ -26,7 +26,8 @@ The platform unifies the full procurement lifecycle into a seamless digital work
    - Human-readable identifiers: Strictly displays Item Numbers (#) and Item Descriptions / Names in tables and narratives, suppressing technical primary keys (`rfx_item_id`).
    - Zero hallucinated math: All calculations, rankings, and allocations derive strictly from deterministic Python tools and PostgreSQL views.
    - Ground-truth traceability post-check verifying stated figures against executed database rows.
-   - 0-token artifact caching with automatic validation to discard outdated or degraded placeholders.
+   - 0-token artifact caching with trace telemetry and resilient user feedback recording linked to `ktq.analyst_traces`.
+   - Native HTML table rendering in chat avoiding in-DOM template parser caveats, with one-click chat history and stored artifact reset controls.
 4. **Deterministic Sourcing Optimization & Scenario Simulation**:
    - Sourcing solvers: Pure L1 cheapest per line, single-vendor award, and multi-vendor split allocations (e.g. 60% vendor share cap).
    - Minimum Order Quantity (MOQ) penalty constraints: Configurable modes (`shortfall_penalty`, `quantity_bump`, `exclude_below_moq`).

@@ -63,6 +63,22 @@ def get_session_history(id: str) -> list[dict[str, Any]]:
     return repo.get_session_history(id)
 
 
+@router.delete("/api/analyst/sessions/{id}")
+def clear_session_history(id: str) -> dict[str, Any]:
+    """Delete all interaction traces for a given session."""
+    repo = get_repository()
+    deleted_count = repo.delete_session_history(id)
+    return {"status": "ok", "deleted_count": deleted_count}
+
+
+@router.delete("/api/analyst/history/{rfx_id}")
+def clear_rfx_history(rfx_id: int) -> dict[str, Any]:
+    """Delete all analyst interaction traces and cached artifacts for an RFx."""
+    repo = get_repository()
+    deleted_count = repo.clear_rfx_history(rfx_id)
+    return {"status": "ok", "deleted_count": deleted_count}
+
+
 @router.post("/api/analyst/feedback")
 def submit_feedback(req: AnalystFeedbackRequest) -> dict[str, Any]:
     """Submit rating and optional SQL/narrative corrections for a specific trace."""
