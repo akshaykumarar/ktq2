@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -28,6 +29,22 @@ from backend.app.vendor.repository import VendorRepository
 from backend.app.vendor.resolve import ResolutionEngine
 
 logger = logging.getLogger(__name__)
+
+
+def extract_rfx_id(ref: str | None) -> int | None:
+    """Extract integer RFx ID from string reference or number (e.g. '26', 'RFI-26', 'RFX 26')."""
+    if not ref:
+        return None
+    ref_clean = ref.strip()
+    if ref_clean.isdigit():
+        return int(ref_clean)
+    m = re.search(r"^(?:rfx|rfi|rfq|id)?[\s#:-]*(\d+)$", ref_clean, re.IGNORECASE)
+    if m:
+        try:
+            return int(m.group(1))
+        except (ValueError, TypeError):
+            pass
+    return None
 
 
 class VendorResponseService:
@@ -64,8 +81,11 @@ class VendorResponseService:
         """Persist raw files and metadata, perform idempotency checks, and return 202 preview."""
         file_hashes = [hashlib.sha256(content).hexdigest() for _, content, _ in files if content]
 
-        # 1. Idempotency check: Link to existing if identical payload arrived
-        duplicate = self.repo.check_duplicate_response(file_hashes, sender_email, int(rfx_ref) if (rfx_ref and rfx_ref.isdigit()) else None)
+        # Extract integer RFx ID if reference provided
+        resolved_rfx_id = extract_rfx_id(rfx_ref)
+
+        # 1. Idempotency check: Link to existing if identical payload arrived for this specific RFx
+        duplicate = self.repo.check_duplicate_response(file_hashes, sender_email, resolved_rfx_id)
         if duplicate and len(file_hashes) > 0:
             logger.info("Duplicate quotation submission detected: links to response #%s", duplicate["id"])
             return VendorResponseSubmitPreview(
@@ -77,7 +97,6 @@ class VendorResponseService:
             )
 
         # 2. Versioning check: If vendor already has an active quote for this RFx, increment version & supersede
-        resolved_rfx_id = int(rfx_ref) if (rfx_ref and rfx_ref.isdigit()) else None
         existing_vendor = self.repo.find_vendor_by_email_or_name(sender_email, vendor_name)
         vendor_id = existing_vendor["id"] if existing_vendor else None
 
@@ -257,6 +276,16 @@ class VendorResponseService:
                 extracted_item_descs=item_descriptions,
             )
 
+            # If rfx_id was resolved asynchronously and vendor had a prior response, handle versioning
+            resolved_version = resp_data.get("version", 1)
+            superseded_prior_id = resp_data.get("supersedes_response_id")
+            if resolution.vendor_id and resolution.rfx_id and not resp_data.get("rfx_id"):
+                prior_resp = self.repo.get_latest_response_for_vendor_rfx(resolution.vendor_id, resolution.rfx_id)
+                if prior_resp and prior_resp["id"] != response_id:
+                    self.repo.supersede_prior_response(prior_resp["id"])
+                    resolved_version = prior_resp["version"] + 1
+                    superseded_prior_id = prior_resp["id"]
+
             self.repo.update_response_status(
                 response_id=response_id,
                 status="resolving",
@@ -264,6 +293,8 @@ class VendorResponseService:
                 vendor_id=resolution.vendor_id,
                 rfx_resolution=resolution.to_rfx_dict(),
                 vendor_resolution=resolution.to_vendor_dict(),
+                version=resolved_version,
+                supersedes_response_id=superseded_prior_id,
             )
 
             self.repo.log_pipeline_event(

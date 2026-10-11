@@ -104,10 +104,22 @@ class ResolutionEngine:
         # Signal 1: Explicit rfx_ref provided
         if rfx_ref and rfx_ref.strip():
             ref_clean = rfx_ref.strip()
-            # Match by integer ID
+            # Match by integer ID or pattern with digits (e.g. "26", "RFI-26", "RFX 26")
+            target_id = None
             if ref_clean.isdigit():
                 target_id = int(ref_clean)
+            else:
+                m_dig = re.search(r"^(?:rfx|rfi|rfq|id)?[\s#:-]*(\d+)$", ref_clean, re.IGNORECASE)
+                if m_dig:
+                    try:
+                        target_id = int(m_dig.group(1))
+                    except (ValueError, TypeError):
+                        pass
+
+            if target_id is not None:
                 matched = next((r for r in open_rfx_list if r["id"] == target_id), None)
+                if not matched and hasattr(self.repo, "get_rfx_by_id"):
+                    matched = self.repo.get_rfx_by_id(target_id)
                 if matched:
                     scored_candidates.append({
                         "rfx_id": matched["id"],

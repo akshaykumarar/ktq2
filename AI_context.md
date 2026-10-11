@@ -231,6 +231,24 @@
 - **Full Test Suite Status**:
   - Full regression suite passing 100% (72 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_hosting_compatibility.log`.
 
+## Step 14: Cross-RFx Vendor Quotation Deduplication & `rfx_id` Form Support
+- **Root Cause Analysis**:
+  - `POST /api/vendor-responses` endpoint accepted `rfx_ref` as a form field, but not `rfx_id`. When users passed `--form 'rfx_id="26"'`, FastAPI omitted it and `rfx_ref` evaluated to `None`.
+  - In `VendorRepository.check_duplicate_response()`, the SQL query checked `WHERE rd.sha256 = ANY(%s) AND vr.is_current = TRUE` without scoping by `vr.rfx_id = %s`.
+  - Because `vendor2_beta_box_clean_table.pdf` was previously uploaded for RFX 25 (creating response #47), the un-scoped query matched response #47, returned `is_duplicate: True` pointing to RFX 25, and skipped background pipeline processing entirely. Neither RFX 26 nor RFX 25 received new extractions.
+- **Form Field Flexibility**:
+  - Updated `submit_vendor_response` in [backend/app/api/vendor.py](file:///Users/akshaykumar/code/ktq2/backend/app/api/vendor.py) to accept both `rfx_id` and `rfx_ref` form fields, prioritizing `rfx_id` or `rfx_ref`.
+  - Added [extract_rfx_id()](file:///Users/akshaykumar/code/ktq2/backend/app/vendor/service.py) helper parsing direct integers (`26`) and prefixed references (`RFI-26`, `RFX-26`, `RFQ #26`).
+- **RFx-Scoped Deduplication**:
+  - Updated [VendorRepository.check_duplicate_response()](file:///Users/akshaykumar/code/ktq2/backend/app/vendor/repository.py):
+    - When `rfx_id` is provided: queries `WHERE rd.sha256 = ANY(%s) AND vr.is_current = TRUE AND vr.rfx_id = %s`. Identical quotation PDFs uploaded for a new RFx are recognized as distinct submissions for that RFx rather than colliding with prior RFxs.
+    - When `rfx_id` is None: queries `WHERE rd.sha256 = ANY(%s) AND vr.is_current = TRUE AND vr.rfx_id IS NULL` to prevent unassigned uploads from hijacking existing assigned RFx responses.
+- **Direct RFx Resolution**:
+  - Added `get_rfx_by_id()` in `VendorRepository` and integrated into [ResolutionEngine.resolve()](file:///Users/akshaykumar/code/ktq2/backend/app/vendor/resolve.py) so explicit numeric and prefixed IDs resolve accurately even if not in `open_rfx_list`.
+  - Enhanced `update_response_status()` to support asynchronous version updates if `rfx_id` is resolved in Phase 3.
+- **Verification**:
+  - Full test suite passing 100% (76 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_full_suite.log` and `artifacts/logs/test_vendor_duplicate_fix.log`.
+
 
 
 

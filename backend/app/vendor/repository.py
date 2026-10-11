@@ -105,16 +105,28 @@ class VendorRepository:
             return None
         with get_db_connection(self.secrets) as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT vr.id, vr.status, vr.rfx_id, vr.vendor_id, vr.version
-                    FROM vendor_responses vr
-                    JOIN response_documents rd ON vr.id = rd.response_id
-                    WHERE rd.sha256 = ANY(%s) AND vr.is_current = TRUE
-                    LIMIT 1
-                    """,
-                    (file_hashes,),
-                )
+                if rfx_id is not None:
+                    cur.execute(
+                        """
+                        SELECT vr.id, vr.status, vr.rfx_id, vr.vendor_id, vr.version
+                        FROM vendor_responses vr
+                        JOIN response_documents rd ON vr.id = rd.response_id
+                        WHERE rd.sha256 = ANY(%s) AND vr.is_current = TRUE AND vr.rfx_id = %s
+                        LIMIT 1
+                        """,
+                        (file_hashes, rfx_id),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT vr.id, vr.status, vr.rfx_id, vr.vendor_id, vr.version
+                        FROM vendor_responses vr
+                        JOIN response_documents rd ON vr.id = rd.response_id
+                        WHERE rd.sha256 = ANY(%s) AND vr.is_current = TRUE AND vr.rfx_id IS NULL
+                        LIMIT 1
+                        """,
+                        (file_hashes,),
+                    )
                 row = cur.fetchone()
                 if row:
                     return {
@@ -277,6 +289,8 @@ class VendorRepository:
         summary: dict[str, Any] | None = None,
         rfx_id: int | None = None,
         vendor_id: int | None = None,
+        version: int | None = None,
+        supersedes_response_id: int | None = None,
     ) -> None:
         """Update overall response state, resolution findings, and summary."""
         clauses = ["status = %s", "updated_at = NOW()"]
@@ -300,6 +314,12 @@ class VendorRepository:
         if vendor_id is not None:
             clauses.append("vendor_id = %s")
             params.append(vendor_id)
+        if version is not None:
+            clauses.append("version = %s")
+            params.append(version)
+        if supersedes_response_id is not None:
+            clauses.append("supersedes_response_id = %s")
+            params.append(supersedes_response_id)
 
         params.append(response_id)
         query = f"UPDATE vendor_responses SET {', '.join(clauses)} WHERE id = %s"
@@ -886,6 +906,38 @@ class VendorRepository:
                         "items": items,
                     })
                 return results
+
+    def get_rfx_by_id(self, rfx_id: int) -> dict[str, Any] | None:
+        """Fetch RFx header and line items by ID."""
+        query = """
+            SELECT id, title, category, scope, status, currency, payment_terms, validity_days, response_deadline, released_at, created_at
+            FROM rfx
+            WHERE id = %s
+        """
+        try:
+            with get_db_connection(self.secrets) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(query, (rfx_id,))
+                    row = cur.fetchone()
+                    if not row:
+                        return None
+                    items = self.get_rfx_items_for_rfx(row[0])
+                    return {
+                        "id": row[0],
+                        "title": row[1],
+                        "category": row[2],
+                        "scope": row[3],
+                        "status": row[4],
+                        "currency": row[5],
+                        "payment_terms": row[6],
+                        "validity_days": row[7],
+                        "response_deadline": row[8],
+                        "released_at": row[9],
+                        "created_at": row[10],
+                        "items": items,
+                    }
+        except Exception:
+            return None
 
     def get_unit_conversions(self) -> dict[tuple[str, str], float]:
         """Fetch configured unit conversion multipliers."""

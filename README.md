@@ -234,8 +234,11 @@ Configure the following in your Vercel Project Settings:
 - `sender_name`: Name of the vendor contact or company
 - `channel`: `email` | `upload` | `api` | `simulated` (default: `upload`)
 - `received_at`: Timestamp (ISO format, defaults to current time)
-- `rfx_ref`: Optional RFx reference code / number (e.g. `RFQ-2026-001` or `1`)
+- `rfx_id`: Optional RFx integer identifier (e.g. `26` or `"26"`)
+- `rfx_ref`: Optional RFx reference code / number (e.g. `RFQ-2026-001`, `RFI-26`, or `26`)
 - `vendor_name`: Optional explicit vendor company name
+
+> **RFx-Scoped Deduplication**: Duplicate detection (`is_duplicate`) is strictly evaluated within the scope of the target RFx (`rfx_id`). Submitting the same quotation or rate card document for a new or different RFx is recognized as a fresh submission for that RFx rather than colliding with prior responses.
 
 #### cURL Example:
 ```bash
@@ -244,8 +247,8 @@ curl -X POST http://localhost:8000/api/vendor-responses \
   -F "sender_email=sales@apexpackaging.in" \
   -F "sender_name=Apex Packaging" \
   -F "subject=Quotation for RFQ-2026-001" \
-  -F "rfx_ref=RFQ-2026-001" \
-  -F "channel=email"
+  -F "rfx_id=26" \
+  -F "channel=upload"
 ```
 
 ### 2. Response Status & Inspection

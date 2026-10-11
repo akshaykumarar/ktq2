@@ -158,9 +158,10 @@ flowchart TD
 ```mermaid
 flowchart TD
     subgraph Ingestion["1. Multi-Modal Ingestion (202 Accepted)"]
-        V1["Multipart POST /api/vendor-responses"]
+        V1["Multipart POST /api/vendor-responses (accepts rfx_id & rfx_ref)"]
         V2["Store Raw Bytes & Hashes Byte-for-Byte"]
-        V3["Check Idempotency (SHA-256) / Supersede Old Version"]
+        V3["RFx-Scoped Idempotency Check (SHA-256 within target RFx)"]
+        V4["Version Increment & Supersede Prior Quote"]
     end
 
     subgraph Preprocessing["2. Preprocessing & Rasterization"]

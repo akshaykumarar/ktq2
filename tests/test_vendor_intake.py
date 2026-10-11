@@ -311,4 +311,117 @@ def test_api_submit_vendor_response_text_body(test_client: TestClient, monkeypat
     assert data["rfx_resolution_preview"]["version"] >= 1
 
 
+def test_extract_rfx_id_helper() -> None:
+    """Test extracting integer RFx ID from various formats."""
+    from backend.app.vendor.service import extract_rfx_id
+
+    assert extract_rfx_id("26") == 26
+    assert extract_rfx_id("RFI-26") == 26
+    assert extract_rfx_id("rfx-26") == 26
+    assert extract_rfx_id("RFX #26") == 26
+    assert extract_rfx_id("RFQ 105") == 105
+    assert extract_rfx_id("") is None
+    assert extract_rfx_id(None) is None
+
+
+def test_api_submit_vendor_response_with_rfx_id_form(test_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test POST /api/vendor-responses accepts rfx_id form field and passes it to service."""
+    from backend.app.vendor.models import VendorResponseSubmitPreview, ResponseStatus
+    from backend.app.vendor.service import VendorResponseService
+
+    captured_rfx_ref = None
+
+    def mock_submit(self, *args, **kwargs):
+        nonlocal captured_rfx_ref
+        captured_rfx_ref = kwargs.get("rfx_ref")
+        return VendorResponseSubmitPreview(
+            response_id=48,
+            status=ResponseStatus.RECEIVED,
+            message="Quotation received.",
+            is_duplicate=False,
+            rfx_resolution_preview={"rfx_id": int(captured_rfx_ref) if captured_rfx_ref else None, "version": 1},
+        )
+
+    async def mock_pipeline(self, response_id: int):
+        pass
+
+    monkeypatch.setattr(VendorResponseService, "submit_vendor_response", mock_submit)
+    monkeypatch.setattr(VendorResponseService, "run_pipeline", mock_pipeline)
+
+    # Test submitting with rfx_id="26" (as in user's curl)
+    resp = test_client.post(
+        "/api/vendor-responses",
+        data={
+            "body_text": "Quotation for Corrugated Boxes: Rs 40 per piece.",
+            "rfx_id": "26",
+        },
+    )
+    assert resp.status_code == 202
+    assert captured_rfx_ref == "26"
+    assert resp.json()["rfx_resolution_preview"]["rfx_id"] == 26
+
+
+def test_service_cross_rfx_not_duplicate(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that identical file hash for a DIFFERENT RFx is NOT treated as duplicate."""
+    import hashlib
+    from backend.app.config.settings import load_config
+    from backend.app.vendor.service import VendorResponseService
+
+    cfg = load_config()
+    svc = VendorResponseService(cfg)
+
+    file_bytes = b"Sample quotation PDF content"
+    expected_hash = hashlib.sha256(file_bytes).hexdigest()
+
+    # Simulate repo where file_hash exists for RFX 25, but we are querying for RFX 26
+    def mock_check_dup(file_hashes, sender_email, rfx_id):
+        # Only return duplicate if querying for RFX 25
+        if rfx_id == 25 and expected_hash in file_hashes:
+            return {"id": 47, "status": "done", "rfx_id": 25, "vendor_id": 2, "version": 1}
+        return None
+
+    def mock_create(*args, **kwargs):
+        return 48
+
+    monkeypatch.setattr(svc.repo, "check_duplicate_response", mock_check_dup)
+    monkeypatch.setattr(svc.repo, "find_vendor_by_email_or_name", lambda *a, **kw: None)
+    monkeypatch.setattr(svc.repo, "get_latest_response_for_vendor_rfx", lambda *a, **kw: None)
+    monkeypatch.setattr(svc.repo, "create_vendor_response", mock_create)
+    monkeypatch.setattr(svc.repo, "add_response_document", lambda *a, **kw: None)
+
+    # Submit for RFX 26 with identical file bytes
+    res_26 = svc.submit_vendor_response(
+        files=[("quote.pdf", file_bytes, "application/pdf")],
+        rfx_ref="26",
+    )
+    assert res_26.is_duplicate is False
+    assert res_26.response_id == 48
+
+    # Submit for RFX 25 with identical file bytes -> should be duplicate
+    res_25 = svc.submit_vendor_response(
+        files=[("quote.pdf", file_bytes, "application/pdf")],
+        rfx_ref="25",
+    )
+    assert res_25.is_duplicate is True
+    assert res_25.response_id == 47
+    assert res_25.rfx_resolution_preview["rfx_id"] == 25
+
+
+def test_resolution_prefixed_rfx_ref(mock_repo: MagicMock) -> None:
+    """Test explicit rfx_ref with prefix like 'RFI-1' or 'RFX-1' resolves to RFx #1."""
+    resolver = ResolutionEngine(mock_repo)
+    res = resolver.resolve(
+        rfx_ref="RFI-1",
+        vendor_name=None,
+        sender_email=None,
+        sender_name=None,
+        subject=None,
+        body_text=None,
+        combined_doc_text="",
+    )
+    assert res.rfx_id == 1
+    assert res.signal_used == "explicit_rfx_ref_id"
+
+
+
 

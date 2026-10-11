@@ -64,6 +64,7 @@ async def submit_vendor_response(
     sender_name: Annotated[str | None, Form(description="Sender contact / company name")] = None,
     channel: Annotated[str, Form(description="Intake channel: email | upload | api | simulated")] = "upload",
     received_at: Annotated[str | None, Form(description="ISO timestamp of receipt")] = None,
+    rfx_id: Annotated[str | None, Form(description="Optional RFx identifier")] = None,
     rfx_ref: Annotated[str | None, Form(description="Optional RFx identifier or reference code")] = None,
     vendor_name: Annotated[str | None, Form(description="Optional vendor name override")] = None,
 ) -> VendorResponseSubmitPreview:
@@ -97,6 +98,9 @@ async def submit_vendor_response(
         except Exception:
             rcv_date = datetime.utcnow()
 
+    # Determine target RFx reference from either rfx_id or rfx_ref
+    target_rfx_ref = (rfx_id.strip() if rfx_id and rfx_id.strip() else None) or (rfx_ref.strip() if rfx_ref and rfx_ref.strip() else None)
+
     svc = _get_service(request)
     preview = svc.submit_vendor_response(
         files=parsed_files,
@@ -107,7 +111,7 @@ async def submit_vendor_response(
         sender_name=sender_name,
         channel=channel,
         received_at=rcv_date,
-        rfx_ref=rfx_ref,
+        rfx_ref=target_rfx_ref,
         vendor_name=vendor_name,
     )
 
