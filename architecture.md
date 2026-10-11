@@ -116,12 +116,14 @@ flowchart TD
 - **Normalized Few-Shot Intent Matching**:
   Strips stop words and punctuation before matching buyer questions against seed question-to-SQL pairs in `config/wren_examples.yaml`, supporting joins across line items, knockout questions, commercial terms, and open flags.
 - **Dual-Mode Narrative Synthesis**:
-  - *LLM Active*: Generates executive summaries, winner breakdowns, and state disclosures using `config/prompts/analyst_system_v1.txt`. Evaluates multi-vendor split trade-offs (cost premium delta vs risk reduction vs operational overhead).
+  - *LLM Active*: Generates executive summaries, winner breakdowns, and state disclosures using `config/prompts/analyst_system_v1.txt`. Evaluates multi-vendor split trade-offs (cost premium delta vs risk reduction vs operational overhead). Leverages LLMs wherever available to generate high-value, nuanced procurement insights while strictly masking internal database primary keys.
   - *Deterministic Fallback*: Analyzes query rows programmatically to construct structured markdown for L1 winners, savings vs budget, quotation coverage, and compliance flags.
+- **Human-Readable Identifiers & Primary Key Masking**:
+  All client-facing tables, LLM prompt contexts, and narrative breakdowns strictly reference line items by their human-readable **Item #** (e.g. `Item #1`) and **Item Description / Name** (e.g. `3-Ply Corrugated Box`). Technical database keys (`rfx_item_id`, `vendor_id`, `response_id`, `document_id`) are stripped from presentation layers.
 - **Ground Truth Traceability Post-Check**:
   Cross-checks all numerical figures in the narrative against executed SQL row values. Ungrounded numbers automatically downgrade confidence.
-- **0-Token Artifact Caching**:
-  Persists generated tables and charts per `rfx_id` in `AnalystRepository`. Repeated identical questions return instant 0-token cached responses.
+- **0-Token Artifact Caching & Validation**:
+  Persists generated tables and charts per `rfx_id` in `AnalystRepository`. Repeated identical questions return instant 0-token cached responses. Incorporates active validation (`_is_valid_cached_response`) to detect and automatically purge outdated placeholders or legacy degraded representations.
 - **5 Ready-Made Standard SQL Widgets**:
   1. *Overall Basket KPI Banner* (Target Spend, Optimal Spend, Potential Savings, Full vs Partial Quotes).
   2. *Vendor Coverage Breakdown* (100% full quote coverage vs partial quotes, spend per vendor).

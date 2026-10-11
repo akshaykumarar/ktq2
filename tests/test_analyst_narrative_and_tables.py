@@ -18,7 +18,7 @@ def test_clean_table_data_hides_internal_ids_and_humanizes_columns():
     tbl = orchestrator._clean_table_data("Who is cheapest vendor for each item?", cols, rows)
 
     assert "rfx_item_id" not in [c.lower() for c in tbl.columns]
-    assert tbl.columns == ["Item #", "Description", "Vendor", "Price (INR)", "State"]
+    assert tbl.columns == ["Item #", "Item Description", "Vendor", "Price (INR)", "State"]
     assert tbl.rows[0] == [1, "3-Ply Corrugated Box", "Vendor Alpha", "₹19.57", "CONFIDENT"]
     assert tbl.rows[1] == [2, "Stretch Film 5m", "Vendor Beta", "₹450.00", "REVIEW"]
     assert tbl.title == "Lowest Quoted Price (L1) per Line Item"
@@ -63,6 +63,8 @@ def test_synthesize_deterministic_narrative_cheapest_vendor():
     assert "Vendor Beta" in narrative
     assert "CONFIDENT" in narrative
     assert "REVIEW" in narrative
+    assert "Carton Box" in narrative
+    assert "rfx_item_id" not in narrative
     assert 20.0 in collected_numbers or 15.0 in collected_numbers or 3.0 in collected_numbers
 
 

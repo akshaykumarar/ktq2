@@ -51,8 +51,9 @@ When buyers ask procurement analysis questions in the AI Analyst chat (e.g. "Who
 
 ### Phase 3: Table Data Cleansing & Column Humanization
 - In `backend/app/analyst/orchestrator.py`:
-  - Transform raw SQL columns into clean, user-friendly labels (e.g., `item_number` -> `Item #`, `rfx_description` -> `Description`, `vendor_name` -> `Vendor`, `effective_price_inr` -> `Price (INR)`, `state` -> `Status`).
-  - Filter out internal database IDs (`rfx_item_id`, `vendor_id`, `response_id`, `rfx_id`) from client-facing display tables.
+  - Transform raw SQL columns into clean, user-friendly labels (e.g., `item_number` -> `Item #`, `rfx_description` -> `Item Description`, `vendor_name` -> `Vendor`, `effective_price_inr` -> `Price (INR)`, `state` -> `Status`).
+  - Filter out internal database IDs (`rfx_item_id`, `vendor_id`, `response_id`, `rfx_id`, `id`) from client-facing display tables.
+  - In narrative synthesis (both deterministic and LLM prompts), strictly reference items by human-readable Item Number (#) and Item Description/Name, never raw database keys (`rfx_item_id`).
   - Format monetary numbers and percentages cleanly in tables.
 
 ### Phase 4: UI Presentation & Quick Asks Alignment

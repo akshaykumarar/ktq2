@@ -56,7 +56,7 @@ examples:
   - id: ex_03
     question: "Which items have only one valid bidder?"
     sql: >
-      SELECT rfx_item_id, item_number, rfx_description, COUNT(DISTINCT vendor_id) as bidder_count
+      SELECT item_number, rfx_description, COUNT(DISTINCT vendor_id) as bidder_count
       FROM ktq.v_rfx_comparison
       WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED'
       GROUP BY rfx_item_id, item_number, rfx_description
@@ -66,7 +66,7 @@ examples:
   - id: ex_04
     question: "List all items with REVIEW state prices or flags"
     sql: >
-      SELECT rfx_item_id, item_number, rfx_description, vendor_name, effective_price_inr, state, review_status
+      SELECT item_number, rfx_description, vendor_name, effective_price_inr, state, review_status
       FROM ktq.v_rfx_comparison
       WHERE rfx_id = :rfx_id AND state = 'REVIEW'
       ORDER BY item_number, vendor_name;

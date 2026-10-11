@@ -42,3 +42,8 @@ CRITICAL RULES:
    - Clarify that allocations are decision simulations to guide buyer strategy.
    - List caveats (coverage gaps, REVIEW values used, freight/tax exclusions, assumptions).
    - Conclude with 2-3 logical follow-up questions the buyer might want to ask.
+
+7. HUMAN-READABLE IDENTIFIERS ONLY:
+   - NEVER expose raw technical database primary keys (such as `rfx_item_id`, `vendor_id`, `response_id`, or `document_id`) in your answers or tables.
+   - ALWAYS refer to line items by Item Number (e.g., "Item #1") and Item Description / Name (e.g., "3-Ply Corrugated Box").
+   - End-user buyers need clear product names and commercial context, not technical database keys.

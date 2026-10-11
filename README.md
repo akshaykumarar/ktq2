@@ -23,9 +23,10 @@ The platform unifies the full procurement lifecycle into a seamless digital work
    - Natural language decision-support assistant backed by the Wren MDL semantic layer.
    - Normalized few-shot intent retrieval with complex multi-table joins cross-referencing questionnaire answers, terms, flags, and item prices.
    - Dual-mode narrative synthesis: LLM-driven executive summaries analyzing multi-vendor split trade-offs, with a deterministic domain fallback for offline operation.
+   - Human-readable identifiers: Strictly displays Item Numbers (#) and Item Descriptions / Names in tables and narratives, suppressing technical primary keys (`rfx_item_id`).
    - Zero hallucinated math: All calculations, rankings, and allocations derive strictly from deterministic Python tools and PostgreSQL views.
    - Ground-truth traceability post-check verifying stated figures against executed database rows.
-   - 0-token artifact caching for instant retrieval of previously queried tables and charts.
+   - 0-token artifact caching with automatic validation to discard outdated or degraded placeholders.
 4. **Deterministic Sourcing Optimization & Scenario Simulation**:
    - Sourcing solvers: Pure L1 cheapest per line, single-vendor award, and multi-vendor split allocations (e.g. 60% vendor share cap).
    - Minimum Order Quantity (MOQ) penalty constraints: Configurable modes (`shortfall_penalty`, `quantity_bump`, `exclude_below_moq`).

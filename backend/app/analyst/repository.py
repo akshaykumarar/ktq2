@@ -31,11 +31,37 @@ class AnalystRepository:
     def __init__(self, secrets: AppSecrets | None = None):
         self._secrets = secrets or AppSecrets()
 
+    @staticmethod
+    def _is_valid_cached_response(resp: dict[str, Any]) -> bool:
+        """Validate that a cached response meets quality standards and is not an obsolete placeholder."""
+        if not isinstance(resp, dict):
+            return False
+        answer = resp.get("answer_text", "")
+        # Discard obsolete placeholders with internal IDs or outdated template phrases
+        if "Top Record:" in answer:
+            return False
+        if "rfx_item_id" in answer:
+            return False
+        if "Retrieved" in answer and "result records based on verified database queries" in answer:
+            return False
+        tables = resp.get("tables", [])
+        for tbl in tables:
+            if tbl.get("title") == "Query Result":
+                return False
+            for col in tbl.get("columns", []):
+                if str(col).lower() in ("rfx_item_id", "vendor_id", "response_id", "response_item_id", "item_id"):
+                    return False
+        return True
+
     def get_cached_response(self, rfx_id: int, question: str) -> dict[str, Any] | None:
         """Retrieve cached analysis response for an RFX ID and question to optimize token usage."""
         cache_key = f"{rfx_id}:{question.strip().lower()}"
         if cache_key in _RESPONSE_CACHE:
-            return _RESPONSE_CACHE[cache_key]
+            cached = _RESPONSE_CACHE[cache_key]
+            if self._is_valid_cached_response(cached):
+                return cached
+            else:
+                _RESPONSE_CACHE.pop(cache_key, None)
 
         if not self._secrets.db_configured:
             return None
@@ -54,8 +80,9 @@ class AnalystRepository:
                     row = cur.fetchone()
                     if row and row.get("final_response"):
                         resp = row["final_response"]
-                        _RESPONSE_CACHE[cache_key] = resp
-                        return resp
+                        if self._is_valid_cached_response(resp):
+                            _RESPONSE_CACHE[cache_key] = resp
+                            return resp
         except Exception as e:
             logger.debug("Cache lookup failed: %s", e)
         return None

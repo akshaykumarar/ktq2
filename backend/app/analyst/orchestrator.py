@@ -41,7 +41,9 @@ logger = logging.getLogger(__name__)
 
 COLUMN_RENAME_MAP = {
     "item_number": "Item #",
-    "rfx_description": "Description",
+    "rfx_description": "Item Description",
+    "description": "Item Description",
+    "item_name": "Item Name",
     "vendor_name": "Vendor",
     "effective_price_inr": "Price (INR)",
     "normalized_price_inr": "Norm Price (INR)",
@@ -87,6 +89,7 @@ HIDDEN_COLS = {
     "flag_id",
     "item_id",
     "rfx_id",
+    "id",
 }
 
 
@@ -142,7 +145,7 @@ class DecisionAnalystOrchestrator:
             return "Projected Spend Summary by Vendor"
         elif any(w in q_low for w in ["single", "one bidder"]):
             return "Single-Bidder Line Items"
-        return "Query Result"
+        return "Quotation Analysis Breakdown"
 
     def _clean_table_data(self, question: str, cols: list[str], rows: list[list[Any]]) -> TableData:
         visible_indices = [i for i, c in enumerate(cols) if c.lower() not in HIDDEN_COLS]
@@ -226,11 +229,37 @@ class DecisionAnalystOrchestrator:
             collected_numbers.add(float(review_count))
             collected_numbers.add(float(confident_count))
 
+            # Extract human-readable line item winners (Item # and Description)
+            item_num_idx = col_lower.index("item_number") if "item_number" in col_lower else -1
+            desc_idx = -1
+            for cand in ["rfx_description", "description", "item_name", "item_description"]:
+                if cand in col_lower:
+                    desc_idx = col_lower.index(cand)
+                    break
+
+            item_lines: list[str] = []
+            max_sample_items = min(5, n_rows)
+            for r in rows[:max_sample_items]:
+                item_lbl = f"Item #{r[item_num_idx]}" if item_num_idx >= 0 and r[item_num_idx] is not None else ""
+                desc_lbl = str(r[desc_idx]).strip() if desc_idx >= 0 and r[desc_idx] else ""
+                full_item = f"**{item_lbl}** ({desc_lbl})" if (item_lbl and desc_lbl) else (f"**{item_lbl}**" if item_lbl else (desc_lbl or "Line Item"))
+                v_lbl = f"**{r[vendor_idx]}**" if vendor_idx >= 0 and r[vendor_idx] else "Vendor"
+                p_val = r[price_idx] if price_idx >= 0 else None
+                p_str = f" at **₹{float(p_val):,.2f}**" if isinstance(p_val, (int, float)) else ""
+                item_lines.append(f"- {full_item}: L1 with {v_lbl}{p_str}")
+
+            item_section = ""
+            if item_lines:
+                item_section = f"\n**Key Line Item Winners**:\n" + "\n".join(item_lines) + "\n"
+                if n_rows > max_sample_items:
+                    item_section += f"- *(and {n_rows - max_sample_items} additional line items detailed in table below)*\n"
+
             narrative = (
                 f"### Lowest Quoted Price (L1) Analysis\n\n"
                 f"Based on verified vendor responses for **RFx #{rfx_id}**, L1 lowest prices were identified across **{n_rows}** line items:\n\n"
                 f"**Vendor Win Distribution**:\n"
-                f"{chr(10).join(wins_summary)}\n\n"
+                f"{chr(10).join(wins_summary)}\n"
+                f"{item_section}\n"
             )
             if prices:
                 narrative += f"- **Price Range**: Unit rates range from **₹{min_p:,.2f}** to **₹{max_p:,.2f}** INR.\n"
@@ -336,8 +365,10 @@ class DecisionAnalystOrchestrator:
             )
 
         # Case 6: General Fallback
+        visible_indices = [i for i, c in enumerate(cols) if c.lower() not in HIDDEN_COLS]
         preview_parts = []
-        for i, c in enumerate(cols[:3]):
+        for i in visible_indices[:4]:
+            c = cols[i]
             val = rows[0][i] if rows and i < len(rows[0]) else ""
             preview_parts.append(f"`{COLUMN_RENAME_MAP.get(c.lower(), c)}: {val}`")
 
@@ -357,7 +388,7 @@ class DecisionAnalystOrchestrator:
         caveats: list[Caveat],
         collected_numbers: set[float],
     ) -> str:
-        """Synthesize executive procurement narrative from verified query data."""
+        """Synthesize executive procurement narrative from verified query data using LLM or deterministic fallback."""
         if not rows:
             caveats.append(Caveat(severity="info", text=f"Zero records matched query for RFx #{rfx_id}."))
             return (
@@ -373,8 +404,13 @@ class DecisionAnalystOrchestrator:
             llm_cfg = app_cfg.llms[llm_key]
             model = create_model(llm_cfg, secrets=self._secrets, fallback_to_mock=False)
 
-            sample_rows = rows[:15]
-            row_preview = "\n".join([f"- {dict(zip(cols, r))}" for r in sample_rows])
+            sample_rows = rows[:25]
+            visible_indices = [i for i, c in enumerate(cols) if c.lower() not in HIDDEN_COLS]
+            cleaned_sample = [
+                {COLUMN_RENAME_MAP.get(cols[i].lower(), cols[i]): r[i] for i in visible_indices}
+                for r in sample_rows
+            ]
+            row_preview = "\n".join([f"- {item}" for item in cleaned_sample])
 
             prompt = (
                 f"{self._system_prompt}\n\n"
@@ -382,15 +418,18 @@ class DecisionAnalystOrchestrator:
                 f"User Question: {question}\n"
                 f"RFx ID: {rfx_id}\n"
                 f"Total Records Found: {len(rows)}\n"
-                f"Data Columns: {', '.join(cols)}\n\n"
-                f"Top Records (sample):\n{row_preview}\n\n"
+                f"Data Columns: {', '.join([COLUMN_RENAME_MAP.get(cols[i].lower(), cols[i]) for i in visible_indices])}\n\n"
+                f"Verified Data Rows (sample):\n{row_preview}\n\n"
                 f"INSTRUCTIONS:\n"
                 f"1. Lead with the direct, concise answer in the first 1-2 sentences.\n"
-                f"2. Summarize key findings, distributions (e.g. which vendors won which items or total spend), and noteworthy highlights.\n"
-                f"3. Note data confidence (CONFIDENT vs REVIEW) if state is in the data.\n"
-                f"4. Format in clean, professional GitHub-flavored Markdown with bold highlights and bullet points.\n"
-                f"5. Do NOT invent numbers. Reference ONLY the exact figures from the provided data.\n"
-                f"6. Keep the response crisp (under 200 words)."
+                f"2. Reference items STRICTLY by their human-readable Item Number (#) and Item Description / Name.\n"
+                f"   CRITICAL: NEVER output raw database primary keys (such as rfx_item_id, vendor_id, response_id).\n"
+                f"3. Summarize key findings: winning vendors per line item, unit prices, spend share, and price ranges.\n"
+                f"4. Provide strategic procurement commentary: supplier concentration vs redundancy, and any notable trade-offs.\n"
+                f"5. Note data confidence (CONFIDENT vs REVIEW) if status is present in the data.\n"
+                f"6. Format in clean, professional GitHub-flavored Markdown with bold highlights and bullet points.\n"
+                f"7. GROUNDING: Do NOT invent or calculate numbers outside the provided data. Reference ONLY the exact figures from the records.\n"
+                f"8. Keep the response crisp, authoritative, and procurement-focused (under 250 words)."
             )
 
             agent = Agent(model)
