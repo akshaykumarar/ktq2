@@ -10,3 +10,4 @@ psycopg[binary]>=3.2.0
 openpyxl>=3.1.0
 python-multipart>=0.0.9
 aiofiles>=24.1.0
+sqlglot>=25.0.0

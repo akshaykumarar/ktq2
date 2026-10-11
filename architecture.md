@@ -1,405 +1,221 @@
-# System Architecture
+# System Architecture: AI Procurement Analyst & Packaging RFx Platform
 
-## Overview
+## 1. Architectural Vision & Core Principles
 
-The application is a configurable multi-agent procurement platform integrating a FastAPI + PydanticAI backend with PostgreSQL, supporting the Vue 3 / Vuetify client-side application alongside an end-to-end Packaging RFI procurement workflow.
+The platform is an enterprise-grade AI procurement assistant and decision-support system designed to streamline packaging RFx workflows, automate multi-modal quotation ingestion, and provide mathematically grounded sourcing analytics.
+
+### Foundational Principles
+1. **LLM Understands & Narrates; Deterministic Engines Compute**:
+   Large Language Models parse unstructured inputs (unstructured packaging requests, natural language questions, messy quotation PDFs/emails) and synthesize executive narratives. All numerical rankings, currency conversions, savings computations, and award allocations are calculated exclusively by deterministic Python algorithms and parameterized PostgreSQL views. Zero numbers are calculated or hallucinated by LLMs.
+2. **Comparability First**:
+   Procurement comparisons must strictly reflect line-item coverage. Totals are never compared across suppliers without disclosing coverage differences, item-level omissions, and quotation confidence states (`CONFIDENT`, `REVIEW`, `MISSING`).
+3. **Defense-in-Depth Security & AST Parsing**:
+   Dynamic SQL generation from natural language questions is constrained by an AST parser (`sqlglot`) enforcing strict table/view allowlists on all main queries, CTEs, subqueries, and JOINs. Destructive statements and system catalog accesses are blocked unconditionally.
+4. **Cloud & Serverless Host-Agnosticism**:
+   Frontend and backend communicate via origin-relative API endpoints (`/api/...`), enabling zero-configuration deployments on local machines, Oracle Cloud Compute, AWS EC2, and Vercel Serverless.
 
 ---
 
-## Packaging RFI Workflow Architecture
+## 2. End-to-End System Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Inputs["1. Intake Channels"]
-        A1["Text Input (POST /api/rfi/intake)"]
-        A2["Excel Upload (POST /api/rfi/intake/excel)"]
-        A3["Chat UI (POST /api/chat)"]
+    subgraph Channels["1. Multi-Channel Intake"]
+        C1["Conversational Chat UI (POST /api/chat)"]
+        C2["Unstructured Text Intake (POST /api/rfi/intake)"]
+        C3["Excel / CSV Workbook Upload (POST /api/rfi/intake/excel)"]
+        C4["Vendor Quote Ingestion (POST /api/vendor-responses)"]
     end
 
-    subgraph ChatOrchestration["2. Chat Session & Focus Guardrails"]
-        S1["Session Tracker (ChatSessionState)"]
-        S2["RFI Focus Guardrail (Strict Creation Only)"]
-        S3["Status / External Info Discourager"]
+    subgraph RFIIntake["2. RFI Intake & Line Item Processing"]
+        R1["Session Manager (ChatSessionState)"]
+        R2["PydanticAI Packaging Agent & Tabular BOQ Parser"]
+        R3["Commercial Terms Isolator & Intent Guardrails"]
+        R4["Dynamic Line Item Operations (Batch removals, updates)"]
     end
 
-    subgraph Processing["3. Parsing & AI Extraction"]
-        B1["Openpyxl Spreadsheet Parser"]
-        B2["PydanticAI Packaging Agent (rfi_parser)"]
-        B3["Deterministic Packaging Extractor (fallback)"]
+    subgraph QuotePipeline["3. Multi-Modal Quotation Extraction Pipeline"]
+        Q1["Raw File Store & SHA-256 RFx-Scoped Deduplication"]
+        Q2["Multi-Format Preprocessor (PDF raster, openpyxl, DOCX, EML)"]
+        Q3["6-Signal Scored RFx & Vendor Resolution Engine"]
+        Q4["Extraction Engine (Volumetric Tiers, MOQs, Terms, OCR Crops)"]
+        Q5["Line-Item Matching Engine (MATCHED / EXTRA / ALTERNATE)"]
+        Q6["Pure Python Normalization (Units, FX to INR) & Validation Flags"]
     end
 
-    subgraph Governance["4. Validation & Business Rules"]
-        C1["Non-Packaging Domain Filter"]
-        C2["Missing Critical Fields Detector"]
-        C3["Traceable Defaults Engine (Non-hallucinatory)"]
-        C4["RFI Readiness Checker"]
+    subgraph Persistence["4. PostgreSQL Source of Truth (Dynamic Schema)"]
+        D1["ktq.rfx & ktq.rfx_items (RFI Headers & Line Specifications)"]
+        D2["ktq.vendor_responses & ktq.response_items (Normalized Bids)"]
+        D3["ktq.response_terms & ktq.response_answers (Commercial Terms & Pass/Fail)"]
+        D4["Analytical Views: v_rfx_comparison, v_vendor_coverage, v_open_flags"]
+        D5["Telemetry & Auditing: analyst_traces, award_scenarios, audit_log"]
     end
 
-    subgraph Persistence["5. PostgreSQL Source of Truth"]
-        D1["ktq.rfx (RFI Header & Lifecycle State)"]
-        D2["ktq.rfx_items (Line Items, Dimensions, Specs)"]
-        D3["ktq.rfx_activity (Audit & Trigger Timestamps)"]
+    subgraph DecisionAnalytics["5. Decision Intelligence & Sourcing Optimization"]
+        A1["Analyst Orchestrator (Intent Router & Dual-Mode Synthesis)"]
+        A2["Semantic Text-to-SQL Layer (Wren MDL & Normalized Few-Shot Retrieval)"]
+        A3["SQL Runner Tool (Guarded SELECT with sqlglot AST Security)"]
+        A4["Award Optimization Engine (L1, Single Vendor, Share Cap Splits, MOQ Penalties)"]
+        A5["Trust & Risk Auditor (0-100 Score, Flag Profiler, Money-at-Risk)"]
+        A6["Visualization & Export (Chart.js Specs, Multi-Sheet XLSX Packs)"]
     end
 
-    subgraph Analytics["6. Intelligence & Analytics Layer"]
-        E1["PydanticAI (Intake & Orchestration)"]
-        E2["WrenAI (Semantic DB Analytics & NL-to-SQL)"]
+    subgraph ClientWorkbench["6. Unified User Interfaces"]
+        W1["Procurement Chat Workbench (/ui/ - index.html)"]
+        W2["Decision Analyst Workbench (/ui/analyst.html - 4 Tabs)"]
     end
 
-    A1 --> B2
-    A1 -. fallback .-> B3
-    A2 --> B1 --> C4
-    A3 --> S1 --> S2
-    S2 -->|Disallowed: Status / Info| S3
-    S2 -->|Allowed: Specs / Progress| B2
-    B2 --> C1
-    B3 --> C1
-    C1 --> C2 --> C3 --> C4
-    C4 -->|Create RFI| D1
-    D1 --- D2
-    D1 --- D3
-    D1 -.-> E2
+    C1 & C2 & C3 --> R1 --> R2 --> R3 --> R4 --> D1
+    C4 --> Q1 --> Q2 --> Q3 --> Q4 --> Q5 --> Q6 --> D2 & D3
+    D1 & D2 & D3 --> D4
+    W2 --> A1
+    A1 --> A2 --> A3 --> D4
+    A1 --> A4 --> D1 & D2
+    A1 --> A5 --> D4
+    A1 --> A6
+    A1 -. 0-Token Cached Artifacts .-> W2
+    D4 -. Standard SQL Widgets .-> W2
 ```
 
 ---
 
-## Core Modules & Design Decisions
+## 3. Subsystem Architecture & Functional Modules
 
-### 1. Unified Backend, Cloud Hosting & Serverless Runtime (`backend/app/main.py` & `api/index.py`)
+### 3.1 Conversational RFI Intake & Tabular BOQ Parser (`backend/app/intake/` & `backend/app/agents/`)
 
-- Built on **FastAPI** with lifespan context for startup initialization of all agents.
-- **Cloud Hosting & Host-Agnostic Endpoints**:
-  - All client-side requests (`chatbot/index.html`, `chatbot/analyst.html`, `chatbot/config.json`) use origin-relative endpoints (`/api/chat`, `/api/rfi`, etc.) eliminating hardcoded `localhost:8000` issues when hosted remotely on Oracle Cloud, AWS, GCP, or bare-metal VPS.
-  - **Self-Healing LocalStorage Migration**: The frontend dynamically detects and upgrades legacy cached `http://localhost:8000/api/chat` or `http://127.0.0.1:8000/api/chat` URLs in client `localStorage` to relative `/api/chat` on page load.
-  - Production cloud runner [scripts/run_server.sh](file:///Users/akshaykumar/code/ktq2/scripts/run_server.sh) binds to `0.0.0.0` and enables proxy headers (`--proxy-headers --forwarded-allow-ips "*"`) for reverse proxies and cloud load balancers.
-- Serverless execution support on **Vercel** via [api/index.py](file:///Users/akshaykumar/code/ktq2/api/index.py) ASGI entrypoint and [vercel.json](file:///Users/akshaykumar/code/ktq2/vercel.json) rewrites.
-- CORS middleware enabled for local UI and external origins.
-- Static file serving mounted at `/ui` to serve `chatbot/index.html` directly.
-- Health check endpoints:
-  - `GET /health` and `GET /api/health`: General system and agent readiness.
-  - `GET /health/db` and `GET /api/db/health`: Safe PostgreSQL connection, dynamic schema presence, and query verification without exposing credentials.
+- **Stateful Single-RFI Continuity**:
+  Conversational sessions track `active_rfi_id`. Incoming requirements augment the active draft rather than generating fragmented RFI records.
+- **Enterprise Tabular BOQ Parsing**:
+  Supports multi-column TSV, pipe-delimited, and space-aligned tables pasted directly into chat (e.g., `BOQ Item #`, `SKU Code`, `Description`, `Category`, `Target Qty`, `UOM`, `Baseline Price INR`, `Lead Time`). Accurately maps 30+ items per turn with preserved dimensions, UOMs, and baseline rates.
+- **Commercial Terms & Boilerplate Auto-Separation**:
+  Conversational email greetings/closings, RFP preambles, and delivery conditions (e.g., `Payment Terms: Net 30`, `Delivery Terms: DDP Pune`, `Quote Validity: 90 Days`) are cleanly isolated into RFI header metadata and prevented from creating bogus line items.
+- **Dynamic Natural Language Line Operations**:
+  - Batch range removals (`remove items 33 to 39`, `delete 1-5`)
+  - Comma-separated list removals (`remove 2, 4, 6`)
+  - Relative removals (`remove last item`, `delete last 7 items`)
+  - Item updates (`update item 1 quantity to 1500`, `change item 2 price to 20 INR`)
+  - Contiguous `1..N` re-indexing in PostgreSQL via `ROW_NUMBER()`.
 
-### 2. Conversational RFI Workflow & Guardrails (`backend/app/agents/master.py`)
+### 3.2 Vendor Quotation Intake, OCR & Extraction (`backend/app/vendor/`)
 
-- **Session Management (`ChatSessionState`)**: Tracks conversation mode (`is_rfi_workflow`), active draft RFI ID (`active_rfi_id`), pending confirmation state (`pending_confirmation`), and message turn count per `conversation_id`.
-- **Single RFI Draft Lifecycle**:
-  - Starter command (`Create an RFI`) guides requirement intake without prematurely creating records. Direct packaging submissions automatically initialize draft creation.
-  - Initial requirement intake creates the active RFI draft record and persists it to `RFIRepository`.
-  - Subsequent inputs work on the **same active RFI** rather than creating new RFI records.
-    - **Enterprise Tabular & Key-Value BOQ Parsing**: Supports pasting structured data, multi-column TSV/Excel/pipe tables, or key-value annotated rows (e.g. `BOQ Item #`, `SKU Code`, `Item Description`, `Category`, `Target BOQ Quantity`, `Standard UOM`, `Internal Baseline (INR)`, `Target Lead Time (Days)`). Maps 30+ items into typed line items with preserved SKU codes, quantities, UOMs, INR baseline prices, and 2D/3D dimensions.
-    - **Document Header & Footer Instruction Filtering**: Automatically extracts document header terms (`RFI Reference`, `Scope`, `Target Validity`, `Baseline Currency`) into RFI metadata and isolates footer commercial instructions (`MANDATORY SOURCING & COMMERCIAL INSTRUCTIONS`) from line items.
-    - **Intent Guardrails & Word Boundaries**: Strict regex word-boundary matching (`\b(update|change|modify|set|adjust|edit)\b`) and multi-line safeguards prevent false-positive item modification triggers on commercial clauses (e.g. `"cash settlement terms"`).
-    - **Session-Scoped RFI Isolation**: Eliminates cross-session bleed-over by isolating active draft IDs to the active session without falling back to historical database records.
-    - **Solicitation Preamble & Table Header Filtering**: RFP preambles (e.g. `Bidding Vendors are requested to provide itemized rates...`) and table header rows are filtered out from becoming line items or RFI titles.
-    - **Commercial Terms Sanitization**: Validates length and format of commercial terms to reject stray single-character tokens (e.g., `Payment Terms: S`).
-    - **Dynamic Natural Language Terms & Line Item Operations**:
-      - **Commercial Terms Updates & Resets**: Evaluated prior to item modifications; extracts terms adjustments (e.g., `"payment terms update it to 10 days after delivery"`, `"delivery terms update it to Pune plant (DDP)"`, `"change currency to USD"`, `"update quote validity to 45 days"`) and resets (e.g., `"remove payment terms"`, `"clear delivery terms"`) without unintended line item deletion.
-      - **Multi-Item & Compound Modifications**: Supports compound sentences modifying multiple items simultaneously (e.g. `"update quantity of 1 to 350, and 2 to 300 and 3 to 500 with baseline of ₹80"`).
-      - **Flexible Phrasing & Code Normalization**: Tolerates phrasing variations (`"update quantity of 1 to 350"`, `"update line item 1 quantity to 300"`, `"update Pkg-001] 3-Ply Corrugated Box () to 300 pieces"`), normalizes item codes, and handles target baseline prices.
-      - **Negative Confirmation Precedence**: When users say `"no, update existing item"`, the pending duplicate addition is cancelled and the update is applied immediately.
-      - **Command Filtering in Intake**: Input command clauses and fragments are strictly filtered from becoming bogus packaging line items.
-      - **Batch Range Removals**: e.g., `remove items 33 to 39`, `remove 33-39`, `delete 1-5`, `delete items from 3 to 5`.
-      - **Comma-Separated & Conjunction Lists**: e.g., `remove items 2, 4, 6`, `delete 1, 3`, `remove item 2 and item 4`.
-      - **Relative Removals**: `remove last item`, `remove last 7 items`.
-      - **Keyword/Code Removals**: `remove [Pkg-029]`, `remove brown tape`.
-      - **Attribute Modifications**: `update item 1 dimensions to 450x350x250 mm`, `change item 1 material to 7 ply heavy kraft`, `update item 1 quantity to 1500`, `change item 2 target price to 20 INR`, `update item 1 delivery date to 2026-12-01`.
-      - **Contiguous Re-indexing**: `RFIRepository.remove_items()` re-sequences remaining line item numbers consecutively (`1..N`) via PostgreSQL `ROW_NUMBER()` and memory fallback.
-    - **Duplicate Detection & Confirmation**: If an incoming line item matches an existing item in the draft, the workflow prompts for explicit confirmation before adding or updating.
-- **Strict Guardrails**:
-  - Inquiries for status of existing RFIs (e.g. `What is the status of RFX-101?`, `Check vendor response`) are discouraged and redirected to completing RFI creation.
-  - External inquiries (vendor lookups, directory searches, general questions) are discouraged and redirected to RFI creation.
-- **UI Progress & Outcome Loader (`chatbot/index.html`)**:
-  - Dynamic loader bubble and input field loading bar displayed while `generating == true`.
-  - Welcome card configured with `Create an RFI`.
+- **Multi-Modal Document Processing (202 Accepted)**:
+  Ingests documents across Excel (`.xlsx`, `.xls`, `.csv`), PDF (rasterized + text), Word (`.docx`), Email (`.eml`), and raw images. Documents are immediately persisted byte-for-byte with SHA-256 idempotency.
+- **RFx-Scoped Deduplication**:
+  Deduplication is strictly scoped by `rfx_id`. Identical rate sheets uploaded for a newly created RFx are processed as valid distinct submissions for that RFx without collision.
+- **6-Signal Scored Resolution Engine**:
+  Resolves ambiguous submissions to target RFxs and vendors using weighted signals: (1) Explicit `rfx_id`/`rfx_ref`, (2) Pattern match in text/subject, (3) Email thread headers, (4) Line-item content similarity, (5) Single open RFx heuristic, and (6) Fallback recency. Automatically creates vendor entity records when missing.
+- **Volumetric Discount Table & OCR Guidance**:
+  Accurately extracts tiered rate break tables common in supplier catalogs and noisy OCR scans (e.g. `100-500 pcs: ₹45, 501-2000 pcs: ₹40, 2001+ pcs: ₹36 | MOQ: 100`). Records lower bounds as line MOQ, captures structured volumetric discount metadata (`{'type': 'volumetric', 'tiers': [...]}`), and segments brackets into distinct item tiers.
+- **Deterministic Normalization & Validation**:
+  Converts foreign currencies to INR using configured FX rates, normalizes packaging UOMs, detects pricing traps (such as "per 100" or "per 1000" pricing), and flags outliers into `CONFIDENT`, `REVIEW`, or `MISSING` states with explainable remediation instructions. Generates visual 10%-padded PNG crops for PDF line items.
 
-### 3. Database Layer & Dynamic Schema (`backend/app/db/`)
+### 3.3 Semantic Decision Analyst & Text-to-SQL Engine (`backend/app/analyst/`)
 
-- **Dynamic Schema**: Does not hardcode schema names; uses the configured `DB_SCHEMA` (default: `ktq`).
-- **Connection Isolation**: Connection context manager executes `SET search_path TO "{schema}", public` to ensure all queries resolve to the active tenant/environment schema.
-- **Repository Abstraction (`RFIRepository`)**: Parameterized queries, atomic transactions for RFI + items creation, and an in-memory fallback for offline test isolation.
-- **Tables**:
-  - `ktq.rfx`: Master RFI record (`id`, `title`, `category`, `scope`, `currency`, `payment_terms`, `delivery_terms`, `validity_days`, `response_deadline`, `status`, `triggered_at`, `created_at`, `updated_at`).
-  - `ktq.rfx_items`: Normalized line items (`item_number`, `description`, `quantity`, `unit`, `material`, `dimensions`, `specifications`, `target_price`, `currency`, `required_date`).
-  - `ktq.rfx_activity`: Audit log (`rfx_id`, `activity_type`, `description`, `performed_by`, `created_at`).
+- **Semantic Layer (Wren MDL)**:
+  Defines standardized column semantics (`effective_price_inr`, `state`, `review_status`, `coverage_pct`) over PostgreSQL views.
+- **Normalized Few-Shot Intent Matching**:
+  Strips stop words and punctuation before matching buyer questions against seed question-to-SQL pairs in `config/wren_examples.yaml`, supporting joins across line items, knockout questions, commercial terms, and open flags.
+- **Dual-Mode Narrative Synthesis**:
+  - *LLM Active*: Generates executive summaries, winner breakdowns, and state disclosures using `config/prompts/analyst_system_v1.txt`. Evaluates multi-vendor split trade-offs (cost premium delta vs risk reduction vs operational overhead).
+  - *Deterministic Fallback*: Analyzes query rows programmatically to construct structured markdown for L1 winners, savings vs budget, quotation coverage, and compliance flags.
+- **Ground Truth Traceability Post-Check**:
+  Cross-checks all numerical figures in the narrative against executed SQL row values. Ungrounded numbers automatically downgrade confidence.
+- **0-Token Artifact Caching**:
+  Persists generated tables and charts per `rfx_id` in `AnalystRepository`. Repeated identical questions return instant 0-token cached responses.
+- **5 Ready-Made Standard SQL Widgets**:
+  1. *Overall Basket KPI Banner* (Target Spend, Optimal Spend, Potential Savings, Full vs Partial Quotes).
+  2. *Vendor Coverage Breakdown* (100% full quote coverage vs partial quotes, spend per vendor).
+  3. *L1 Best Price Summary & Savings* (Lowest quoted prices vs targets).
+  4. *Price Spread & Bidder Variance* (Min, Max, Absolute Spread, Spread %).
+  5. *Vendor Win Leaderboard* (Items won L1 and spend share).
 
-### 4. LLM Provider Factory (`backend/app/providers/factory.py`)
+### 3.4 Deterministic Award Optimization & Scenario Solver (`backend/app/analyst/optimizer.py`)
 
-- `create_model()` instantiates `PydanticAI` models (`OpenAIChatModel`, `AnthropicModel`, `GoogleModel`, `OllamaModel`).
-- **Strict Credential Validation**: Default `fallback_to_mock=False` ensures missing API keys raise an explicit `ValueError` rather than silently returning mock models in production.
-- Explicit mock/test models (`provider: "test"` or `fallback_to_mock=True`) are preserved for unit testing.
+- **Multi-Criteria Sourcing Strategies**:
+  - *Cheapest Per Line (L1)*: Pure lowest-cost allocation across all items.
+  - *Single Vendor*: Lowest total spend from a single supplier capable of fulfilling all items.
+  - *Multi-Vendor Split*: Constrained allocation enforcing a maximum percentage cap on any single supplier (e.g. 60% cap).
+- **Minimum Order Quantity (MOQ) Penalty Constraints**:
+  Evaluates supplier line MOQ against required order quantities:
+  - `none`: Standard allocation without MOQ enforcement.
+  - `shortfall_penalty`: Adds a shortfall penalty cost `(MOQ - Qty) * Unit Price * Penalty Rate` to line spend.
+  - `quantity_bump`: Bumps order quantity to vendor MOQ, computing spend on `MOQ * Unit Price` and reporting surplus cost.
+  - `exclude_below_moq`: Disqualifies suppliers whose MOQ exceeds required order volume for that line.
+- **Knockout Quality Gate**:
+  Enforces mandatory pass requirements on RFx technical and quality questionnaire answers.
+- **Decision-Support Boundary**:
+  Optimization runs purely as simulation scenarios to inform procurement strategy. The system does not execute binding contractual awards or alter RFx lifecycle status.
 
-### 5. PydanticAI Agent & LLM-First Extraction (`backend/app/intake/agent.py`)
+### 3.5 SQL AST Security Guardrails (`backend/app/analyst/tools/sql_runner.py`)
 
-- PydanticAI `rfi_parser` configured via `config/agents.yaml`.
-- **LLM as First Choice**: The PydanticAI LLM agent is the primary engine for requirement extraction, category classification, dimension parsing, and commercial terms isolation.
-- Produces strict `IntakeExtractionResult` and `PackagingRequirement` models rather than free-form text.
-- **Multi-Line Item Support**: Robustly segments multi-item compound requirements (e.g., `1000 corrugated boxes, 300 x 200 x 150 mm, and 300 rolls of brown tape`) into multiple typed `PackagingRequirement` line items with independent dimensions, units, and materials.
-- Extracts dimensions into structured dictionaries (`length`, `width`, `height`, `unit`).
-- Deterministic regex fallback acts as a high-reliability fallback for offline testing or unconfigured API keys.
-- **No Hallucination**: Missing quantities, dimensions, prices, or dates are flagged explicitly rather than invented.
-
-### 6. Excel Intake Parser (`backend/app/intake/excel_parser.py`)
-
-- Reads `.xlsx` via `openpyxl` and `.csv` via standard library.
-- Flexible header alias dictionary handles variations (`qty`, `volume`, `quantity` → `quantity`; `specs`, `notes` → `specifications`).
-- Captures row-level errors and skips blank or malformed lines without failing the entire file.
-
-### 7. RFI Lifecycle & REST API (`backend/app/api/rfi.py`)
-
-- Lifecycle states: `DRAFT` → `READY` → `TRIGGERED` → `RESPONSES_PENDING` → `COMPLETED`.
-- `POST /api/rfi/intake`: Text requirements intake.
-- `POST /api/rfi/intake/excel`: Spreadsheet requirement upload.
-- `POST /api/rfi`: Direct RFI creation.
-- `GET /api/rfi/{id}`: Full RFI detail retrieval.
-- `PATCH /api/rfi/{id}`: Safe updates to permitted fields.
-- `POST /api/rfi/{id}/trigger`: Validates readiness, transitions status to `TRIGGERED`, records `triggered_at`.
-
-### 8. Semantic Analytics & Decision Intelligence Layer (`backend/app/analyst/`)
-
-- **Semantic Modeling**: Defines domain models and column descriptions (`config/wren_semantic_model.yaml`, `config/wren_mdl.json`).
-- **Few-Shot Retrieval**: Matches relevant procurement question-to-SQL examples (`config/wren_examples.yaml`).
-- **Self-Correction Loop**: Single-retry execution recovery feedback loop correcting syntax/column errors.
-- **Decision Engine**: Coordinates deterministic optimization, risk auditing, chart generation, and multi-sheet XLSX export packs.
-
-## Step 2: Vendor Quotation Intake & Extraction Architecture
-
-```mermaid
-flowchart TD
-    subgraph Ingestion["1. Multi-Modal Ingestion (202 Accepted)"]
-        V1["Multipart POST /api/vendor-responses (accepts rfx_id & rfx_ref)"]
-        V2["Store Raw Bytes & Hashes Byte-for-Byte"]
-        V3["RFx-Scoped Idempotency Check (SHA-256 within target RFx)"]
-        V4["Version Increment & Supersede Prior Quote"]
-    end
-
-    subgraph Preprocessing["2. Preprocessing & Rasterization"]
-        P1["Excel/CSV (openpyxl coordinate dumper)"]
-        P2["PDF (Text extraction + Scanned page rasterization)"]
-        P3["Word (Paragraphs, Tables, Footnotes)"]
-        P4["Email (Headers, Body, Quoted History)"]
-        P5["Images/Photos (Auto-orient, Contrast enhancement)"]
-    end
-
-    subgraph Resolution["3. Scored RFx & Vendor Resolution"]
-        R1["Signal 1: Explicit rfx_ref"]
-        R2["Signal 2: Pattern matching in text/subject"]
-        R3["Signal 3: Reply-thread hints"]
-        R4["Signal 4: Line item content similarity"]
-        R5["Signal 5: Single open RFx for vendor"]
-        R6["Signal 6: Fallback (Most recent open RFx)"]
-        R7["Ambiguity Detection & Entity Auto-Creation"]
-    end
-
-    subgraph ExtractionReconciliation["4. Extraction & Reconciliation"]
-        E1["Provider-Agnostic LLM Vision / Structured Extraction"]
-        E2["Multi-Document Conflict Reconciliation & Body Text Parsing"]
-        E3["Pydantic Strict Validation & Single Retry on Failure"]
-        E4["Deterministic Signature & Multi-Tier Extractor (Fallback)"]
-    end
-
-    subgraph Matching["5. RFx Line Item Matching"]
-        M1["Semantic Matching to rfx_items"]
-        M2["MATCHED / EXTRA / ALTERNATE / NOT_QUOTED Classification"]
-        M3["Many-to-One / One-to-Many Linking"]
-    end
-
-    subgraph NormalizationValidation["6. Pure Python Normalization & Validation"]
-        N1["Unit Conversions (uom table)"]
-        N2["Foreign Currency Conversion (FX rates to INR)"]
-        N3["Pricing Traps (per-100 vs per-unit detection)"]
-        N4["Rule-Based Flags (Outliers, Expirations, Conflicting docs)"]
-        N5["State Evaluation (CONFIDENT / REVIEW / MISSING)"]
-        N6["Plain-Language Explainability (why_unsure / how_to_resolve)"]
-        N7["Visual Bounding Box Evidence Cropping"]
-    end
-
-    V1 --> V2 --> V3 --> P1 & P2 & P3 & P4 & P5
-    P1 & P2 & P3 & P4 & P5 --> R1 & R2 & R3 & R4 & R5 & R6 --> R7
-    R7 --> E1 --> E2 --> E3 --> M1 --> M2 --> M3
-    M3 --> N1 --> N2 --> N3 --> N4 --> N5 --> N6 --> N7
-```
-
-### State Machine Lifecycle
-
-`received` ➔ `preprocessing` ➔ `extracting` ➔ `resolving` ➔ `matching` ➔ `normalizing` ➔ `validating` ➔ `done` | `needs_review` | `failed`
-
-### Read-Only SQL Views for Analysis
-
-1. `v_response_items_current`: Clean current line items with RFx item details, normalized prices in INR, flags, and crop URLs.
-2. `v_vendor_coverage`: Summary per vendor response (total items, quoted count, coverage %, min/max price, open critical flags).
-3. `v_open_flags`: Unresolved review flags with plain-language explanations for buyer intervention.
-4. `v_rfx_comparison`: Cross-vendor comparison table per RFx item, computing lowest normalized price and ranking.
+- **Strict AST Parser (`sqlglot`)**:
+  Parses incoming SQL into an abstract syntax tree using the PostgreSQL dialect.
+- **Recursive Entity Traversal**:
+  Extracts all referenced `exp.Table` nodes across:
+  - Main SELECT statements
+  - CTE definitions (`WITH` clauses)
+  - Subqueries in `FROM`, `WHERE`, `HAVING`, and scalar projections
+  - `JOIN` targets
+- **CTE Alias Disambiguation**:
+  Identifies internal CTE aliases defined in the query and isolates them from physical database tables.
+- **Strict Table Allowlist**:
+  Rejects any query referencing tables outside `ALLOWED_TABLES_AND_VIEWS` (e.g. `information_schema`, `pg_catalog`, `ktq.rfx_activity`, unauthorized schemas).
+- **Execution Safeguards**:
+  Enforces `statement_timeout = 5000ms`, single-statement execution (semicolon isolation), read-only keyword verification, and parameter clamping (`LIMIT <= 500`).
 
 ---
 
----
+## 4. Database Schema Architecture
 
-## Step 3: Decision Analyst & Award Optimization Architecture
+Database entities are organized under a dynamic PostgreSQL schema (`DB_SCHEMA`, default `ktq`):
 
-```mermaid
-flowchart TD
-    subgraph NaturalLanguage["1. Buyer Interaction & Natural Language"]
-        Q1["Buyer Question: POST /api/analyst/ask"]
-        Q2["Intent Routing & Guardrails"]
-    end
+### Core Tables
+| Table | Description |
+|---|---|
+| `ktq.rfx` | RFx headers, commercial terms, lifecycle status (`DRAFT`, `READY`, `TRIGGERED`, `COMPLETED`). |
+| `ktq.rfx_items` | Normalized packaging requirements, quantities, units, target prices, dimensions, specs. |
+| `ktq.rfx_questions` | RFx technical/compliance questionnaire, knockout flags. |
+| `ktq.vendors` | Supplier master records (name, email, phone, GSTIN, address). |
+| `ktq.vendor_responses` | Quotation submission envelope, channel, status, current version flag. |
+| `ktq.response_documents` | Raw document bytes, SHA-256 hash, mime type, parsed OCR text, quality score. |
+| `ktq.response_items` | Normalized extracted quotation line items, matched RFx item, raw/normalized price, MOQ, flags, crop coordinates. |
+| `ktq.response_terms` | Extracted commercial conditions (payment terms, freight, warranty, validity). |
+| `ktq.response_answers` | Supplier questionnaire answers and knockout pass/fail evaluation. |
+| `ktq.analyst_traces` | Decision analyst Q&A telemetry, SQL executed, tool latencies, response JSON. |
+| `ktq.award_scenarios` | Saved allocation scenarios, constraints, and buyer finalization records. |
+| `ktq.analyst_audit_log` | Immutable audit trail recording scenario finalization and accepted REVIEW flags. |
 
-    subgraph DecisionTools["2. Deterministic Tool Layer (No LLM Math)"]
-        T1["ask_data: Semantic MDL to SQL Engine"]
-        T2["run_sql: Guarded Read-Only SELECT with Limits & Timeout"]
-        T3["award_optimizer: Multi-Criteria Split / Cap Solver"]
-        T4["trust_report: Reliability, Coverage & Risk Profiler"]
-        T5["make_chart: Chart.js Spec Generator"]
-        T6["export_file: Multi-Sheet XLSX with Caveats Sheet"]
-        T7["Assumptions Manager: Session What-If Parameters"]
-    end
-
-    subgraph Governance["3. Hallucination & State Guardrails"]
-        G1["Number Post-Check Scanner (Ground truth verification)"]
-        G2["Comparability Guardrail (Coverage disparity flags)"]
-        G3["State Discloser (REVIEW/MISSING disclosure)"]
-        G4["Quality Gate (Knockout questionnaire validation)"]
-    end
-
-    subgraph PersistenceAudit["4. Persistence & Observability"]
-        DB1["ktq.analyst_traces (Telemetry & Step Latencies)"]
-        DB2["ktq.analyst_feedback (Ratings & SQL Corrections)"]
-        DB3["ktq.award_scenarios (Stored Scenarios)"]
-        DB4["ktq.analyst_audit_log (Immutable Award Finalization)"]
-    end
-
-    Q1 --> Q2
-    Q2 --> T1 & T2 & T3 & T4 & T5 & T6 & T7
-    T1 & T2 & T3 & T4 & T5 & T6 & T7 --> G1 & G2 & G3 & G4
-    G1 & G2 & G3 & G4 --> DB1 & DB2 & DB3 & DB4
-```
-
-### Deterministic Principles
-
-1. **LLM Understands & Narrates; Python & PostgreSQL Compute**: Every calculation, ranking, sum, and allocation comes from deterministic tools.
-2. **Comparability First**: Overall totals are never compared without checking and stating line item coverage.
-3. **Traceability Post-Check**: All figures in generated text are verified against tool outputs; ungrounded numbers automatically downgrade confidence.
-4. **Governed Decision Scenarios**: Allocation optimizations serve strictly as decision-support simulations to evaluate sourcing strategies.
-5. **No Binding Awards**: The chat assistant and analyst screens provide decision-support intelligence only; binding line item awards and RFX status transitions to awarded are future scope.
+### Analytical Views
+| View | Purpose |
+|---|---|
+| `ktq.v_rfx_comparison` | Master comparison matrix: joins RFx items with current supplier quotes, effective INR prices, ranks, and flags. |
+| `ktq.v_vendor_coverage` | Vendor quotation coverage % (total items, quoted count, confident quotes, spend totals). |
+| `ktq.v_open_flags` | Open validation flags with severity, plain-language explanation, and resolution guidance. |
+| `ktq.v_response_items_current` | Current line item extractions with crops, normalized prices, and document metadata. |
 
 ---
 
-## Step 4: Unified Decision Analyst & Token-Optimized Artifact Architecture
+## 5. Deployment & Runtime Architecture
 
-```mermaid
-flowchart TD
-    subgraph ClientUI["1. Unified Client Interface (chatbot/analyst.html)"]
-        UI1["RFI Specification & Line Items Table"]
-        UI2["Analyst & Vendor Chat (Tooltip-Guided)"]
-        UI3["Comparison Grid & 5 SQL Table Views"]
-        UI4["Vendor Comparison Matrix (1 Row Per Vendor + Score Reasoning)"]
-        UI5["Saved Graphs & Reports Viewer"]
-        UI6["Dynamic RFX Dropdown Selector (GET /api/rfi)"]
-    end
-
-    subgraph TokenOptimization["2. Token Optimization & Artifact Storage"]
-        C1["Repository Cache Lookup (rfx_id + query)"]
-        C2["Artifact Persistence (charts/reports by rfx_id)"]
-        C3["0-Token Instant Cache Hit Execution"]
-    end
-
-    subgraph DeterministicWidgets["3. Ready-Made Comparison Widgets (Standard SQL - No AI)"]
-        W1["Basket KPI Summary (Target vs L1 Optimal vs Full/Partial Quotes)"]
-        W2["Vendor Response Coverage Breakdown (Full vs Partial Quotations)"]
-        W3["L1 Best Price Summary & Savings"]
-        W4["Price Spread & Bidder Variance Matrix"]
-        W5["Vendor Win Count Leaderboard"]
-    end
-
-    UI1 --> C1
-    C1 -->|Hit| C3 --> UI1
-    C1 -->|Miss| UI1
-    UI2 --> W1 & W2 & W3 & W4
-    UI4 --> C2
-```
-
-### Ready-Made Standard SQL Comparison Queries
-
-1. **L1 Best Price & Savings**:
-
-   ```sql
-   SELECT ri.item_number, ri.description, ri.quantity, ri.target_price,
-          c.vendor_name as l1_vendor, MIN(c.effective_price_inr) as l1_price
-   FROM ktq.rfx_items ri
-   JOIN ktq.v_rfx_comparison c ON ri.id = c.rfx_item_id
-   WHERE c.rfx_id = :rfx_id
-   GROUP BY ri.id, ri.item_number, ri.description, ri.quantity, ri.target_price, c.vendor_name;
-   ```
-
-2. **Price Spread & Bidder Variance**:
-
-   ```sql
-   SELECT item_number, description, COUNT(DISTINCT vendor_id) as bidder_count,
-          MIN(effective_price_inr) as min_price, MAX(effective_price_inr) as max_price,
-          (MAX(effective_price_inr) - MIN(effective_price_inr)) as price_spread
-   FROM ktq.v_rfx_comparison
-   WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL
-   GROUP BY item_number, description
-   ORDER BY item_number;
-   ```
+- **FastAPI ASGI Backend**: High-performance asynchronous API supporting lifespan startup initialization of LLM agents.
+- **Vercel Serverless Support**: Configured via `api/index.py` and `vercel.json` for zero-management serverless hosting.
+- **Cloud VM Runner (`scripts/run_server.sh`)**: Binds to `0.0.0.0` with configurable `HOST` and `PORT`, forwarding proxy headers for Nginx, Caddy, or Oracle Cloud Load Balancers.
+- **Host-Agnostic Single-Page Applications**:
+  - `chatbot/index.html`: Unified RFI creation and general procurement assistant.
+  - `chatbot/analyst.html`: 4-tab decision analyst workbench (RFI Details, Comparison Grid, Vendor Comparison, AI Chat).
+  - Dynamic endpoint resolution uses origin-relative paths (`/api/...`) with automatic migration of legacy `localhost` entries in client `localStorage`.
 
 ---
 
-## Step 5: Natural Language Decision Synthesis & Table Humanization
+## 6. Verification & Test Suite
 
-```mermaid
-flowchart TD
-    subgraph QueryIntake["1. Query Intake & Normalization"]
-        Q1["Buyer Question: askQuick or Chat Input"]
-        Q2["Stop-Word & Punctuation Normalization"]
-        Q3["Semantic Few-Shot Lookup (wren_examples.yaml)"]
-        Q4["Intent Fallback Builder (cheapest, savings, coverage, flags, lead times)"]
-    end
+The test harness provides 100% coverage across business logic, offline parsing, AST security, and database-dependent components:
 
-    subgraph DeterministicExecution["2. Deterministic SQL Execution"]
-        E1["run_sql: Guarded SELECT with :rfx_id"]
-        E2["PostgreSQL Views (ktq.v_rfx_comparison, ktq.v_vendor_coverage, etc.)"]
-        E3["Exact Numbers Collection (collected_numbers)"]
-    end
+- **Offline/Unit Testing**: Automatically executes in isolation without external database or LLM requirements.
+- **PostgreSQL Tests**: Managed via dynamic `requires_db` pytest marker in `tests/conftest.py`.
 
-    subgraph SynthesisEngine["3. Dual-Mode Narrative Synthesis"]
-        S1{"LLM Available?"}
-        S2["LLM Narrative Synthesis (analyst_system_v1.txt)"]
-        S3["Deterministic Domain Fallback (L1 wins, savings, coverage, risk)"]
-        S4["Traceability Check (extract_numbers_from_text)"]
-    end
-
-    subgraph DataPresentation["4. Table Cleansing & UI Stream"]
-        T1["Filter Internal IDs (rfx_item_id, vendor_id, etc.)"]
-        T2["Humanize Columns (Item #, Vendor, Price INR, Savings INR)"]
-        T3["Format Currency & Percentages (₹, %)"]
-        T4["Interactive Vuetify Chips (CONFIDENT, REVIEW, CRITICAL, etc.)"]
-    end
-
-    Q1 --> Q2 --> Q3
-    Q3 -.->|No match| Q4
-    Q3 --> E1
-    Q4 --> E1
-    E1 --> E2 --> E3
-    E3 --> S1
-    S1 -->|Yes| S2 --> S4
-    S1 -->|No / Offline| S3 --> S4
-    E2 --> T1 --> T2 --> T3 --> T4
-```
-
-### Architectural Highlights
-
-1. **Normalized Intent Matching**: Strips stop words (`the`, `a`, `an`, `for`, `please`) and punctuation to ensure variations like `"Who is cheapest vendor for each item?"` match seed examples identically.
-2. **Dual-Mode Narrative Synthesis**: When LLM is active, prompt engineering synthesizes executive answers without hallucinating numbers; when offline, deterministic domain rules generate formatted markdown with exact counts and ranges.
-3. **Table Cleansing**: Prevents exposing database keys (`rfx_item_id`) to business users, humanizes column names, and formats INR currency.
-
----
-
-## Running Tests
-
-Run the full pytest suite:
-
+Run full test suite:
 ```bash
 PYTHONPATH=. .venv/bin/pytest tests/ backend/tests/ -v
 ```
-
-Test logs are output to [`artifacts/logs/test_full_suite.log`](file:///Users/akshaykumar/code/ktq2/artifacts/logs/test_full_suite.log).
+Test execution traces are stored in `artifacts/logs/`.

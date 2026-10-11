@@ -111,6 +111,15 @@ class AwardConstraints(BaseModel):
     price_overrides: dict[str, float] = Field(default_factory=dict, description="vendor_id:item_number -> new unit price")
     freight_override_per_unit: float | None = None
     fx_rate_overrides: dict[str, float] = Field(default_factory=dict, description="Currency -> INR rate")
+    enforce_moq: bool = Field(default=False, description="Enforce minimum order quantity (MOQ) constraints")
+    moq_penalty_mode: Literal["none", "shortfall_penalty", "quantity_bump", "exclude_below_moq"] = Field(
+        default="none",
+        description="MOQ handling mode: 'none', 'shortfall_penalty', 'quantity_bump', or 'exclude_below_moq'"
+    )
+    moq_shortfall_penalty_rate: float = Field(
+        default=1.0,
+        description="Multiplier for shortfall penalty when order qty is below MOQ"
+    )
 
 
 class LineAllocation(BaseModel):
@@ -130,6 +139,9 @@ class LineAllocation(BaseModel):
     prior_year_unit_price_inr: float | None = None
     savings_vs_prior_year_inr: float | None = None
     savings_vs_l1_inr: float | None = None
+    moq: float | None = None
+    moq_penalty_inr: float | None = None
+    effective_order_quantity: float | None = None
 
 
 class VendorAllocationTotal(BaseModel):
@@ -147,6 +159,7 @@ class AwardOptimizationResult(BaseModel):
     vendor_totals: list[VendorAllocationTotal]
     total_project_spend_inr: float
     total_savings_vs_prior_year_inr: float | None = None
+    total_moq_penalty_inr: float | None = None
     excluded_vendors: dict[str, str] = Field(default_factory=dict, description="Vendor name -> reason")
     caveats: list[str] = Field(default_factory=list)
     has_unresolved_review_items: bool = False

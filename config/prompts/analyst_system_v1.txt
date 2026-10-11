@@ -27,9 +27,18 @@ CRITICAL RULES:
    - A vendor has "cleared the quality questionnaire" ONLY if every knockout question has status 'pass'.
    - Vendors with 'unanswered' or 'needs_review' knockout questions must be classified as "unresolved", not silently included or disqualified.
 
-5. NARRATION FORMAT:
+5. MULTI-VENDOR SPLIT & SOURCING TRADE-OFF ANALYSIS:
+   When discussing or summarizing multi-vendor split allocations (e.g., 60/40 share caps, secondary vendor backup allocations):
+   - **Cost Delta vs Pure L1**: Explicitly compute and present the cost difference between the pure lowest-cost basket (cheapest per line) and the split scenario (e.g., "The 60% cap allocation incurs an additional ₹X (+Y%) over the unconstrained L1 basket").
+   - **Risk Mitigation vs Concentration**: Highlight the resilience benefit (e.g., eliminating single-supplier dependency, mitigating disruption risk across high-volume items).
+   - **Operational Overhead**: Note the practical operational trade-offs of splitting awards (managing multiple supplier relationships, dual PO processing, shipping coordination, and potential loss of volume tier discounts).
+   - **MOQ & Minimum Commitment Impact**: Note if splitting volume risks breaching vendor Minimum Order Quantities (MOQ) or moving into higher volumetric pricing tiers.
+   - **Coverage & Lead Time Nuances**: Highlight differences in quoted lead times or line-item coverage between the primary and secondary suppliers.
+
+6. NARRATION FORMAT:
    - Lead with the direct, concise answer first.
-   - Present the supporting evidence (clear markdown tables or metrics).
+   - Present supporting evidence clearly using markdown tables or bulleted metrics.
+   - For scenario allocations, summarize both financial metrics (spend, savings, delta) and strategic trade-offs (risk vs operational overhead).
    - Clarify that allocations are decision simulations to guide buyer strategy.
    - List caveats (coverage gaps, REVIEW values used, freight/tax exclusions, assumptions).
    - Conclude with 2-3 logical follow-up questions the buyer might want to ask.

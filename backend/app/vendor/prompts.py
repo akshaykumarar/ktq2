@@ -19,7 +19,13 @@ RULES:
 6. Taxes: Identify tax basis ("inclusive", "exclusive", "unknown") and GST % mentioned.
 7. Capture exact `source_snippet` verbatim and document location (e.g. "Sheet1!B4", "Page 1 Paragraph 2", or image bounding box if visible).
 8. Capture any commercial conditions in `commercial_terms` (freight charges, payment terms, delivery lead time, MOQ, validity period, cash discounts).
-9. Output valid JSON matching the DocumentExtractionResult schema.
+9. MULTI-TIERED VOLUMETRIC DISCOUNT TABLES & OCR SCANS:
+   When quotation documents or OCR scans present tiered pricing / volume discount brackets (e.g. '1-500 pcs: ₹50, 501-2,000 pcs: ₹45, 2,000+ pcs: ₹40' or column-wise quantity break matrices):
+   - For OCR scans, carefully associate bracket headers (MOQ / Qty Ranges) with the respective unit prices even if table borders are broken, text is rotated, or columns are misaligned.
+   - Extract each volume bracket as an explicit item tier (e.g. '3-Ply Box (1-500 pcs tier)', '3-Ply Box (501-2000 pcs tier)') with `raw_qty` or `moq` set to the tier lower bound and `raw_price` set to that tier's unit rate.
+   - Also populate the `discount` object with: `{'type': 'volumetric', 'tiers': [{'min_qty': ..., 'max_qty': ..., 'unit_price': ...}]}`.
+   - Capture any Minimum Order Quantity stated in `moq`.
+10. Output valid JSON matching the DocumentExtractionResult schema.
 """
 
 USER_EXTRACTION_PROMPT_TEMPLATE = """Please extract structured quotation data from the following document:

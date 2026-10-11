@@ -273,3 +273,54 @@ examples:
       ) ranked
       WHERE rank = 1
       ORDER BY item_number;
+
+  - id: ex_21
+    question: "Show quoted prices on all items for vendors who passed all knockout quality questions"
+    sql: >
+      SELECT c.item_number, c.rfx_description, c.vendor_name, c.effective_price_inr, c.state
+      FROM ktq.v_rfx_comparison c
+      JOIN ktq.vendor_responses vr ON vr.vendor_id = c.vendor_id AND vr.rfx_id = c.rfx_id AND vr.is_current = TRUE
+      WHERE c.rfx_id = :rfx_id AND c.effective_price_inr IS NOT NULL AND c.kind = 'MATCHED'
+        AND NOT EXISTS (
+          SELECT 1 FROM ktq.response_answers ra
+          JOIN ktq.rfx_questions rq ON ra.rfx_question_id = rq.id
+          WHERE ra.response_id = vr.id AND rq.is_knockout = TRUE AND ra.pass_fail != 'pass'
+        )
+      ORDER BY c.item_number, c.effective_price_inr ASC;
+
+  - id: ex_22
+    question: "Compare unit prices and commercial payment terms across vendors for item 1"
+    sql: >
+      SELECT c.item_number, c.rfx_description, c.vendor_name, c.effective_price_inr,
+             COALESCE(pt.value_text, 'Not Specified') as payment_terms,
+             COALESCE(ft.value_text, 'Not Specified') as freight_terms
+      FROM ktq.v_rfx_comparison c
+      JOIN ktq.vendor_responses vr ON vr.vendor_id = c.vendor_id AND vr.rfx_id = c.rfx_id AND vr.is_current = TRUE
+      LEFT JOIN ktq.response_terms pt ON pt.response_id = vr.id AND pt.term_type = 'payment_terms'
+      LEFT JOIN ktq.response_terms ft ON ft.response_id = vr.id AND ft.term_type = 'freight'
+      WHERE c.rfx_id = :rfx_id AND c.item_number = 1 AND c.effective_price_inr IS NOT NULL
+      ORDER BY c.effective_price_inr ASC;
+
+  - id: ex_23
+    question: "List items with active critical review flags along with vendor price and potential savings"
+    sql: >
+      SELECT c.item_number, c.rfx_description, c.vendor_name, c.effective_price_inr,
+             f.code as flag_code, f.severity, f.message as flag_message,
+             (c.rfx_target_price - c.effective_price_inr) as savings_per_unit_inr
+      FROM ktq.v_rfx_comparison c
+      JOIN ktq.v_open_flags f ON f.rfx_id = c.rfx_id AND f.vendor_name = c.vendor_name
+      WHERE c.rfx_id = :rfx_id AND f.severity = 'critical'
+      ORDER BY c.item_number, c.vendor_name;
+
+  - id: ex_24
+    question: "Cross-reference quality questionnaire answers with quoted line items and prices"
+    sql: >
+      SELECT c.item_number, c.rfx_description, c.vendor_name, c.effective_price_inr,
+             rq.question_text, ra.answer_text, ra.pass_fail
+      FROM ktq.v_rfx_comparison c
+      JOIN ktq.vendor_responses vr ON vr.vendor_id = c.vendor_id AND vr.rfx_id = c.rfx_id AND vr.is_current = TRUE
+      JOIN ktq.response_answers ra ON ra.response_id = vr.id
+      JOIN ktq.rfx_questions rq ON ra.rfx_question_id = rq.id
+      WHERE c.rfx_id = :rfx_id AND c.effective_price_inr IS NOT NULL
+      ORDER BY c.item_number, c.vendor_name, rq.id;
+

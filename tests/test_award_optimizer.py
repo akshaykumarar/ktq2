@@ -73,3 +73,46 @@ def test_review_items_disclosure():
             assert "vendor_id" in item
             assert "item_id" in item
             assert "price" in item
+
+
+def test_moq_penalty_computation_modes():
+    """Verify compute_line_moq_cost handles none, shortfall_penalty, quantity_bump, and exclude_below_moq."""
+    from backend.app.analyst.optimizer import compute_line_moq_cost
+
+    # 1. No MOQ enforcement
+    c_none = AwardConstraints(enforce_moq=False, moq_penalty_mode="none")
+    spend, eff_q, pen, ok = compute_line_moq_cost(qty=100.0, unit_price=10.0, moq=500.0, constraints=c_none)
+    assert spend == 1000.0
+    assert eff_q == 100.0
+    assert pen is None
+    assert ok is True
+
+    # 2. Shortfall penalty mode (order 100 pcs @ 10, MOQ 500, shortfall = 400 pcs)
+    # penalty = 400 * 10 * 1.0 = 4000. Total spend = 1000 + 4000 = 5000.
+    c_penalty = AwardConstraints(enforce_moq=True, moq_penalty_mode="shortfall_penalty", moq_shortfall_penalty_rate=1.0)
+    spend, eff_q, pen, ok = compute_line_moq_cost(qty=100.0, unit_price=10.0, moq=500.0, constraints=c_penalty)
+    assert spend == 5000.0
+    assert eff_q == 100.0
+    assert pen == 4000.0
+    assert ok is True
+
+    # 3. Quantity bump mode (order 100 pcs bumped to MOQ 500 pcs @ 10 = 5000 total spend, surplus = 4000)
+    c_bump = AwardConstraints(enforce_moq=True, moq_penalty_mode="quantity_bump")
+    spend, eff_q, pen, ok = compute_line_moq_cost(qty=100.0, unit_price=10.0, moq=500.0, constraints=c_bump)
+    assert spend == 5000.0
+    assert eff_q == 500.0
+    assert pen == 4000.0
+    assert ok is True
+
+    # 4. Exclude below MOQ mode
+    c_exclude = AwardConstraints(enforce_moq=True, moq_penalty_mode="exclude_below_moq")
+    spend, eff_q, pen, ok = compute_line_moq_cost(qty=100.0, unit_price=10.0, moq=500.0, constraints=c_exclude)
+    assert ok is False
+    assert spend == float("inf")
+
+    # 5. Qty meets or exceeds MOQ (no penalty)
+    spend, eff_q, pen, ok = compute_line_moq_cost(qty=600.0, unit_price=10.0, moq=500.0, constraints=c_penalty)
+    assert spend == 6000.0
+    assert eff_q == 600.0
+    assert pen is None
+    assert ok is True

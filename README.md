@@ -1,63 +1,122 @@
-# Configurable Multi-Agent Procurement Assistant & Packaging RFI Workflow
+# AI Procurement Analyst & Packaging RFx Platform
 
-A configurable procurement product powered by **FastAPI**, **PydanticAI**, and **PostgreSQL**, connected to the existing **AI-QL Chat UI** frontend and supporting direct end-to-end Packaging RFI procurement workflows.
-
-## Architecture
-
-```text
-User / Warehouse Executive
-    │
-    ├── Plain Text Intake: POST /api/rfi/intake ────────────────┐
-    │                                                           │
-    ├── Excel Spreadsheet: POST /api/rfi/intake/excel ──────────┼──► [PydanticAI / Rule Extractor]
-    │                                                           │          │
-    └── Chat UI Frontend: POST /api/chat ───────────────────────┘          ▼
-                                                                  [Pydantic Validation & Defaults]
-                                                                           │
-                                                                           ▼
-                                                                  [PostgreSQL ktq.rfx / rfx_items]
-                                                                           │
-                                                                  ┌────────┴────────┐
-                                                                  ▼                 ▼
-                                                            PATCH /api/rfi/{id}   POST /api/rfi/{id}/trigger
-                                                            (Edit terms/status)   (DRAFT/READY -> TRIGGERED)
-```
-
-- **PydanticAI & LLM-First Decision Engine**: LLM agents (`master`, `rfi_parser`, `rfx`, `vendor`, `status`) serve as the primary, first-choice engines for intent understanding, requirement extraction, conversational routing, and decision support, with deterministic fallbacks for offline testing.
-- **WrenAI**: Preserved as secondary intelligence layer for semantic database analytics and natural language business intelligence queries over PostgreSQL.
-- **PostgreSQL**: Source of truth storing RFIs (`ktq.rfx`), line items (`ktq.rfx_items`), and audit history (`ktq.rfx_activity`) under the dynamically configured schema (`DB_SCHEMA`, default `ktq`).
-- **Pydantic Models**: Canonical, type-safe contracts across parsing, AI extraction, REST APIs, and database persistence.
+An enterprise-grade AI procurement platform powered by **FastAPI**, **PydanticAI**, and **PostgreSQL**, designed to automate packaging RFx intake, multi-modal quotation ingestion & OCR extraction, and mathematically grounded decision-support analytics.
 
 ---
 
-## Quickstart & Setup
+## 1. System Overview & Core Capabilities
+
+The platform unifies the full procurement lifecycle into a seamless digital workflow:
+
+1. **Conversational & Tabular RFI Intake**:
+   - Conversational requirement intake via chat (`POST /api/chat`) and structured text/Excel endpoints.
+   - Enterprise Tabular BOQ ingestion: Parses multi-column TSV, pipe-delimited, and copy-pasted tables (30+ items per turn) with preserved SKU codes, quantities, UOMs, INR baseline prices, and 2D/3D dimensions.
+   - Natural language line-item operations (batch range deletions, comma-separated lists, relative removals, attribute updates) with contiguous `1..N` re-indexing.
+   - Automatic separation of commercial terms (payment, delivery, validity, freight) and boilerplate from product line items.
+2. **Multi-Modal Vendor Quotation Ingestion & OCR**:
+   - Accepts quotations in **any** format: Excel (`.xlsx`, `.xls`, `.csv`), PDF (rasterized + text), Word (`.docx`), Email (`.eml`), images, or JSON payloads.
+   - Immediate byte-for-byte document persistence with SHA-256 idempotency scoped to target RFxs (`rfx_id`).
+   - 6-signal scored resolution engine matching quotes to RFxs and vendors with automatic entity creation.
+   - Multi-tiered volumetric discount extraction: Captures rate break brackets, volume tiers, and Minimum Order Quantities (MOQ).
+   - Deterministic normalization: Currency conversion to INR, UOM standardization, pricing trap detection (per 100/1000), and visual 10%-padded PNG bounding box crops.
+3. **Decision Analyst & Semantic Text-to-SQL Intelligence**:
+   - Natural language decision-support assistant backed by the Wren MDL semantic layer.
+   - Normalized few-shot intent retrieval with complex multi-table joins cross-referencing questionnaire answers, terms, flags, and item prices.
+   - Dual-mode narrative synthesis: LLM-driven executive summaries analyzing multi-vendor split trade-offs, with a deterministic domain fallback for offline operation.
+   - Zero hallucinated math: All calculations, rankings, and allocations derive strictly from deterministic Python tools and PostgreSQL views.
+   - Ground-truth traceability post-check verifying stated figures against executed database rows.
+   - 0-token artifact caching for instant retrieval of previously queried tables and charts.
+4. **Deterministic Sourcing Optimization & Scenario Simulation**:
+   - Sourcing solvers: Pure L1 cheapest per line, single-vendor award, and multi-vendor split allocations (e.g. 60% vendor share cap).
+   - Minimum Order Quantity (MOQ) penalty constraints: Configurable modes (`shortfall_penalty`, `quantity_bump`, `exclude_below_moq`).
+   - Technical & quality knockout questionnaire enforcement.
+   - Decision-support simulation boundary: Scenarios inform buyer strategy without executing binding awards.
+5. **Unified Modern Client Dashboards**:
+   - **Procurement Chat Workbench** (`/ui/`): Interactive RFI creation, progress loaders, and conversational requirement gathering.
+   - **Decision Analyst Workbench** (`/ui/analyst.html`): 4-tab dashboard featuring RFI Details & Line Items, Side-by-Side Comparison Matrix with 5 standard SQL widgets, Vendor Comparison & Trust Audits, and AI Analyst Chat with Chart.js analytics and multi-sheet XLSX export packs.
+
+---
+
+## 2. Architecture Diagram
+
+```mermaid
+flowchart TD
+    subgraph Intake["Intake & Specification"]
+        A1["Chat UI (/ui/)"]
+        A2["Text / Excel Intake"]
+        A3["Vendor Quotation Upload (PDF, Excel, Word, Email)"]
+    end
+
+    subgraph CoreBackend["FastAPI Backend & Extraction Engine"]
+        B1["Chat Orchestrator & Tabular BOQ Parser"]
+        B2["Resolution & Extraction Pipeline (Volumetric Tiers, MOQ)"]
+        B3["Pure Python Normalizer & Validation Engine"]
+    end
+
+    subgraph Database["PostgreSQL (ktq schema)"]
+        C1["ktq.rfx & ktq.rfx_items"]
+        C2["ktq.vendor_responses & ktq.response_items"]
+        C3["Analytical Views: v_rfx_comparison, v_vendor_coverage, v_open_flags"]
+        C4["Audit & Telemetry: analyst_traces, award_scenarios"]
+    end
+
+    subgraph DecisionLayer["Decision Analyst & Optimization Engine"]
+        D1["Semantic Text-to-SQL (sqlglot AST Security)"]
+        D2["Deterministic Award Optimizer (MOQ Penalties, Share Caps)"]
+        D3["Trust & Risk Auditor (0-100 Score, Flag Profiler)"]
+        D4["0-Token Cached Artifact Store"]
+    end
+
+    subgraph AnalystWorkbench["Decision Analyst Workbench (/ui/analyst.html)"]
+        E1["Tab 1: RFI Details & Item Specs"]
+        E2["Tab 2: Side-by-Side Comparison Grid & SQL Widgets"]
+        E3["Tab 3: Vendor Comparison & Trust Matrix"]
+        E4["Tab 4: AI Procurement Analyst Chat & Charts"]
+    end
+
+    A1 & A2 --> B1 --> C1
+    A3 --> B2 --> B3 --> C2
+    C1 & C2 --> C3
+    C3 --> D1 & D2 & D3
+    D1 & D2 & D3 --> D4
+    D4 --> AnalystWorkbench
+    C3 -. Direct SQL Widgets .-> E2
+```
+
+---
+
+## 3. Quickstart & Installation
 
 ### 1. Prerequisites
 
 - Python 3.10+ (tested with Python 3.14)
-- Virtual environment (`.venv`)
+- PostgreSQL database (local or cloud, e.g. Neon, Supabase, RDS)
 
-### 2. Installation
+### 2. Environment Setup
 
 ```bash
-# Activate virtual environment
+# Clone the repository
+git clone <repo-url> ktq2
+cd ktq2
+
+# Create and activate virtual environment
+python3 -m venv .venv
 source .venv/bin/activate
 
-# Install requirements
-pip install fastapi uvicorn "pydantic>=2.10" pyyaml python-dotenv httpx pytest pydantic-ai "psycopg[binary]" openpyxl
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-### 3. Environment Secrets
+### 3. Configure Secrets
 
-Copy `.env.example` to `.env` and configure secrets:
+Copy `.env.example` to `.env` and fill in your settings:
 
 ```bash
 cp .env.example .env
 ```
 
-Database & provider settings:
-
 ```dotenv
+# LLM Providers (at least one recommended; deterministic fallback used if unset)
 OPENAI_API_KEY=
 ANTHROPIC_API_KEY=
 GOOGLE_API_KEY=
@@ -65,351 +124,141 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 # PostgreSQL Configuration
 POSTGRES_MODE=cloud
-DB_HOST=ep-muddy-voice-aozlceqy-pooler.c-2.ap-southeast-1.aws.neon.tech
+DB_HOST=your-host
 DB_PORT=5432
-DB_NAME=neondb
-DB_USER=neondb_owner
-DB_PASSWORD=your_password
+DB_NAME=your-db
+DB_USER=your-username
+DB_PASSWORD=your-password
 DB_SSL_MODE=require
-DB_CHANNEL_BINDING=require
 DB_SCHEMA=ktq
-# Alternatively:
-# DATABASE_URL=postgresql://user:password@host:5432/dbname?sslmode=require
 ```
 
-> **Note**: Missing LLM API keys raise an explicit `ValueError` by default to ensure credentials are properly configured. For offline testing or unit tests, mock models can be explicitly configured via `provider: "test"` or `fallback_to_mock=True`. Database operations continue to support in-memory fallback for local test runs when PostgreSQL is unconfigured.
-
-### 4. Running the Application
-
-Start the unified FastAPI backend locally or on a cloud instance:
+### 4. Run the Server
 
 ```bash
-# Using the production cloud runner:
+# Using the production cloud startup script:
 ./scripts/run_server.sh
 
-# Or directly via uvicorn:
+# Or directly with uvicorn:
 .venv/bin/uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Then visit:
+Then access:
 
-- **Chat UI**: [http://localhost:8000/ui/](http://localhost:8000/ui/) (or `http://<your-server-ip>:8000/ui/` when hosted)
+- **Chat UI**: [http://localhost:8000/ui/](http://localhost:8000/ui/)
+- **Decision Analyst Workbench**: [http://localhost:8000/ui/analyst.html](http://localhost:8000/ui/analyst.html)
 - **Interactive OpenAPI Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **System Health**: [http://localhost:8000/health](http://localhost:8000/health)
 - **Database Health**: [http://localhost:8000/health/db](http://localhost:8000/health/db)
 
 ---
 
-## Cloud Hosting & Oracle Cloud (OCI) Deployment
+## 4. Cloud & Production Deployment
 
-The application is completely cloud hosting-compatible and host-independent:
+### Host-Agnostic Dynamic Endpoints
 
-- **Dynamic Endpoint Resolution**: All frontend API calls use relative paths (`/api/chat`, `/api/rfi`, etc.) rather than hardcoded `localhost:8000`.
-- **Automatic Self-Healing**: If a client browser has previously cached `http://localhost:8000/api/chat` in `localStorage`, the frontend automatically detects that the app is running on a remote host and migrates the endpoint to `/api/chat`.
-- **0.0.0.0 Network Binding**: `scripts/run_server.sh` binds to `0.0.0.0` by default and respects `PORT` and `HOST` environment variables.
+The platform is fully decoupled from host environments:
 
-### Deploying on Oracle Cloud Compute
+- **Origin-Relative Endpoints**: All client calls use relative paths (`/api/chat`, `/api/rfi`, etc.), eliminating hardcoded `localhost:8000` issues when hosted remotely on Oracle Cloud, AWS, GCP, or private servers.
+- **Self-Healing LocalStorage**: Frontend automatically detects when running on a remote host and migrates any legacy cached `localhost:8000` URLs in browser `localStorage`.
+- **0.0.0.0 Binding**: `scripts/run_server.sh` binds to `0.0.0.0` and configures proxy header forwarding (`--proxy-headers --forwarded-allow-ips "*"`).
 
-1. **Clone repository & set up environment**:
+### Oracle Cloud Compute (OCI) Deployment
 
-   ```bash
-   git clone <repo-url> ktq2
-   cd ktq2
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   cp .env.example .env
-   # Add your OPENAI_API_KEY, DATABASE_URL / DB credentials
-   ```
+1. Set up an Ubuntu instance in OCI.
+2. In the OCI Console, add an **Ingress Rule** to your VCN's Security List for TCP port `8000` (or `80`/`443` if using Nginx/Caddy).
+3. Clone the repository, configure `.env`, install requirements, and execute `./scripts/run_server.sh`.
+4. Access `http://<public-ip>:8000/ui/`.
 
-2. **Oracle Cloud Ingress Security Rule**:
-   - In the OCI Console, navigate to **Networking** > **Virtual Cloud Networks** > your VCN > **Security Lists** > **Default Security List**.
-   - Add an **Ingress Rule**:
-     - **Source CIDR**: `0.0.0.0/0`
-     - **IP Protocol**: `TCP`
-     - **Destination Port Range**: `8000` (or `80, 443` if using reverse proxy)
-   - If using Ubuntu/Debian on the instance, ensure `iptables` / `ufw` permits traffic:
+### Vercel Serverless Deployment
 
-     ```bash
-     sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8000 -j ACCEPT
-     sudo netfilter-persistent save  # if iptables-persistent is installed
-     ```
-
-3. **Start the server**:
-
-   ```bash
-   ./scripts/run_server.sh
-   # Or run in background via systemd or tmux:
-   # nohup ./scripts/run_server.sh > server.log 2>&1 &
-   ```
-
-4. **Access the Application**:
-   - Open `http://<your-oracle-cloud-public-ip>:8000/ui/` in your browser. All chat, RFI intake, and analyst APIs will connect directly to your hosted instance.
+- Configured via `vercel.json` and ASGI handler `api/index.py`.
+- In the Vercel Dashboard, configure environment variables (`DATABASE_URL`, `DB_SCHEMA`, and LLM keys).
+- Deploy with `vercel --prod`.
 
 ---
 
-## Vercel Deployment
+## 5. REST API Reference
 
-This project includes first-class support for Vercel Serverless deployment (FastAPI ASGI + Chatbot UI).
+### Health & Monitoring
 
-### Configuration Files
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/health` (or `/api/health`) | Verifies backend readiness and initialized agent catalog. |
+| `GET` | `/health/db` (or `/api/db/health`) | Verifies PostgreSQL connectivity and dynamic schema existence. |
 
-- [vercel.json](file:///Users/akshaykumar/code/ktq2/vercel.json): Configures `@vercel/python` serverless runtime and routes all incoming traffic to the ASGI app handler.
-- [api/index.py](file:///Users/akshaykumar/code/ktq2/api/index.py): Vercel Serverless entrypoint exposing the FastAPI `app`.
-- [requirements.txt](file:///Users/akshaykumar/code/ktq2/requirements.txt): Pinned dependencies required for the serverless build.
+### Packaging RFI Lifecycle
 
-### Vercel Dashboard Settings
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/chat` | Conversational RFI creation, tabular BOQ intake, and natural language line operations. |
+| `POST` | `/api/rfi/intake` | Extracts structured requirements from unstructured text. |
+| `POST` | `/api/rfi/intake/excel` | Multi-sheet spreadsheet intake (`.xlsx`, `.csv`) with header alias mapping. |
+| `POST` | `/api/rfi` | Direct creation of structured RFI records. |
+| `GET` | `/api/rfi` | List all RFIs/RFXs with title, status, and metadata for dropdown selectors. |
+| `GET` | `/api/rfi/{id}` | Retrieve complete RFI details, commercial terms, and line items. |
+| `PATCH` | `/api/rfi/{id}` | Update editable fields (`title`, `terms`, `status`, `validity_days`). |
+| `POST` | `/api/rfi/{id}/trigger` | Transitions RFI status to `TRIGGERED` and records timestamp. |
 
-- **Framework Preset**: `Other`
-- **Root Directory**: `.`
-- **Build Command**: _Leave empty / Default_
-- **Output Directory**: _Leave empty / Default_
-- **Install Command**: `pip install -r requirements.txt` (or default)
+### Vendor Response Submission & Document Inspection
 
-### Environment Variables
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/vendor-responses` | Submits vendor quotes in any format (202 Accepted, async processing). |
+| `GET` | `/api/vendor-responses/{id}` | Detailed pipeline status, per-document progress, and scored resolution reasoning. |
+| `GET` | `/api/vendor-responses/{id}/items` | Extracted line items, matching states, validation flags, and crop URLs. |
+| `GET` | `/api/vendor-responses/{id}/documents/{doc_id}/raw` | Retrieves original document bytes exactly as uploaded. |
+| `GET` | `/api/response-items/{item_id}/crop` | Cropped PNG visual evidence bounding box with 10% padding. |
+| `GET` | `/api/rfx/{rfx_id}/responses` | All supplier submissions for an RFx with coverage metrics. |
+| `POST` | `/api/vendor-responses/{id}/reprocess` | Re-executes extraction pipeline as a new run. |
+| `PATCH` | `/api/response-items/{item_id}` | Buyer manual line-item correction audit trail. |
 
-Configure the following in your Vercel Project Settings:
+### Decision Analyst & Sourcing Intelligence
 
-- `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY`
-- `DATABASE_URL` (or `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`, `DB_SSL_MODE=require`)
-- `DB_SCHEMA=ktq`
-
----
-
-## Packaging RFI API Endpoints
-
-### 1. Health Checks
-
-- `GET /health` (or `/api/health`): Verifies running service and initialized agents.
-- `GET /health/db` (or `/api/db/health`): Verifies PostgreSQL connectivity, schema existence, and query execution without leaking credentials.
-
-### 2. Text Requirement Intake
-
-- `POST /api/rfi/intake`
-  - Accepts raw text requirements (e.g. `"Need 5000 boxes, 600x400x300 mm, 5 ply kraft, delivery by 30 Nov."`).
-  - Extracts structured items, dimensions, plies, material, required date, and target price.
-  - Identifies missing critical fields without hallucinating them.
-  - Optionally creates an RFI immediately if `create_rfi=true`.
-
-### 3. Excel Spreadsheet Intake
-
-- `POST /api/rfi/intake/excel` (multipart/form-data)
-  - Accepts `.xlsx` or `.csv` workbooks.
-  - Tolerant header mapping (`qty`, `volume`, `quantity` → `quantity`; `specs`, `notes` → `specifications`).
-  - Captures row-level errors without failing entire file.
-  - Supports multi-sheet extraction.
-
-### 4. RFI Lifecycle & Management
-
-- `POST /api/rfi`: Direct creation of an RFI with structured requirements.
-- `GET /api/rfi`: Retrieve list of all available RFIs/RFXs for dropdown selectors.
-- `GET /api/rfi/{id}`: Retrieve RFI metadata, commercial terms, and line items.
-- `PATCH /api/rfi/{id}`: Safely update editable fields (`title`, `terms`, `status`, `validity_days`, `response_deadline`).
-- `POST /api/rfi/{id}/trigger`: Validates readiness, transitions status to `TRIGGERED`, records `triggered_at` timestamp.
-
-### 5. Conversational RFI Workflow (`POST /api/chat` & `/ui`)
-
-- **Chat Outcome Loader**: Chat UI (`/ui`) displays an animated processing loader bubble in the chat view and input area whenever an outcome is expected.
-- **RFI Initial Input Flow**: When selecting "Create an RFI" from the welcome cards or entering packaging requirements directly, the assistant guides the user and initializes draft creation without creating empty dummy RFX records.
-- **Commercial Terms & Unstructured Notes Auto-Separation**: Separator lines, commercial clause blocks, conversational email paragraphs (greetings, closing remarks, delivery instructions, quality/sample requirements), and Excel footer note rows (e.g. `Note: GST 18% extra. Rates must include transit insurance`) are automatically parsed into RFI terms metadata (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`/`notes`) rather than becoming dummy line items. Numbered list prefixes (`1.`, `2)`) are stripped cleanly.
-- **Dynamic Natural Language Line Item & Terms Operations**:
-  - **Commercial Terms Updates & Resets**: Direct natural language modification of terms (e.g. `"payment terms update it to 10 days after delivery"`, `"delivery terms update it to Pune plant (DDP)"`, `"change currency to USD"`, `"update quote validity to 45 days"`, `"remove payment terms"`). Terms resets immediately revert fields to default parameters without deleting product line items.
-  - **Multi-Item & Compound Modifications**: Supports updating multiple items and multiple attributes in a single natural language sentence (e.g. `"update quantity of 1 to 350, and 2 to 300 and 3 to 500 with baseline of ₹80"`).
-  - **Flexible Phrasing & Prefixes**: Handles natural language variations (`"update quantity of 1 to 350"`, `"update line item 1 quantity to 300"`, `"update Pkg-001] 3-Ply Corrugated Box () to 300 pieces"`, `"with baseline of ₹80"`).
-  - **Negative Confirmation Precedence**: Commands like `"no, update existing item"` reject duplicate additions and execute item modifications directly.
-  - **Command Fallthrough Protection**: Commands, prepositions, or update instructions are never mistakenly converted into bogus line items.
-  - **Batch Range Deletions**: `remove items 33 to 39`, `remove 33-39`, `delete 1-5`, `delete items from 3 to 5`.
-  - **Multi-Item Lists**: `remove items 2, 4, 6`, `delete 1, 3`, `remove item 2 and item 4`.
-  - **Relative Removals**: `remove last item`, `delete last 7 items`.
-  - **Product Names/Codes**: `remove [Pkg-029]`, `remove brown tape`.
-  - **Field Updates**: `update item 1 dimensions to 450x350x250 mm`, `change item 1 material to 7 ply heavy kraft`, `update item 1 quantity to 1500`, `change item 2 target price to 20 INR`, `update item 1 delivery date to 2026-12-01`.
-  - **Automatic Re-indexing**: Removed items trigger consecutive re-indexing (`1..N`) for all remaining line items.
-- **Duplicate Detection & Confirmation**: If an incoming requirement matches an item already in the draft, the assistant flags the duplicate and prompts the user for explicit confirmation before proceeding.
-- **Advanced Natural Language & Enterprise Tabular BOQ Intake**:
-  - Robustly parses compound requirements, metric & imperial cube box dimensions (`50inch cube boxes 300`), film specs (`5m stretch films 1000 pcs`), and weights (`bubble wrap 50kg`).
-  - **Enterprise Tabular BOQs**: Automatically parses multi-column tabular spreadsheets and pasted documents (e.g. `BOQ Item #`, `SKU Code`, `Item Description`, `Category`, `Target BOQ Quantity`, `Standard UOM`, `Internal Baseline (INR)`, `Target Lead Time (Days)`), mapping 30+ items into typed line items with preserved SKU codes, quantities, UOMs, INR baseline prices, and 2D/3D dimensions.
-  - **Header & Footer Extraction**: Extracts RFI Reference (`RFI-PKG-2026-001`), Scope, Target Validity (`90 Days`), and Baseline Currency (`INR`). Filters mandatory commercial instructions into RFI metadata.
-  - **Intent Guardrails**: Strict word-boundary intent matching and multi-line safeguards prevent false-positive item modification triggers on commercial clauses (e.g. `"cash settlement terms"`).
-  - Excludes RFP solicitation preambles and table headers from line items and titles.
-  - Sanitizes commercial terms (e.g. rejects single-character bullets like `Payment Terms: S`).
-- **Strict Guardrails**: When in the RFI creation workflow, only solutions and progress for creating the RFI are provided. Checking existing RFI status or fetching external information (vendor directories, general questions) is politely discouraged and redirected back to RFI creation.
-- **RFI Progression**: Users can review line items, amend terms, or say `"Trigger RFI"` to finalize and issue quote requests to qualified suppliers.
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/analyst/ask` | Natural language decision Q&A with 0-token caching for repeated questions. |
+| `GET` | `/api/analyst/sessions/{id}` | Session interaction history and telemetry traces. |
+| `POST` | `/api/analyst/feedback` | Records user ratings, comments, and corrected SQL queries for traces. |
+| `GET` | `/api/rfx/{id}/comparison` | Side-by-side comparison matrix and 5 standard SQL widgets. |
+| `GET` | `/api/rfx/{id}/trust` | Supplier reliability scores (0-100), risk tier, points reasoning, and money-at-risk. |
+| `GET` | `/api/rfx/{id}/artifacts` | Fetches stored graphs, Chart.js specs, and generated reports (0 tokens). |
+| `POST` | `/api/rfx/{id}/award/scenarios` | Executes award simulation with constraints (MOQ, share caps, knockouts). |
+| `GET` | `/api/rfx/{id}/award/scenarios/{sid}` | Fetches stored scenario allocation details. |
+| `POST` | `/api/rfx/{id}/award/scenarios/{sid}/finalize` | Saves immutable scenario audit record and flag acceptance. |
+| `GET` | `/api/exports/{id}` | Downloads multi-tab Excel workbooks with mandatory *Assumptions & Caveats* sheet. |
 
 ---
 
-## Step 2: Vendor Quotation Intake, OCR & Extraction Endpoints
+## 6. Analytical Tuning & Configuration
 
-### 1. Vendor Response Submission (Multipart / Asynchronous)
+All system knobs are externalized in configuration files:
 
-- `POST /api/vendor-responses` (Status: `202 Accepted`)
-  - Accepts vendor quotation in **ANY** shape (Excel, CSV, PDF, Word, Email `.eml`, Images/Photos, raw text, JSON payload).
-  - Immediately stores raw files/payloads byte-for-byte with SHA-256 idempotency before async processing.
-  - Returns `{ "response_id": ..., "status": "received", "rfx_resolution_preview": ... }`.
-
-#### Request Parameters (Multipart Form-Data)
-
-- `files`: (0..n files) `.xlsx`, `.xls`, `.csv`, `.pdf`, `.docx`, `.doc`, `.txt`, `.eml`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.heic`
-- `body_text`: Raw email body or pasted quote text
-- `body_json`: Arbitrary JSON quotation payload
-- `subject`: Email subject or submission title
-- `sender_email`: Email address of the vendor representative
-- `sender_name`: Name of the vendor contact or company
-- `channel`: `email` | `upload` | `api` | `simulated` (default: `upload`)
-- `received_at`: Timestamp (ISO format, defaults to current time)
-- `rfx_id`: Optional RFx integer identifier (e.g. `26` or `"26"`)
-- `rfx_ref`: Optional RFx reference code / number (e.g. `RFQ-2026-001`, `RFI-26`, or `26`)
-- `vendor_name`: Optional explicit vendor company name
-
-> **RFx-Scoped Deduplication**: Duplicate detection (`is_duplicate`) is strictly evaluated within the scope of the target RFx (`rfx_id`). Submitting the same quotation or rate card document for a new or different RFx is recognized as a fresh submission for that RFx rather than colliding with prior responses.
-
-#### cURL Example
-
-```bash
-curl -X POST http://localhost:8000/api/vendor-responses \
-  -F "files=@samples/Apex_Packaging_Quote.xlsx" \
-  -F "sender_email=sales@apexpackaging.in" \
-  -F "sender_name=Apex Packaging" \
-  -F "subject=Quotation for RFQ-2026-001" \
-  -F "rfx_id=26" \
-  -F "channel=upload"
-```
-
-### 2. Response Status & Inspection
-
-- `GET /api/vendor-responses/{id}`: Detailed status, per-document processing progress, RFx & vendor resolution with confidence scores and reasoning, summary counts.
-- `GET /api/vendor-responses/{id}/items`: Extracted line items with matching state (`MATCHED`, `EXTRA`, `ALTERNATE`, `NOT_QUOTED`), validation state (`CONFIDENT`, `REVIEW`, `MISSING`), flags, reasoning, and crop coordinates.
-- `GET /api/vendor-responses/{id}/documents/{doc_id}/raw`: Retrieve original document byte-for-byte exactly as received.
-- `GET /api/response-items/{item_id}/crop`: Cropped PNG evidence image from PDF/image pages with 10% bounding padding.
-- `GET /api/rfx/{rfx_id}/responses`: All vendor responses for an RFx with coverage summary, flags, and item comparisons.
-- `POST /api/vendor-responses/{id}/reprocess`: Re-run the real extraction & validation pipeline (new run created, previous run preserved).
-- `PATCH /api/response-items/{item_id}`: Human buyer correction audit trail (records before/after diffs, user, and timestamp).
+1. **Semantic Text-to-SQL Models (`config/wren_semantic_model.yaml` & `config/wren_mdl.json`)**:
+   Defines field semantics (`effective_price_inr`, `coverage_pct`, `review_status`) to guide accurate SQL generation.
+2. **Few-Shot Examples (`config/wren_examples.yaml`)**:
+   24+ question-to-SQL examples covering complex joins (questionnaires, terms, flags, item prices, lead times, knockouts). User-rated feedback can be synced into examples via `python scripts/export_feedback_to_examples.py`.
+3. **Analyst Orchestrator Prompt (`config/prompts/analyst_system_v1.txt`)**:
+   Governs comparability-first rules, data state transparency (`CONFIDENT` vs `REVIEW`), and nuanced multi-vendor split trade-off summaries (cost delta, concentration risk, operational overhead, MOQ impacts).
+4. **Extraction Prompts (`backend/app/vendor/prompts.py`)**:
+   Guides multi-tiered volumetric discount table extraction, bracket parsing, and OCR scan column alignment.
+5. **Security & Guardrail Knobs (`backend/app/analyst/tools/sql_runner.py`)**:
+   `sqlglot` AST parser enforcing table allowlists, statement timeout (`5000ms`), and parameter limits.
 
 ---
 
-## Step 3: Natural Language Analysis, Decision Support & Award Optimization
+## 7. Verification & Test Suite
 
-Step 3 equips buyers with natural language analysis, original RFI specification review, side-by-side comparison grids, trust & risk scoring, deterministic award optimization, Chart.js visual analytics, and export packs (XLSX).
-
-### Decision Analyst Workbench (`/ui/analyst.html`)
-
-- **RFI Details & Items Tab**: View the complete original RFI scope, commercial terms (payment terms, delivery terms, validity, response deadline), estimated target spend, live line items search filter, and full line item specifications table (dimensions, materials, quantities, target prices, total line values, required dates, specifications, and total summary row). Includes quick action buttons to jump directly into the AI Chat assistant or vendor comparison grid.
-- **Analyst & Vendor Chat Tab**: Natural language AI assistant with 0-token caching for repeated questions, Chart.js diagrams, and transparent _How I Got This_ step audit traces.
-- **Comparison Grid & Widgets Tab**: Side-by-side line item comparison matrix and ready-made SQL benchmark widgets with L1 pricing, price spreads, and evidence crops.
-- **Trust & Risk Tab**: Vendor trust scores (0-100), risk audits, quotation confidence levels, and money-at-risk breakdown.
-
-### REST Endpoints
-
-1. **`POST /api/analyst/ask`**: Natural language Q&A returning structured JSON response contract:
-   - Request: `{ "rfx_id": 6, "session_id": "sess_1", "question": "Split the award: cheapest per line" }`
-   - Response: `{ answer_text, tables, charts, exports, caveats, how_i_got_this, confidence, suggested_followups, trace_id }`
-2. **`GET /api/analyst/sessions/{id}`**: Conversation history and telemetry traces.
-3. **`POST /api/analyst/feedback`**: Submit rating, comments, and corrected SQL for any trace.
-4. **`GET /api/rfx/{id}/comparison`**: Side-by-side comparison matrix (items x vendors: prices, state, flags, crops, coverage row, spend totals).
-5. **`GET /api/rfx/{id}/trust`**: Comprehensive trust & risk profile (0-100 score, % coverage, CONFIDENT/REVIEW/MISSING quotes, money at risk).
-6. **`POST /api/rfx/{id}/award/scenarios`**: Create / run deterministic allocation scenario simulation (Decision Tool).
-7. **`GET /api/rfx/{id}/award/scenarios/{sid}`**: Fetch saved scenario.
-8. **`POST /api/rfx/{id}/award/scenarios/{sid}/finalize`**: Saves scenario audit record. Note: Actual RFX status change to awarded is future scope.
-9. **`GET /api/exports/{id}`**: Download multi-tab Excel workbooks with mandatory _Assumptions & Caveats_ sheet.
-
-### cURL Examples
-
-#### 1. Ask a Decision Question (with 0-token caching for repeated questions)
-
-```bash
-curl -X POST http://localhost:8000/api/analyst/ask \
-  -H "Content-Type: application/json" \
-  -d '{
-    "rfx_id": 6,
-    "session_id": "buyer_session_1",
-    "question": "Who is cheapest vendor for each item?"
-  }'
-```
-
-#### 2. Fetch Comparison Grid with Ready-Made SQL Widgets
-
-```bash
-curl -X GET http://localhost:8000/api/rfx/6/comparison
-```
-
-*Returns side-by-side matrix along with deterministic SQL widgets: `basket_summary` (with full vs partial quote counts), `vendor_coverage` (100% quoted vs partial responses per vendor), `l1_items`, `price_spread`, and `vendor_leaderboard`._
-
-#### 3. Fetch Vendor Comparison & Trust Audit
-
-```bash
-curl -X GET http://localhost:8000/api/rfx/6/trust
-```
-
-*Returns vendor reliability scores, deterministic point calculations (`score_reasoning`), risk tier (`risk_level`), price confidence breakdown, money at risk, and total quoted spend per vendor._
-
-#### 4. Fetch Stored Graphs & Reports (0 Tokens)
-
-```bash
-curl -X GET http://localhost:8000/api/rfx/6/artifacts
-```
-
-#### 4. Finalize Award Scenario with Flag Acceptance
-
-```bash
-curl -X POST http://localhost:8000/api/rfx/6/award/scenarios/1/finalize \
-  -H "Content-Type: application/json" \
-  -d '{
-    "accepted_review_flags": [
-      {"vendor_id": 39, "item_id": 8, "reason": "Verified price manually via vendor email"}
-    ],
-    "buyer_name": "lead_procurement@company.com"
-  }'
-```
-
----
-
-## Tuning Guide & Customization Knobs
-
-All analytical knobs are externalized in config files (ordered by tuning impact):
-
-1. **Semantic Model Descriptions (`config/wren_semantic_model.yaml` & `config/wren_mdl.json`)**:
-   - _Impact_: **Highest**. Explaining column semantics (e.g. `effective_price_inr`, `state`, `review_status`) directly guides SQL generation accuracy.
-   - _Deployment_: Run `python scripts/deploy_wren_model.py`.
-2. **Few-shot Question-to-SQL Examples (`config/wren_examples.yaml`)**:
-   - _Impact_: **Very High**. 20+ seed pairs covering joins, aggregations, knockouts, and ranking.
-   - _Feedback Sync_: Run `python scripts/export_feedback_to_examples.py` to convert rated buyer corrections into new examples.
-3. **Analyst Orchestrator System Prompt (`config/prompts/analyst_system_v1.txt`)**:
-   - _Impact_: **High**. Enforces comparability-first, numbers verification, and structured markdown narration.
-4. **Guardrail & Threshold Knobs (`config/analyst_config.yaml`)**:
-   - _Impact_: **Medium**. Configures allowed view allowlists, statement timeout (`5000ms`), max tool steps, trust penalties, and default what-if assumptions (FX rates, freight).
-5. **Model Stage Switcher (`config/llms.yaml` & `config/analyst_config.yaml`)**:
-   - _Impact_: **Medium**. Seamlessly switch providers (`openai`, `anthropic`, `google`, `ollama`) across pipeline stages.
-
----
-
-## Running Benchmarks & Tests
-
-### Run 33-Question Decision Analyst Benchmark
-
-```bash
-PYTHONPATH=. .venv/bin/python scripts/eval_analyst.py
-```
-
-Outputs pass/fail matrix and logs trace details to `artifacts/logs/eval_analyst.log`.
-
-### Run Full Test Suite
+Run the full pytest suite covering all 86 unit and integration tests:
 
 ```bash
 PYTHONPATH=. .venv/bin/pytest tests/ backend/tests/ -v
 ```
 
----
+Run the 33-question Decision Analyst benchmark:
 
-## Decision Analyst Natural Language Question Answering & Synthesis
+```bash
+PYTHONPATH=. .venv/bin/python scripts/eval_analyst.py
+```
 
-The Decision Analyst incorporates dual-mode natural language synthesis and table formatting for buyer questions:
-
-- **Intelligent Narrative Synthesis**:
-  - LLM-powered primary synthesis using `config/prompts/analyst_system_v1.txt` delivers executive summaries, win distributions, and key highlights directly answering the buyer's query.
-  - Deterministic domain fallback synthesizes structured analysis for L1 lowest bidder allocations, vendor coverage, target price savings, and open risk flags when running offline or without LLM keys.
-- **Normalized Few-Shot Intent Matching**:
-  - Tolerates phrasing differences, stop words, and punctuation in user queries against `config/wren_examples.yaml`.
-  - Comprehensive intent fallbacks for newly created free-form buyer questions across savings, lead times, spend totals, single bidders, and specific item numbers.
-- **Clean Table Formatting & Technical Key Filtering**:
-  - Automatically suppresses internal primary keys (`rfx_item_id`, `vendor_id`, `response_id`) from buyer-facing tables.
-  - Humanizes column headers (`Item #`, `Description`, `Vendor`, `Price (INR)`, `Savings (INR)`, `Coverage %`) and applies INR currency formatting (`₹`).
-  - Renders inline status chips (`CONFIDENT`, `REVIEW`, `MISSING`, `CRITICAL`, `WARNING`, `PASS`, `FAIL`) in the chat workbench table stream.
+Test logs are output to [`artifacts/logs/test_fine_tuning_and_consolidation.log`](file:///Users/akshaykumar/code/ktq2/artifacts/logs/test_fine_tuning_and_consolidation.log).

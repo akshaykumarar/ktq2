@@ -285,17 +285,42 @@ def deterministic_text_extractor(parsed_text: str, filename: str) -> DocumentExt
 
             curr = "USD" if ("$" in price_clause or "usd" in price_clause.lower()) else "INR"
 
-            # Check for sub-clauses joined by "and" or "," (e.g. "₹1,000 for 50 pieces and ₹5,000 for 300 pieces" or "5m at ₹300 per box...")
-            sub_clauses = [s.strip() for s in re.split(r",?\s+and\s+|,;\s*", price_clause) if s.strip() and any(c in s.lower() for c in ["rs", "rate", "@", "$", "inr", "price", "₹"])]
+            # Check for sub-clauses joined by "and", comma, semicolon, or pipe
+            sub_clauses = [s.strip() for s in re.split(r",?\s+and\s+|[,;]\s*|\|\s*", price_clause) if s.strip() and any(c in s.lower() for c in ["rs", "rate", "@", "$", "inr", "price", "₹", "tier"])]
             if not sub_clauses:
                 sub_clauses = [price_clause]
+
+            # Detect line-level MOQ if mentioned
+            line_moq = None
+            moq_m = re.search(r"\bmoq\s*[:=]?\s*(\d+(?:\.\d+)?)\b", l_clean, re.IGNORECASE)
+            if moq_m:
+                line_moq = float(moq_m.group(1))
 
             for sc_idx, sc in enumerate(sub_clauses):
                 price_m = re.search(r"(?:unit price|rate|price|cost|@|rs\.?|inr|\$|₹)\s*[:=]?\s*([0-9,]+(?:\.[0-9]+)?)", sc, re.IGNORECASE)
                 p_val = float(price_m.group(1).replace(",", "")) if price_m else None
 
-                qty_m = re.search(r"(?:for|quantity|qty|volume|moq|\()\s*[:=]?\s*([0-9,]+(?:\.[0-9]+)?)\s*(?:pieces|pcs|dozen|box|boxes|rolls|roll|kg|sqm)?", sc, re.IGNORECASE)
-                q_val = float(qty_m.group(1).replace(",", "")) if qty_m else None
+                # Check for volumetric tier range e.g. "100-500 pcs", "501 to 2000", "2001+"
+                vol_range_m = re.search(r"(\d+)\s*(?:-|to)\s*(\d+|\+)\s*(?:pieces|pcs|units|box|boxes)?", sc, re.IGNORECASE)
+                vol_plus_m = re.search(r"(\d+)\s*\+\s*(?:pieces|pcs|units|box|boxes)?", sc, re.IGNORECASE) if not vol_range_m else None
+
+                q_val = None
+                tier_min = None
+                tier_max = None
+                discount_dict = {}
+
+                if vol_range_m:
+                    tier_min = float(vol_range_m.group(1))
+                    tier_max = float(vol_range_m.group(2)) if vol_range_m.group(2) != "+" else None
+                    q_val = tier_min
+                    discount_dict = {"type": "volumetric", "min_qty": tier_min, "max_qty": tier_max}
+                elif vol_plus_m:
+                    tier_min = float(vol_plus_m.group(1))
+                    q_val = tier_min
+                    discount_dict = {"type": "volumetric", "min_qty": tier_min, "max_qty": None}
+                else:
+                    qty_m = re.search(r"(?:for|quantity|qty|volume|moq|\()\s*[:=]?\s*([0-9,]+(?:\.[0-9]+)?)\s*(?:pieces|pcs|dozen|box|boxes|rolls|roll|kg|sqm)?", sc, re.IGNORECASE)
+                    q_val = float(qty_m.group(1).replace(",", "")) if qty_m else None
 
                 unit = "pcs"
                 if "per dozen" in sc.lower() or "dozen" in sc.lower():
@@ -317,8 +342,13 @@ def deterministic_text_extractor(parsed_text: str, filename: str) -> DocumentExt
                 spec_m = re.search(r"(\d+\s*(?:m|meter|gauge|micron|inch|cm|ply))\s+([a-zA-Z\s]+)", sc, re.IGNORECASE)
                 if spec_m:
                     item_desc = f"{spec_m.group(1)} {desc_part}".strip()
+                elif tier_min is not None:
+                    bracket_label = f"{int(tier_min)}-{int(tier_max) if tier_max else '+'}"
+                    item_desc = f"{desc_part} ({bracket_label} pcs tier)"
                 elif len(sub_clauses) > 1 and q_val:
                     item_desc = f"{desc_part} ({int(q_val)} pcs tier)"
+
+                moq_val = line_moq or tier_min
 
                 line_items.append(ExtractedLineItem(
                     vendor_line_no=str(len(line_items) + 1),
@@ -327,6 +357,8 @@ def deterministic_text_extractor(parsed_text: str, filename: str) -> DocumentExt
                     raw_price=p_val,
                     raw_unit=unit,
                     raw_currency=curr,
+                    moq=moq_val,
+                    discount=discount_dict,
                     source_snippet=f"{l_clean} -> {sc}",
                     source_location=f"Line {idx}",
                     extraction_confidence=0.95,
@@ -456,6 +488,8 @@ class ExtractionEngine:
                 doc_role=doc_role,
                 document_content=parsed_text[:12000],  # bounded safe context window
             )
+            if any(term in filename.lower() or term in parsed_text[:500].lower() for term in ["scan", "ocr", "image", "photo", "pdf", "table"]):
+                user_prompt += "\n\nGuidance: For OCR scans or tiered rate tables, extract each quantity break bracket as an explicit item tier with corresponding lower-bound qty/moq, rate, and structured discount tiers."
 
             result = await agent.run(user_prompt)
             duration_ms = int((time.time() - start_time) * 1000)

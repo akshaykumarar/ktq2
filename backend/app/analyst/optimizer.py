@@ -18,6 +18,35 @@ from backend.app.analyst.models import (
 logger = logging.getLogger(__name__)
 
 
+def compute_line_moq_cost(
+    qty: float,
+    unit_price: float,
+    moq: float | None,
+    constraints: AwardConstraints,
+) -> tuple[float, float, float | None, bool]:
+    """Compute (effective_line_spend, effective_order_quantity, moq_penalty_inr, is_valid)."""
+    if not constraints.enforce_moq or constraints.moq_penalty_mode in ("none", None):
+        return (qty * unit_price, qty, None, True)
+
+    if moq is None or qty >= moq:
+        return (qty * unit_price, qty, None, True)
+
+    shortfall = moq - qty
+    if constraints.moq_penalty_mode == "exclude_below_moq":
+        return (float("inf"), qty, None, False)
+    elif constraints.moq_penalty_mode == "quantity_bump":
+        surplus_spend = shortfall * unit_price
+        total_spend = moq * unit_price
+        return (total_spend, moq, round(surplus_spend, 2), True)
+    elif constraints.moq_penalty_mode == "shortfall_penalty":
+        rate = constraints.moq_shortfall_penalty_rate if constraints.moq_shortfall_penalty_rate is not None else 1.0
+        penalty = shortfall * unit_price * rate
+        total_spend = (qty * unit_price) + penalty
+        return (total_spend, qty, round(penalty, 2), True)
+
+    return (qty * unit_price, qty, None, True)
+
+
 def optimize_award(
     rfx_id: int,
     constraints: AwardConstraints | None = None,
@@ -84,7 +113,7 @@ def optimize_award(
                        ri.id as response_item_id, ri.raw_price, ri.raw_currency, ri.unit_factor,
                        ri.normalized_price_inr,
                        COALESCE((ri.buyer_override->>'corrected_price_inr')::numeric, ri.normalized_price_inr) as effective_price_inr,
-                       ri.state, ri.flags
+                       ri.state, ri.flags, ri.moq
                 FROM ktq.rfx_items rxi
                 JOIN ktq.response_items ri ON ri.rfx_item_id = rxi.id AND ri.is_current = TRUE
                 JOIN ktq.vendor_responses vr ON ri.response_id = vr.id AND vr.is_current = TRUE
@@ -161,6 +190,7 @@ def optimize_award(
 
         q_copy = dict(q)
         q_copy["effective_price_inr"] = eff_price
+        q_copy["moq"] = float(q["moq"]) if q.get("moq") is not None else None
         quotes_by_item.setdefault(item_id, []).append(q_copy)
 
     # Filter quotes by eligibility & review state
@@ -173,10 +203,10 @@ def optimize_award(
     if constraints.strategy == "single_vendor":
         best_vendor_id: int | None = None
         best_vendor_spend = float("inf")
-        best_vendor_quotes: dict[int, dict[str, Any]] = {}
+        best_vendor_quotes: dict[int, tuple[dict[str, Any], float, float, float | None]] = {}
 
         for vid in eligible_vendor_ids:
-            v_quotes: dict[int, dict[str, Any]] = {}
+            v_quotes: dict[int, tuple[dict[str, Any], float, float, float | None]] = {}
             can_quote_all = True
             v_spend = 0.0
 
@@ -191,9 +221,19 @@ def optimize_award(
                     matching = [q for q in matching if q["state"] == "CONFIDENT"]
 
                 if matching:
-                    best_q = min(matching, key=lambda x: x["effective_price_inr"])
-                    v_quotes[iid] = best_q
-                    v_spend += best_q["effective_price_inr"] * qty
+                    evaluated = []
+                    for mq in matching:
+                        line_cost, eff_q, pen, ok = compute_line_moq_cost(qty, mq["effective_price_inr"], mq.get("moq"), constraints)
+                        if ok:
+                            evaluated.append((line_cost, eff_q, pen, mq))
+                    if evaluated:
+                        evaluated.sort(key=lambda x: x[0])
+                        b_cost, b_eff_q, b_pen, b_q = evaluated[0]
+                        v_quotes[iid] = (b_q, b_cost, b_eff_q, b_pen)
+                        v_spend += b_cost
+                    else:
+                        can_quote_all = False
+                        break
                 else:
                     can_quote_all = False
                     break
@@ -210,9 +250,8 @@ def optimize_award(
             for it in rfx_items:
                 iid = it["id"]
                 qty = float(it["quantity"] or 1.0)
-                q = best_vendor_quotes[iid]
+                q, line_tot, eff_q, pen = best_vendor_quotes[iid]
                 unit_p = q["effective_price_inr"]
-                line_tot = unit_p * qty
                 total_spend += line_tot
 
                 # Prior year target benchmark
@@ -252,12 +291,14 @@ def optimize_award(
                         prior_year_unit_price_inr=target_p,
                         savings_vs_prior_year_inr=savings_vs_target,
                         savings_vs_l1_inr=savings_vs_l1,
+                        moq=q.get("moq"),
+                        moq_penalty_inr=pen,
+                        effective_order_quantity=eff_q,
                     )
                 )
 
     # Strategy 2: Cheapest per line or Multi-Vendor Split
     if constraints.strategy in ("cheapest_per_line", "multi_vendor_split"):
-        # First compute baseline unconstrained cheapest per line
         temp_allocations: list[dict[str, Any]] = []
         vendor_accumulated_spend: dict[int, float] = {}
 
@@ -278,18 +319,30 @@ def optimize_award(
                     if q["vendor_id"] in eligible_vendor_ids and q["effective_price_inr"] is not None
                 ]
 
-            if eligible_quotes:
-                # Sort ascending by price
-                eligible_quotes.sort(key=lambda x: x["effective_price_inr"])
+            # Evaluate each quote considering MOQ cost
+            evaluated_quotes = []
+            for eq in eligible_quotes:
+                line_cost, eff_q, pen, ok = compute_line_moq_cost(qty, eq["effective_price_inr"], eq.get("moq"), constraints)
+                if ok:
+                    evaluated_quotes.append({
+                        "quote": eq,
+                        "line_cost": line_cost,
+                        "effective_qty": eff_q,
+                        "moq_penalty": pen,
+                    })
+
+            if evaluated_quotes:
+                # Sort ascending by line_cost
+                evaluated_quotes.sort(key=lambda x: x["line_cost"])
                 temp_allocations.append({
                     "item": it,
-                    "quotes": eligible_quotes,
+                    "evaluated_quotes": evaluated_quotes,
                 })
             else:
                 caveats.append(f"No valid quotes found for item #{it['item_number']} ({it['description']}).")
 
         # Estimate unconstrained total spend
-        unconstrained_total = sum(t["quotes"][0]["effective_price_inr"] * float(t["item"]["quantity"] or 1.0) for t in temp_allocations)
+        unconstrained_total = sum(t["evaluated_quotes"][0]["line_cost"] for t in temp_allocations) if temp_allocations else 0.0
         max_spend_cap = float("inf")
         if constraints.max_share_per_vendor_pct and constraints.max_share_per_vendor_pct > 0:
             max_spend_cap = unconstrained_total * (constraints.max_share_per_vendor_pct / 100.0)
@@ -297,29 +350,34 @@ def optimize_award(
         # Allocate items considering cap
         for item_entry in temp_allocations:
             it = item_entry["item"]
-            quotes = item_entry["quotes"]
+            ev_quotes = item_entry["evaluated_quotes"]
             iid = it["id"]
             qty = float(it["quantity"] or 1.0)
 
-            # Pick the lowest priced quote that doesn't breach the vendor spend cap (if alternative exists)
-            selected_quote = quotes[0]
-            for q in quotes:
+            # Pick lowest priced quote that doesn't breach vendor spend cap
+            selected_entry = ev_quotes[0]
+            for eq in ev_quotes:
+                q = eq["quote"]
                 vid = q["vendor_id"]
                 current_v_spend = vendor_accumulated_spend.get(vid, 0.0)
-                line_val = q["effective_price_inr"] * qty
-                if current_v_spend + line_val <= max_spend_cap or q == quotes[-1]:
-                    selected_quote = q
+                line_val = eq["line_cost"]
+                if current_v_spend + line_val <= max_spend_cap or eq == ev_quotes[-1]:
+                    selected_entry = eq
                     break
 
+            selected_quote = selected_entry["quote"]
             vid = selected_quote["vendor_id"]
             unit_p = selected_quote["effective_price_inr"]
-            line_tot = unit_p * qty
+            line_tot = selected_entry["line_cost"]
+            pen = selected_entry["moq_penalty"]
+            eff_q = selected_entry["effective_qty"]
+
             vendor_accumulated_spend[vid] = vendor_accumulated_spend.get(vid, 0.0) + line_tot
             total_spend += line_tot
 
             target_p = float(it["target_price"]) if it["target_price"] else None
             savings_vs_target = (target_p - unit_p) * qty if target_p else None
-            l1_p = quotes[0]["effective_price_inr"]
+            l1_p = ev_quotes[0]["quote"]["effective_price_inr"]
             savings_vs_l1 = (l1_p - unit_p) * qty
 
             if selected_quote["state"] == "REVIEW":
@@ -350,6 +408,9 @@ def optimize_award(
                     prior_year_unit_price_inr=target_p,
                     savings_vs_prior_year_inr=savings_vs_target,
                     savings_vs_l1_inr=savings_vs_l1,
+                    moq=selected_quote.get("moq"),
+                    moq_penalty_inr=pen,
+                    effective_order_quantity=eff_q,
                 )
             )
 
@@ -377,12 +438,16 @@ def optimize_award(
 
     # Calculate aggregate savings vs prior year
     tot_savings_prior = sum(a.savings_vs_prior_year_inr for a in allocations if a.savings_vs_prior_year_inr is not None)
+    tot_moq_penalty = sum(a.moq_penalty_inr for a in allocations if a.moq_penalty_inr is not None)
+    if tot_moq_penalty > 0:
+        caveats.append(f"MOQ constraints enforced ({constraints.moq_penalty_mode}): Total MOQ penalty/surplus incurred is ₹{tot_moq_penalty:,.2f}.")
 
     return AwardOptimizationResult(
         allocations=allocations,
         vendor_totals=vendor_totals,
         total_project_spend_inr=round(total_spend, 2),
         total_savings_vs_prior_year_inr=round(tot_savings_prior, 2) if tot_savings_prior != 0 else None,
+        total_moq_penalty_inr=round(tot_moq_penalty, 2) if tot_moq_penalty > 0 else None,
         excluded_vendors=excluded_vendors,
         caveats=caveats,
         has_unresolved_review_items=len(review_items_awarded) > 0,

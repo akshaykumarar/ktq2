@@ -37,6 +37,52 @@ def test_sql_runner_blocks_destructive_commands():
             validate_sql_query(bad_sql)
 
 
+def test_sql_runner_ast_blocks_unauthorized_subqueries_and_joins():
+    """Verify AST parser strictly rejects unallowed tables in subqueries, CTEs, and JOINs."""
+    unauthorized_queries = [
+        # Subquery in WHERE
+        "SELECT * FROM ktq.v_rfx_comparison WHERE vendor_id IN (SELECT id FROM unallowed_secret_table)",
+        # Subquery in FROM
+        "SELECT * FROM (SELECT * FROM secret_payroll_data) sub",
+        # Unapproved table in JOIN
+        "SELECT * FROM ktq.v_rfx_comparison c JOIN sensitive_audit_table s ON c.rfx_item_id = s.item_id",
+        # CTE referencing unapproved table
+        "WITH leaked AS (SELECT * FROM private_credentials) SELECT * FROM leaked",
+        # Non-allowed schema table
+        "SELECT * FROM public.users",
+    ]
+    for bad_sql in unauthorized_queries:
+        with pytest.raises(SQLSecurityError):
+            validate_sql_query(bad_sql)
+
+
+def test_sql_runner_ast_allows_safe_ctes_and_allowed_tables():
+    """Verify AST parser permits complex queries and CTEs on approved views."""
+    safe_queries = [
+        """
+        WITH cte AS (
+            SELECT item_number, effective_price_inr
+            FROM ktq.v_rfx_comparison
+            WHERE rfx_id = 6
+        )
+        SELECT item_number, effective_price_inr FROM cte WHERE effective_price_inr < 50
+        """,
+        """
+        SELECT item_number, vendor_name
+        FROM (
+            SELECT item_number, vendor_name, effective_price_inr,
+                   ROW_NUMBER() OVER (PARTITION BY rfx_item_id ORDER BY effective_price_inr ASC) as rank
+            FROM ktq.v_rfx_comparison
+            WHERE rfx_id = 6
+        ) sub
+        WHERE rank = 1
+        """,
+    ]
+    for q in safe_queries:
+        validated = validate_sql_query(q)
+        assert "LIMIT" in validated
+
+
 @pytest.mark.requires_db
 def test_trust_report_computation():
     """Verify trust and risk profiling computes scores, money at risk, and flags."""

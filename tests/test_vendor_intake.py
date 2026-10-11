@@ -423,5 +423,36 @@ def test_resolution_prefixed_rfx_ref(mock_repo: MagicMock) -> None:
     assert res.signal_used == "explicit_rfx_ref_id"
 
 
+def test_deterministic_text_extractor_volumetric_discount_brackets() -> None:
+    """Test extraction of multi-tiered volumetric discount brackets and MOQ in text."""
+    from backend.app.vendor.extract import deterministic_text_extractor
+
+    raw_text = """
+    From: sales@boxmakers.in
+    Quotation for RFX #1
+    1. 5-Ply Corrugated Master Box: 100-500 pcs @ ₹45, 501-2000 pcs @ ₹40, 2001+ pcs @ ₹36 | MOQ: 100
+    2. Stretch Film 500mm: 50-200 rolls @ ₹320, 201-1000 rolls @ ₹290 | MOQ: 50
+    Payment Terms: Net 30 days
+    """
+    res = deterministic_text_extractor(raw_text, "quote_ocr_scan.txt")
+    assert len(res.line_items) >= 5  # 3 tiers for box + 2 tiers for film
+    box_tiers = [it for it in res.line_items if "Corrugated" in it.raw_description or "Box" in it.raw_description]
+    assert len(box_tiers) == 3
+    assert box_tiers[0].raw_price == 45.0
+    assert box_tiers[0].moq == 100.0
+    assert box_tiers[0].discount.get("type") == "volumetric"
+    assert box_tiers[0].discount.get("min_qty") == 100.0
+    assert box_tiers[0].discount.get("max_qty") == 500.0
+
+    assert box_tiers[1].raw_price == 40.0
+    assert box_tiers[1].discount.get("min_qty") == 501.0
+    assert box_tiers[1].discount.get("max_qty") == 2000.0
+
+    assert box_tiers[2].raw_price == 36.0
+    assert box_tiers[2].discount.get("min_qty") == 2001.0
+    assert box_tiers[2].discount.get("max_qty") is None
+
+
+
 
 
