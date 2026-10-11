@@ -79,17 +79,61 @@ DB_SCHEMA=ktq
 
 ### 4. Running the Application
 
-Start the unified FastAPI backend:
+Start the unified FastAPI backend locally or on a cloud instance:
 
 ```bash
+# Using the production cloud runner:
+./scripts/run_server.sh
+
+# Or directly via uvicorn:
 .venv/bin/uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Then visit:
-- **Chat UI**: [http://localhost:8000/ui/](http://localhost:8000/ui/)
+- **Chat UI**: [http://localhost:8000/ui/](http://localhost:8000/ui/) (or `http://<your-server-ip>:8000/ui/` when hosted)
 - **Interactive OpenAPI Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **System Health**: [http://localhost:8000/health](http://localhost:8000/health)
 - **Database Health**: [http://localhost:8000/health/db](http://localhost:8000/health/db)
+
+---
+
+## Cloud Hosting & Oracle Cloud (OCI) Deployment
+
+The application is completely cloud hosting-compatible and host-independent:
+- **Dynamic Endpoint Resolution**: All frontend API calls use relative paths (`/api/chat`, `/api/rfi`, etc.) rather than hardcoded `localhost:8000`.
+- **Automatic Self-Healing**: If a client browser has previously cached `http://localhost:8000/api/chat` in `localStorage`, the frontend automatically detects that the app is running on a remote host and migrates the endpoint to `/api/chat`.
+- **0.0.0.0 Network Binding**: `scripts/run_server.sh` binds to `0.0.0.0` by default and respects `PORT` and `HOST` environment variables.
+
+### Deploying on Oracle Cloud Compute:
+1. **Clone repository & set up environment**:
+   ```bash
+   git clone <repo-url> ktq2
+   cd ktq2
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   cp .env.example .env
+   # Add your OPENAI_API_KEY, DATABASE_URL / DB credentials
+   ```
+2. **Oracle Cloud Ingress Security Rule**:
+   - In the OCI Console, navigate to **Networking** > **Virtual Cloud Networks** > your VCN > **Security Lists** > **Default Security List**.
+   - Add an **Ingress Rule**:
+     - **Source CIDR**: `0.0.0.0/0`
+     - **IP Protocol**: `TCP`
+     - **Destination Port Range**: `8000` (or `80, 443` if using reverse proxy)
+   - If using Ubuntu/Debian on the instance, ensure `iptables` / `ufw` permits traffic:
+     ```bash
+     sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8000 -j ACCEPT
+     sudo netfilter-persistent save  # if iptables-persistent is installed
+     ```
+3. **Start the server**:
+   ```bash
+   ./scripts/run_server.sh
+   # Or run in background via systemd or tmux:
+   # nohup ./scripts/run_server.sh > server.log 2>&1 &
+   ```
+4. **Access the Application**:
+   - Open `http://<your-oracle-cloud-public-ip>:8000/ui/` in your browser. All chat, RFI intake, and analyst APIs will connect directly to your hosted instance.
 
 ---
 

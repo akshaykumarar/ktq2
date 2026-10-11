@@ -1982,6 +1982,7 @@
                 const useDefaultChoiceStore = defineStore("defaultChoiceStore", {
                     state: () => ({
                         url: [
+                            "/api/chat",
                             "https://api.openai.com",
                             "http://127.0.0.1",
                             "https://api.deepinfra.com",
@@ -2021,7 +2022,7 @@
                 const useChatbotStore = defineStore("chatbotStore", {
                     state: () => ({
                         apiKey: "aerchain3",
-                        url: "http://localhost:8000/api/chat",
+                        url: "/api/chat",
                         vendorWebhookUrl: "https://hook.eu1.make.com/ah791mkhp7r10xwsoljltui2jaymc5xr",
                         path: "",
                         model: "Qwen/Qwen3-32B",
@@ -2078,7 +2079,7 @@
                     }, []);
 
                     const isWebhook = chatbotStore.mode === 'webhook' ||
-                        (chatbotStore.url && (chatbotStore.url.includes('hook.') || chatbotStore.url.includes('make.com') || chatbotStore.url.includes('webhook')));
+                        (chatbotStore.url && (chatbotStore.url.includes('/api/chat') || chatbotStore.url.includes('hook.') || chatbotStore.url.includes('make.com') || chatbotStore.url.includes('webhook')));
 
                     if (isWebhook) {
                         try {
@@ -2111,7 +2112,18 @@
                                 conversation_id: messageStore.conversationId || Date.now().toString()
                             };
 
-                            const targetUrl = chatbotStore.url + (chatbotStore.path ? chatbotStore.path : '');
+                            let targetUrl = chatbotStore.url + (chatbotStore.path ? chatbotStore.path : '');
+                            // Auto-heal stale localhost/127.0.0.1 references from localStorage
+                            if (targetUrl === 'http://localhost:8000/api/chat' || targetUrl === 'http://127.0.0.1:8000/api/chat') {
+                                targetUrl = '/api/chat';
+                                chatbotStore.url = '/api/chat';
+                            } else if (
+                                (targetUrl.includes('localhost:8000') || targetUrl.includes('127.0.0.1:8000')) &&
+                                window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+                            ) {
+                                targetUrl = targetUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1):8000/, window.location.origin);
+                                chatbotStore.url = '/api/chat';
+                            }
 
                             const response = await fetch(targetUrl, {
                                 method: chatbotStore.method || "POST",
@@ -2517,8 +2529,16 @@
                     if (!chatbotStore.apiKey) {
                         chatbotStore.apiKey = 'aerchain3';
                     }
-                    if (!chatbotStore.url || chatbotStore.url.includes('api2.aiql.com')) {
-                        chatbotStore.url = 'http://localhost:8000/api/chat';
+                    // Auto-heal URL: migrate hardcoded localhost, deprecated external endpoints, or empty URLs to /api/chat
+                    const isLocalhostHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                    if (
+                        !chatbotStore.url ||
+                        chatbotStore.url.includes('api2.aiql.com') ||
+                        chatbotStore.url === 'http://localhost:8000/api/chat' ||
+                        chatbotStore.url === 'http://127.0.0.1:8000/api/chat' ||
+                        (!isLocalhostHost && (chatbotStore.url.includes('localhost') || chatbotStore.url.includes('127.0.0.1')))
+                    ) {
+                        chatbotStore.url = '/api/chat';
                         chatbotStore.mode = 'webhook';
                     }
                     if (!chatbotStore.vendorWebhookUrl) {

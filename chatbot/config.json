@@ -1,6 +1,6 @@
 {
   "chatbotStore": {
-    "url": "http://localhost:8000/api/chat",
+    "url": "/api/chat",
     "apiKey": "",
     "authHeader": "",
     "path": "",

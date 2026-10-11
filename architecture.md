@@ -64,8 +64,12 @@ flowchart TD
 
 ## Core Modules & Design Decisions
 
-### 1. Unified Backend & Serverless Runtime (`backend/app/main.py` & `api/index.py`)
+### 1. Unified Backend, Cloud Hosting & Serverless Runtime (`backend/app/main.py` & `api/index.py`)
 - Built on **FastAPI** with lifespan context for startup initialization of all agents.
+- **Cloud Hosting & Host-Agnostic Endpoints**:
+  - All client-side requests (`chatbot/index.html`, `chatbot/analyst.html`, `chatbot/config.json`) use origin-relative endpoints (`/api/chat`, `/api/rfi`, etc.) eliminating hardcoded `localhost:8000` issues when hosted remotely on Oracle Cloud, AWS, GCP, or bare-metal VPS.
+  - **Self-Healing LocalStorage Migration**: The frontend dynamically detects and upgrades legacy cached `http://localhost:8000/api/chat` or `http://127.0.0.1:8000/api/chat` URLs in client `localStorage` to relative `/api/chat` on page load.
+  - Production cloud runner [scripts/run_server.sh](file:///Users/akshaykumar/code/ktq2/scripts/run_server.sh) binds to `0.0.0.0` and enables proxy headers (`--proxy-headers --forwarded-allow-ips "*"`) for reverse proxies and cloud load balancers.
 - Serverless execution support on **Vercel** via [api/index.py](file:///Users/akshaykumar/code/ktq2/api/index.py) ASGI entrypoint and [vercel.json](file:///Users/akshaykumar/code/ktq2/vercel.json) rewrites.
 - CORS middleware enabled for local UI and external origins.
 - Static file serving mounted at `/ui` to serve `chatbot/index.html` directly.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Demonstration Script: Submitting Vendor Quotations across diverse channels and formats
 
-BASE_URL="http://127.0.0.1:8000"
+BASE_URL="${BASE_URL:-http://127.0.0.1:8000}"
 SAMPLES_DIR="$(cd "$(dirname "$0")/samples" && pwd)"
 
 echo "================================================================================"

@@ -31,81 +31,92 @@ def compute_trust_report(rfx_id: int, secrets: AppSecrets | None = None) -> Trus
 
     # 1. Fetch RFx info
     rfx_title = f"RFx #{rfx_id}"
-    with get_db_connection(secrets) as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute("SELECT id, title FROM ktq.rfx WHERE id = %s", (rfx_id,))
-            rfx_row = cur.fetchone()
-            if rfx_row:
-                rfx_title = rfx_row["title"]
+    try:
+        with get_db_connection(secrets) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute("SELECT id, title FROM ktq.rfx WHERE id = %s", (rfx_id,))
+                rfx_row = cur.fetchone()
+                if rfx_row:
+                    rfx_title = rfx_row["title"]
 
-            # 2. Fetch vendor coverage rows
-            cur.execute(
-                """
-                SELECT vendor_id, vendor_name, total_rfx_items, matched_items_count, coverage_pct,
-                       confident_items_count, review_items_count, missing_items_count,
-                       min_normalized_price_inr, max_normalized_price_inr, avg_normalized_price_inr
-                FROM ktq.v_vendor_coverage
-                WHERE rfx_id = %s
-                ORDER BY coverage_pct DESC, vendor_name ASC
-                """,
-                (rfx_id,),
-            )
-            coverage_rows = cur.fetchall()
+                # 2. Fetch vendor coverage rows
+                cur.execute(
+                    """
+                    SELECT vendor_id, vendor_name, total_rfx_items, matched_items_count, coverage_pct,
+                           confident_items_count, review_items_count, missing_items_count,
+                           min_normalized_price_inr, max_normalized_price_inr, avg_normalized_price_inr
+                    FROM ktq.v_vendor_coverage
+                    WHERE rfx_id = %s
+                    ORDER BY coverage_pct DESC, vendor_name ASC
+                    """,
+                    (rfx_id,),
+                )
+                coverage_rows = cur.fetchall()
 
-            # 3. Fetch open flags
-            cur.execute(
-                """
-                SELECT flag_id, vendor_name, item_id, code, severity, message
-                FROM ktq.v_open_flags
-                WHERE rfx_id = %s
-                ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 ELSE 3 END
-                """,
-                (rfx_id,),
-            )
-            open_flags = cur.fetchall()
+                # 3. Fetch open flags
+                cur.execute(
+                    """
+                    SELECT flag_id, vendor_name, item_id, code, severity, message
+                    FROM ktq.v_open_flags
+                    WHERE rfx_id = %s
+                    ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 ELSE 3 END
+                    """,
+                    (rfx_id,),
+                )
+                open_flags = cur.fetchall()
 
-            # 4. Fetch questionnaire knockout statuses
-            cur.execute(
-                """
-                SELECT vr.vendor_id,
-                       COUNT(ra.id) FILTER (WHERE rq.is_knockout = TRUE AND ra.pass_fail = 'fail') as knockout_fails,
-                       COUNT(ra.id) FILTER (WHERE rq.is_knockout = TRUE AND ra.pass_fail IN ('unanswered', 'needs_review')) as knockout_unresolved,
-                       COUNT(ra.id) FILTER (WHERE rq.is_knockout = TRUE) as total_knockouts
-                FROM ktq.vendor_responses vr
-                LEFT JOIN ktq.response_answers ra ON ra.response_id = vr.id
-                LEFT JOIN ktq.rfx_questions rq ON ra.rfx_question_id = rq.id
-                WHERE vr.rfx_id = %s AND vr.is_current = TRUE
-                GROUP BY vr.vendor_id
-                """,
-                (rfx_id,),
-            )
-            knockout_rows = {row["vendor_id"]: row for row in cur.fetchall()}
+                # 4. Fetch questionnaire knockout statuses
+                cur.execute(
+                    """
+                    SELECT vr.vendor_id,
+                           COUNT(ra.id) FILTER (WHERE rq.is_knockout = TRUE AND ra.pass_fail = 'fail') as knockout_fails,
+                           COUNT(ra.id) FILTER (WHERE rq.is_knockout = TRUE AND ra.pass_fail IN ('unanswered', 'needs_review')) as knockout_unresolved,
+                           COUNT(ra.id) FILTER (WHERE rq.is_knockout = TRUE) as total_knockouts
+                    FROM ktq.vendor_responses vr
+                    LEFT JOIN ktq.response_answers ra ON ra.response_id = vr.id
+                    LEFT JOIN ktq.rfx_questions rq ON ra.rfx_question_id = rq.id
+                    WHERE vr.rfx_id = %s AND vr.is_current = TRUE
+                    GROUP BY vr.vendor_id
+                    """,
+                    (rfx_id,),
+                )
+                knockout_rows = {row["vendor_id"]: row for row in cur.fetchall()}
 
-            # 5. Fetch money at risk (sum of effective_price * qty for REVIEW state lines)
-            cur.execute(
-                """
-                SELECT vendor_id,
-                       SUM(rfx_quantity * effective_price_inr) as money_at_risk
-                FROM ktq.v_rfx_comparison
-                WHERE rfx_id = %s AND state = 'REVIEW' AND effective_price_inr IS NOT NULL
-                GROUP BY vendor_id
-                """,
-                (rfx_id,),
-            )
-            risk_rows = {row["vendor_id"]: float(row["money_at_risk"] or 0.0) for row in cur.fetchall()}
+                # 5. Fetch money at risk (sum of effective_price * qty for REVIEW state lines)
+                cur.execute(
+                    """
+                    SELECT vendor_id,
+                           SUM(rfx_quantity * effective_price_inr) as money_at_risk
+                    FROM ktq.v_rfx_comparison
+                    WHERE rfx_id = %s AND state = 'REVIEW' AND effective_price_inr IS NOT NULL
+                    GROUP BY vendor_id
+                    """,
+                    (rfx_id,),
+                )
+                risk_rows = {row["vendor_id"]: float(row["money_at_risk"] or 0.0) for row in cur.fetchall()}
 
-            # 6. Fetch total quoted spend per vendor
-            cur.execute(
-                """
-                SELECT vendor_id,
-                       SUM(rfx_quantity * effective_price_inr) as total_spend
-                FROM ktq.v_rfx_comparison
-                WHERE rfx_id = %s AND effective_price_inr IS NOT NULL
-                GROUP BY vendor_id
-                """,
-                (rfx_id,),
-            )
-            spend_rows = {row["vendor_id"]: float(row["total_spend"] or 0.0) for row in cur.fetchall()}
+                # 6. Fetch total quoted spend per vendor
+                cur.execute(
+                    """
+                    SELECT vendor_id,
+                           SUM(rfx_quantity * effective_price_inr) as total_spend
+                    FROM ktq.v_rfx_comparison
+                    WHERE rfx_id = %s AND effective_price_inr IS NOT NULL
+                    GROUP BY vendor_id
+                    """,
+                    (rfx_id,),
+                )
+                spend_rows = {row["vendor_id"]: float(row["total_spend"] or 0.0) for row in cur.fetchall()}
+    except Exception as exc:
+        logger.warning("Database query failed in compute_trust_report for RFx #%s: %s", rfx_id, exc)
+        return TrustReportResult(
+            rfx_id=rfx_id,
+            rfx_title=rfx_title,
+            overall_confidence="low",
+            vendors=[],
+            critical_open_flags=[],
+            recommendations=[f"Database connection or query error: {exc}"],
+        )
 
     # Aggregate vendor trust summaries
     vendor_summaries: list[VendorTrustSummary] = []

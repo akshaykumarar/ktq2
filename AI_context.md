@@ -208,5 +208,29 @@
   - Validated local ASGI import via `python -c "from api.index import app; print(app.title)"`.
   - Full pytest regression suite executed with 32 passed unit/integration tests and logs in `artifacts/logs/test_vercel_prep.log`.
 
+## Step 13: Cloud Hosting Compatibility & Dynamic Endpoint Resolution
+- **Root Cause Resolution for Remote / Oracle Cloud Hosting**:
+  - Previously, `chatbot/config.json` and `chatbot/index.html` hardcoded `"url": "http://localhost:8000/api/chat"`.
+  - When hosted on Oracle Cloud (or any remote VPS), client web browsers attempted to dispatch API calls to `localhost:8000` (the client's machine) rather than the cloud host, causing network connection refused errors across chat workflows.
+  - Furthermore, `pinia-plugin-persist` retained the old `localhost` endpoint in client `localStorage`, causing failures to persist across page reloads.
+- **Host-Agnostic Frontend Architecture**:
+  - `chatbot/config.json`: Updated endpoint to origin-relative `"/api/chat"`.
+  - `chatbot/index.html`:
+    - Updated initial store state default to `url: "/api/chat"`.
+    - Added `/api/chat` to `defaultChoiceStore.url` options.
+    - Added automatic self-healing in `loadConfigFile()`: dynamically detects when running on a remote host or when `chatbotStore.url` contains `localhost:8000`/`127.0.0.1:8000`, migrating it immediately to `/api/chat`.
+    - Added runtime guard in `createCompletion`: intercepts any legacy `localhost:8000` URLs restored from `localStorage` and rewrites to `${window.location.origin}/api/chat`.
+    - Enhanced `isWebhook` check to include `/api/chat` for correct payload framing.
+- **Backend Resilience for Cloud Environments**:
+  - In `backend/app/analyst/tools/comparison.py`: wrapped database operations in `try...except` to catch connection and operational failures gracefully, returning structured diagnostics rather than crashing the worker.
+  - In `backend/app/analyst/tools/trust.py`: wrapped database queries with `try...except`, returning structured `TrustReportResult` with low confidence and clear diagnostics upon database connectivity issues.
+  - In `backend/app/api/analyst.py`: added HTTP error handling for comparison, trust, and artifact caching routes.
+- **Production Server & Deployment Support**:
+  - Added executable production startup script `scripts/run_server.sh` with `0.0.0.0` binding, configurable `HOST` and `PORT`, and proxy headers forwarding support (`--proxy-headers --forwarded-allow-ips "*"`).
+  - Updated `scripts/demo_submit.sh` to support `BASE_URL="${BASE_URL:-http://127.0.0.1:8000}"`.
+- **Full Test Suite Status**:
+  - Full regression suite passing 100% (72 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_hosting_compatibility.log`.
+
+
 
 

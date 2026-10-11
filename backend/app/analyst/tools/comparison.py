@@ -19,126 +19,130 @@ def get_comparison_grid(rfx_id: int, secrets: AppSecrets | None = None) -> dict[
     if not secrets.db_configured:
         return {"error": "Database not configured", "rfx_id": rfx_id}
 
-    with get_db_connection(secrets) as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            # 1. RFx header
-            cur.execute("SELECT id, title, status, currency, response_deadline FROM ktq.rfx WHERE id = %s", (rfx_id,))
-            rfx_row = cur.fetchone()
-            if not rfx_row:
-                return {"error": f"RFx #{rfx_id} not found", "rfx_id": rfx_id}
+    try:
+        with get_db_connection(secrets) as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                # 1. RFx header
+                cur.execute("SELECT id, title, status, currency, response_deadline FROM ktq.rfx WHERE id = %s", (rfx_id,))
+                rfx_row = cur.fetchone()
+                if not rfx_row:
+                    return {"error": f"RFx #{rfx_id} not found", "rfx_id": rfx_id}
 
-            # 2. RFx line items
-            cur.execute(
-                """
-                SELECT id, item_number, description, quantity, unit, target_price, specifications
-                FROM ktq.rfx_items
-                WHERE rfx_id = %s
-                ORDER BY item_number ASC
-                """,
-                (rfx_id,),
-            )
-            items = [dict(r) for r in cur.fetchall()]
+                # 2. RFx line items
+                cur.execute(
+                    """
+                    SELECT id, item_number, description, quantity, unit, target_price, specifications
+                    FROM ktq.rfx_items
+                    WHERE rfx_id = %s
+                    ORDER BY item_number ASC
+                    """,
+                    (rfx_id,),
+                )
+                items = [dict(r) for r in cur.fetchall()]
 
-            # 3. Vendor responses & coverage
-            cur.execute(
-                """
-                SELECT vendor_id, vendor_name, response_id, coverage_pct, matched_items_count,
-                       total_rfx_items, confident_items_count, review_items_count, missing_items_count
-                FROM ktq.v_vendor_coverage
-                WHERE rfx_id = %s
-                ORDER BY coverage_pct DESC, vendor_name ASC
-                """,
-                (rfx_id,),
-            )
-            vendors = [dict(r) for r in cur.fetchall()]
+                # 3. Vendor responses & coverage
+                cur.execute(
+                    """
+                    SELECT vendor_id, vendor_name, response_id, coverage_pct, matched_items_count,
+                           total_rfx_items, confident_items_count, review_items_count, missing_items_count
+                    FROM ktq.v_vendor_coverage
+                    WHERE rfx_id = %s
+                    ORDER BY coverage_pct DESC, vendor_name ASC
+                    """,
+                    (rfx_id,),
+                )
+                vendors = [dict(r) for r in cur.fetchall()]
 
-            # 4. Detailed comparison rows
-            cur.execute(
-                """
-                SELECT rfx_item_id, item_number, vendor_id, vendor_name, response_id, response_item_id,
-                       kind, raw_price, raw_unit, raw_currency, normalized_price_inr, effective_price_inr,
-                       lead_time_days, state, review_status
-                FROM ktq.v_rfx_comparison
-                WHERE rfx_id = %s
-                """,
-                (rfx_id,),
-            )
-            comp_rows = cur.fetchall()
+                # 4. Detailed comparison rows
+                cur.execute(
+                    """
+                    SELECT rfx_item_id, item_number, vendor_id, vendor_name, response_id, response_item_id,
+                           kind, raw_price, raw_unit, raw_currency, normalized_price_inr, effective_price_inr,
+                           lead_time_days, state, review_status
+                    FROM ktq.v_rfx_comparison
+                    WHERE rfx_id = %s
+                    """,
+                    (rfx_id,),
+                )
+                comp_rows = cur.fetchall()
 
-            # 5. Crop links
-            cur.execute(
-                """
-                SELECT ic.item_id, ic.id as crop_id
-                FROM ktq.item_crops ic
-                JOIN ktq.response_items ri ON ic.item_id = ri.id
-                JOIN ktq.vendor_responses vr ON ri.response_id = vr.id
-                WHERE vr.rfx_id = %s
-                """,
-                (rfx_id,),
-            )
-            crop_map = {row["item_id"]: f"/api/response-items/{row['item_id']}/crop" for row in cur.fetchall()}
+                # 5. Crop links
+                cur.execute(
+                    """
+                    SELECT ic.item_id, ic.id as crop_id
+                    FROM ktq.item_crops ic
+                    JOIN ktq.response_items ri ON ic.item_id = ri.id
+                    JOIN ktq.vendor_responses vr ON ri.response_id = vr.id
+                    WHERE vr.rfx_id = %s
+                    """,
+                    (rfx_id,),
+                )
+                crop_map = {row["item_id"]: f"/api/response-items/{row['item_id']}/crop" for row in cur.fetchall()}
 
-            # 6. Open flags map
-            cur.execute(
-                """
-                SELECT item_id, code, severity, message
-                FROM ktq.v_open_flags
-                WHERE rfx_id = %s AND item_id IS NOT NULL
-                """,
-                (rfx_id,),
-            )
-            flags_map: dict[int, list[str]] = {}
-            for f in cur.fetchall():
-                iid = f["item_id"]
-                flags_map.setdefault(iid, []).append(f"{f['code']}: {f['message']}")
+                # 6. Open flags map
+                cur.execute(
+                    """
+                    SELECT item_id, code, severity, message
+                    FROM ktq.v_open_flags
+                    WHERE rfx_id = %s AND item_id IS NOT NULL
+                    """,
+                    (rfx_id,),
+                )
+                flags_map: dict[int, list[str]] = {}
+                for f in cur.fetchall():
+                    iid = f["item_id"]
+                    flags_map.setdefault(iid, []).append(f"{f['code']}: {f['message']}")
 
-            # 7. Questionnaire answers
-            cur.execute(
-                """
-                SELECT vr.vendor_id, rq.question_text, rq.is_knockout, ra.pass_fail, ra.reason
-                FROM ktq.response_answers ra
-                JOIN ktq.vendor_responses vr ON ra.response_id = vr.id
-                JOIN ktq.rfx_questions rq ON ra.rfx_question_id = rq.id
-                WHERE vr.rfx_id = %s AND vr.is_current = TRUE
-                ORDER BY vr.vendor_id, rq.id
-                """,
-                (rfx_id,),
-            )
-            questionnaire_by_vendor: dict[int, list[dict[str, Any]]] = {}
-            for q in cur.fetchall():
-                vid = q["vendor_id"]
-                questionnaire_by_vendor.setdefault(vid, []).append({
-                    "question_text": q["question_text"],
-                    "is_knockout": q["is_knockout"],
-                    "pass_fail": q["pass_fail"],
-                    "reason": q["reason"],
-                })
+                # 7. Questionnaire answers
+                cur.execute(
+                    """
+                    SELECT vr.vendor_id, rq.question_text, rq.is_knockout, ra.pass_fail, ra.reason
+                    FROM ktq.response_answers ra
+                    JOIN ktq.vendor_responses vr ON ra.response_id = vr.id
+                    JOIN ktq.rfx_questions rq ON ra.rfx_question_id = rq.id
+                    WHERE vr.rfx_id = %s AND vr.is_current = TRUE
+                    ORDER BY vr.vendor_id, rq.id
+                    """,
+                    (rfx_id,),
+                )
+                questionnaire_by_vendor: dict[int, list[dict[str, Any]]] = {}
+                for q in cur.fetchall():
+                    vid = q["vendor_id"]
+                    questionnaire_by_vendor.setdefault(vid, []).append({
+                        "question_text": q["question_text"],
+                        "is_knockout": q["is_knockout"],
+                        "pass_fail": q["pass_fail"],
+                        "reason": q["reason"],
+                    })
 
-            # 8. Document list
-            cur.execute(
-                """
-                SELECT rd.id, rd.response_id, COALESCE(v.name, vr.sender_name) as vendor_name,
-                       rd.filename, rd.mime, rd.size_bytes, rd.created_at
-                FROM ktq.response_documents rd
-                JOIN ktq.vendor_responses vr ON rd.response_id = vr.id
-                LEFT JOIN ktq.vendors v ON vr.vendor_id = v.id
-                WHERE vr.rfx_id = %s AND vr.is_current = TRUE
-                ORDER BY rd.created_at DESC
-                """,
-                (rfx_id,),
-            )
-            docs = [
-                {
-                    "id": d["id"],
-                    "response_id": d["response_id"],
-                    "vendor_name": d["vendor_name"],
-                    "filename": d["filename"],
-                    "mime": d["mime"],
-                    "size_bytes": d["size_bytes"],
-                    "download_url": f"/api/vendor-responses/{d['response_id']}/documents/{d['id']}/raw",
-                }
-                for d in cur.fetchall()
-            ]
+                # 8. Document list
+                cur.execute(
+                    """
+                    SELECT rd.id, rd.response_id, COALESCE(v.name, vr.sender_name) as vendor_name,
+                           rd.filename, rd.mime, rd.size_bytes, rd.created_at
+                    FROM ktq.response_documents rd
+                    JOIN ktq.vendor_responses vr ON rd.response_id = vr.id
+                    LEFT JOIN ktq.vendors v ON vr.vendor_id = v.id
+                    WHERE vr.rfx_id = %s AND vr.is_current = TRUE
+                    ORDER BY rd.created_at DESC
+                    """,
+                    (rfx_id,),
+                )
+                docs = [
+                    {
+                        "id": d["id"],
+                        "response_id": d["response_id"],
+                        "vendor_name": d["vendor_name"],
+                        "filename": d["filename"],
+                        "mime": d["mime"],
+                        "size_bytes": d["size_bytes"],
+                        "download_url": f"/api/vendor-responses/{d['response_id']}/documents/{d['id']}/raw",
+                    }
+                    for d in cur.fetchall()
+                ]
+    except Exception as exc:
+        logger.warning("Database query failed in get_comparison_grid for RFx #%s: %s", rfx_id, exc)
+        return {"error": f"Database query failed: {exc}", "rfx_id": rfx_id}
 
     # Find minimum price per line item (L1)
     min_price_by_item: dict[int, float] = {}

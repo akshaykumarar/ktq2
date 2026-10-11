@@ -78,28 +78,49 @@ def submit_feedback(req: AnalystFeedbackRequest) -> dict[str, Any]:
 @router.get("/api/rfx/{id}/comparison")
 def get_rfx_comparison(id: int) -> dict[str, Any]:
     """Retrieve side-by-side items x vendors comparison grid with evidence crops and totals."""
-    grid = get_comparison_grid(id)
-    if "error" in grid and grid["error"]:
-        raise HTTPException(status_code=404, detail=grid["error"])
-    return grid
+    try:
+        grid = get_comparison_grid(id)
+        if "error" in grid and grid["error"]:
+            raise HTTPException(status_code=404, detail=grid["error"])
+        return grid
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Failed to fetch comparison grid for RFx #%s: %s", id, exc)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch comparison grid: {exc}")
 
 
 @router.get("/api/rfx/{id}/trust", response_model=TrustReportResult)
 def get_rfx_trust_report(id: int) -> TrustReportResult:
     """Retrieve comprehensive vendor trust scores, coverage %, and money at risk."""
-    return compute_trust_report(id)
+    try:
+        return compute_trust_report(id)
+    except Exception as exc:
+        logger.error("Failed to compute trust report for RFx #%s: %s", id, exc)
+        return TrustReportResult(
+            rfx_id=id,
+            rfx_title=f"RFx #{id}",
+            overall_confidence="low",
+            vendors=[],
+            critical_open_flags=[],
+            recommendations=[f"Failed to compute trust report: {exc}"],
+        )
 
 
 @router.get("/api/rfx/{id}/artifacts")
 def get_rfx_artifacts(id: int) -> dict[str, Any]:
     """Retrieve all stored and cached graphs, charts, and reports generated for a given RFX ID."""
-    repo = get_repository()
-    artifacts = repo.get_rfx_artifacts(id)
-    return {
-        "rfx_id": id,
-        "count": len(artifacts),
-        "artifacts": artifacts,
-    }
+    try:
+        repo = get_repository()
+        artifacts = repo.get_rfx_artifacts(id)
+        return {
+            "rfx_id": id,
+            "count": len(artifacts),
+            "artifacts": artifacts,
+        }
+    except Exception as exc:
+        logger.warning("Failed to fetch artifacts for RFx #%s: %s", id, exc)
+        return {"rfx_id": id, "count": 0, "artifacts": []}
 
 
 # ── Award Scenarios & Finalization ───────────────────────────────────────────
