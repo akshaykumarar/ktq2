@@ -2496,35 +2496,6 @@
                         console.warn('Could not load ./config.json:', e);
                     }
 
-                    // Also check for .env fallback for CHATBOTAUTH and CHATBOTURL
-                    try {
-                        const envPaths = ['./.env', '../.env'];
-                        for (const path of envPaths) {
-                            try {
-                                const envRes = await fetch(path);
-                                if (envRes.ok) {
-                                    const envText = await envRes.text();
-                                    envText.split('\n').forEach(line => {
-                                        const trimmed = line.trim();
-                                        if (trimmed && !trimmed.startsWith('#')) {
-                                            const [k, ...v] = trimmed.split('=');
-                                            const key = k ? k.trim() : '';
-                                            const val = v.join('=').trim();
-                                            if (key === 'CHATBOTAUTH' && val) {
-                                                chatbotStore.apiKey = val;
-                                            }
-                                            if (key === 'CHATBOTURL' && val) {
-                                                chatbotStore.url = val;
-                                            }
-                                        }
-                                    });
-                                    break;
-                                }
-                            } catch (err) { }
-                        }
-                    } catch (e) {
-                        console.warn('Could not read .env file directly:', e);
-                    }
 
                     if (!chatbotStore.apiKey) {
                         chatbotStore.apiKey = 'aerchain3';

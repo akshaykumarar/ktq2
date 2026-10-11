@@ -1,6 +1,7 @@
 # AI Context & Project Source of Truth
 
 ## Step 1: Packaging RFI Workflow & Intake System
+
 - Configurable multi-agent chatbot system extended with end-to-end Packaging RFI workflow:
   - **Conversational RFI Chat Workflow (`POST /api/chat`)**:
     - **Welcome Card Initiation**: UI starter card updated to "Create an RFI".
@@ -26,6 +27,7 @@
 - Automated evaluation (`scripts/eval_extraction.py`) passing 100% (8/8 ground truth items correct, 0 silent errors, crops generated for evidence).
 
 ## Step 2: Vendor Quotation Intake, Extraction & Validation System
+
 - **Database Architecture (`migrations/002_vendor_intake.sql`)**:
   - Raw document persistence: `vendor_responses`, `response_documents` (stores raw bytea, sha256, mime, size).
   - Normalized extracted data: `vendors`, `response_items`, `item_crops`, `response_terms`, `response_answers`, `response_flags`.
@@ -53,6 +55,7 @@
   - `PATCH /api/response-items/{item_id}` (Buyer corrections with before/after audit trail)
 
 ## Step 3: Natural Language Analysis, Decision Support & Award Optimization
+
 - **Database Architecture (`migrations/003_analyst.sql`)**:
   - `ktq.analyst_traces`: Detailed telemetry of each analyst interaction (question, tools called, SQL executed, path used, latencies, tokens, confidence, full JSON response).
   - `ktq.analyst_feedback`: User ratings, comments, corrected SQL, and corrected answers linked to traces.
@@ -85,6 +88,7 @@
   - Full pytest regression suite passing 100% (69/69) with logs in `artifacts/logs/test_full_suite.log`.
 
 ## Key Files
+
 - `backend/app/api/analyst.py`: FastAPI routes for decision analyst chat, grid, trust, and scenarios.
 - `backend/app/analyst/`: Core decision engine modules (`orchestrator.py`, `semantic.py`, `optimizer.py`, `repository.py`, `models.py`, `charts.py`, `exports.py`, `tools/`).
 - `chatbot/analyst.html`: 4-tab decision support UI workbench.
@@ -100,6 +104,7 @@
 - `artifacts/logs/test_cleanup_pass.log`: Test execution log verifying 69 tests across offline/mock and database-dependent components with graceful pytest skipping.
 
 ## Codebase Cleanup & Baseline Stabilization
+
 - **Test Harness Standardization**: Created `tests/conftest.py` with dynamic `requires_db` marker to automatically and gracefully skip tests requiring live network/DB connections during offline runs.
 - **Python Modernization & Cleanliness**:
   - Replaced deprecated `datetime.utcnow()` with `datetime.now(timezone.utc)` in `backend/app/vendor/service.py`.
@@ -108,6 +113,7 @@
 - **Documentation Parity**: Synchronized section numbering in `architecture.md`, completed the semantic decision intelligence layer overview, and cleaned Markdown syntax across `README.md` and `AI_context.md`.
 
 ## Step 4: Decision Analyst & Vendor Intelligence Unification
+
 - **Workflow & Skill Consolidation**:
   - Combined disparate "Check Vendor Response" and "Analyst Chat" into a unified **AI Procurement Analyst & Vendor Responses** hub.
   - Eliminated external make.com webhook intercept (`isVendorFlow` / `vendorWebhookUrl`) returning raw `"Accepted"`; routed all responses directly to unified backend endpoints.
@@ -152,10 +158,11 @@
     - The system does not execute binding line item awards or change RFX lifecycle status to awarded; formal award issuance and status changes remain future scope.
 
 ## Step 6: Commercial Terms Filtering & Dynamic Line Item Operations
+
 - **Commercial Terms & Free-Form Notes Auto-Separation**:
   - Resolved issue where pasted commercial terms sections (e.g. `Mandatory Commercial Terms To Include:`, `Clear Indication of MOQ`, `Freight / Shipping Cost`, `Warranty SLA`), conversational email paragraphs (e.g. greetings `Hi team`, closing paragraphs with implicit conditions `Please ensure delivery is completed within 15 days...`, `Thanks and regards`), and spreadsheet remarks/footer rows (`Note: GST 18% extra...`) were erroneously parsed as line items.
   - Implemented `is_separator_line()`, `is_conversational_or_boilerplate()`, `is_commercial_term_or_header()`, and natural language `extract_commercial_terms()` in `backend/app/intake/validation.py`.
-  - Automatically isolates non-product sentences/notes, strips leading list markers (`1. `, `2) `, `[3] `), and maps implicit terms (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`/`notes`) directly to RFI metadata.
+  - Automatically isolates non-product sentences/notes, strips leading list markers (`1.`, `2)`, `[3]`), and maps implicit terms (`payment_terms`, `delivery_terms`, `validity_days`, `currency`, `scope`/`notes`) directly to RFI metadata.
   - Applied consistently across PydanticAI parser instructions, deterministic extractor (`backend/app/intake/agent.py`), Excel/CSV importer (`backend/app/intake/excel_parser.py`), and Master agent orchestration (`backend/app/agents/master.py`).
 - **Dynamic Natural Language Line Item Operations**:
   - Added support for batch range deletions (e.g., "remove items 33 to 39", "remove 33-39", "delete items from 33 to 39").
@@ -168,6 +175,7 @@
   - Direct packaging text inputs (even without typing "Create an RFI" first) are recognized via packaging domain heuristics and routed directly to `handle_rfi_workflow_turn()`.
 
 ## Step 9: Tabular Key-Value Row Parsing, Solicitation Filtering & Terms Sanitization
+
 - **Tabular & Key-Value Row Intake**:
   - Structured and key-value annotated text (e.g. `1 [Pkg-001] 3-Ply Corrugated Box () Category: Cartons Target Qty: 433 Piece Baseline: ₹19.57`) is parsed into typed semantic fields regardless of tab, space, or pipe alignment.
   - Key-value tokens (`Category: ...`, `Target Qty: ...`, `Baseline: ₹...`, `Target Price: ...`) are mapped directly to `category`, `material`, `quantity`, `unit`, and `target_price`.
@@ -184,6 +192,7 @@
   - Full suite passing 100% (65 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_full_suite.log`.
 
 ## Step 11: Enterprise Tabular BOQ Intake, Intent Guardrails & Clean Presentation
+
 - **Intent Guardrails & Substring Bug Fix**:
   - Replaced naive substring checks (`v in q_lower`) with regex word-boundary matching `\b(update|change|modify|set|adjust|edit)\b` across `parse_modification_intent()`, `parse_terms_intent()`, and `parse_removal_intent()`.
   - Added multi-line tabular guards preventing multi-row table pastes from triggering single-item modification intents.
@@ -200,6 +209,7 @@
   - Full regression suite passing 100% (66 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_full_suite.log` and `artifacts/logs/test_tabular_intake.log`.
 
 ## Step 12: Vercel Serverless & Full-Stack Deployment Support
+
 - **Vercel Serverless Architecture**:
   - `requirements.txt`: Pinned root dependencies (`fastapi`, `uvicorn`, `pydantic`, `pydantic-ai`, `psycopg[binary]`, `openpyxl`, `httpx`, `pyyaml`, `python-dotenv`, `python-multipart`, `aiofiles`).
   - `api/index.py`: Serverless entrypoint exposing ASGI `app` from `backend.app.main` with automatic root directory path injection into `sys.path`.
@@ -209,6 +219,7 @@
   - Full pytest regression suite executed with 32 passed unit/integration tests and logs in `artifacts/logs/test_vercel_prep.log`.
 
 ## Step 13: Cloud Hosting Compatibility & Dynamic Endpoint Resolution
+
 - **Root Cause Resolution for Remote / Oracle Cloud Hosting**:
   - Previously, `chatbot/config.json` and `chatbot/index.html` hardcoded `"url": "http://localhost:8000/api/chat"`.
   - When hosted on Oracle Cloud (or any remote VPS), client web browsers attempted to dispatch API calls to `localhost:8000` (the client's machine) rather than the cloud host, causing network connection refused errors across chat workflows.
@@ -232,6 +243,7 @@
   - Full regression suite passing 100% (72 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_hosting_compatibility.log`.
 
 ## Step 14: Cross-RFx Vendor Quotation Deduplication & `rfx_id` Form Support
+
 - **Root Cause Analysis**:
   - `POST /api/vendor-responses` endpoint accepted `rfx_ref` as a form field, but not `rfx_id`. When users passed `--form 'rfx_id="26"'`, FastAPI omitted it and `rfx_ref` evaluated to `None`.
   - In `VendorRepository.check_duplicate_response()`, the SQL query checked `WHERE rd.sha256 = ANY(%s) AND vr.is_current = TRUE` without scoping by `vr.rfx_id = %s`.
@@ -250,6 +262,7 @@
   - Full test suite passing 100% (76 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_full_suite.log` and `artifacts/logs/test_vendor_duplicate_fix.log`.
 
 ## Step 15: Decision Analyst Question Answering & Natural Language Synthesis Fix
+
 - **Root Cause Analysis**:
   - In `backend/app/analyst/orchestrator.py`: Route C executed SQL queries via `ask_data()` and retrieved valid data rows, but output only a static placeholder template:
     `### Analysis for: *{question}*\n\nRetrieved {len(rows)} result records based on verified database queries.\n- Top Record: {cols[0]}: {rows[0][0]} | {cols[1]}: {rows[0][1]}`.
@@ -273,8 +286,3 @@
     - Rendered interactive status chips (`CONFIDENT`, `REVIEW`, `MISSING`, `CRITICAL`, `WARNING`, `PASS`, `FAIL`) and added a scrollable container for clean display of 30+ row tables.
 - **Verification**:
   - Full test suite passing 100% (82 passed, 14 skipped live PostgreSQL tests) with trace logs in `artifacts/logs/test_analyst_questions_fix.log` and `artifacts/logs/test_full_suite.log`.
-
-
-
-
-

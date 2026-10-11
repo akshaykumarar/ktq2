@@ -1,6 +1,7 @@
 # System Architecture
 
 ## Overview
+
 The application is a configurable multi-agent procurement platform integrating a FastAPI + PydanticAI backend with PostgreSQL, supporting the Vue 3 / Vuetify client-side application alongside an end-to-end Packaging RFI procurement workflow.
 
 ---
@@ -65,6 +66,7 @@ flowchart TD
 ## Core Modules & Design Decisions
 
 ### 1. Unified Backend, Cloud Hosting & Serverless Runtime (`backend/app/main.py` & `api/index.py`)
+
 - Built on **FastAPI** with lifespan context for startup initialization of all agents.
 - **Cloud Hosting & Host-Agnostic Endpoints**:
   - All client-side requests (`chatbot/index.html`, `chatbot/analyst.html`, `chatbot/config.json`) use origin-relative endpoints (`/api/chat`, `/api/rfi`, etc.) eliminating hardcoded `localhost:8000` issues when hosted remotely on Oracle Cloud, AWS, GCP, or bare-metal VPS.
@@ -78,6 +80,7 @@ flowchart TD
   - `GET /health/db` and `GET /api/db/health`: Safe PostgreSQL connection, dynamic schema presence, and query verification without exposing credentials.
 
 ### 2. Conversational RFI Workflow & Guardrails (`backend/app/agents/master.py`)
+
 - **Session Management (`ChatSessionState`)**: Tracks conversation mode (`is_rfi_workflow`), active draft RFI ID (`active_rfi_id`), pending confirmation state (`pending_confirmation`), and message turn count per `conversation_id`.
 - **Single RFI Draft Lifecycle**:
   - Starter command (`Create an RFI`) guides requirement intake without prematurely creating records. Direct packaging submissions automatically initialize draft creation.
@@ -110,6 +113,7 @@ flowchart TD
   - Welcome card configured with `Create an RFI`.
 
 ### 3. Database Layer & Dynamic Schema (`backend/app/db/`)
+
 - **Dynamic Schema**: Does not hardcode schema names; uses the configured `DB_SCHEMA` (default: `ktq`).
 - **Connection Isolation**: Connection context manager executes `SET search_path TO "{schema}", public` to ensure all queries resolve to the active tenant/environment schema.
 - **Repository Abstraction (`RFIRepository`)**: Parameterized queries, atomic transactions for RFI + items creation, and an in-memory fallback for offline test isolation.
@@ -119,11 +123,13 @@ flowchart TD
   - `ktq.rfx_activity`: Audit log (`rfx_id`, `activity_type`, `description`, `performed_by`, `created_at`).
 
 ### 4. LLM Provider Factory (`backend/app/providers/factory.py`)
+
 - `create_model()` instantiates `PydanticAI` models (`OpenAIChatModel`, `AnthropicModel`, `GoogleModel`, `OllamaModel`).
 - **Strict Credential Validation**: Default `fallback_to_mock=False` ensures missing API keys raise an explicit `ValueError` rather than silently returning mock models in production.
 - Explicit mock/test models (`provider: "test"` or `fallback_to_mock=True`) are preserved for unit testing.
 
 ### 5. PydanticAI Agent & LLM-First Extraction (`backend/app/intake/agent.py`)
+
 - PydanticAI `rfi_parser` configured via `config/agents.yaml`.
 - **LLM as First Choice**: The PydanticAI LLM agent is the primary engine for requirement extraction, category classification, dimension parsing, and commercial terms isolation.
 - Produces strict `IntakeExtractionResult` and `PackagingRequirement` models rather than free-form text.
@@ -133,11 +139,13 @@ flowchart TD
 - **No Hallucination**: Missing quantities, dimensions, prices, or dates are flagged explicitly rather than invented.
 
 ### 6. Excel Intake Parser (`backend/app/intake/excel_parser.py`)
+
 - Reads `.xlsx` via `openpyxl` and `.csv` via standard library.
 - Flexible header alias dictionary handles variations (`qty`, `volume`, `quantity` → `quantity`; `specs`, `notes` → `specifications`).
 - Captures row-level errors and skips blank or malformed lines without failing the entire file.
 
 ### 7. RFI Lifecycle & REST API (`backend/app/api/rfi.py`)
+
 - Lifecycle states: `DRAFT` → `READY` → `TRIGGERED` → `RESPONSES_PENDING` → `COMPLETED`.
 - `POST /api/rfi/intake`: Text requirements intake.
 - `POST /api/rfi/intake/excel`: Spreadsheet requirement upload.
@@ -147,11 +155,11 @@ flowchart TD
 - `POST /api/rfi/{id}/trigger`: Validates readiness, transitions status to `TRIGGERED`, records `triggered_at`.
 
 ### 8. Semantic Analytics & Decision Intelligence Layer (`backend/app/analyst/`)
+
 - **Semantic Modeling**: Defines domain models and column descriptions (`config/wren_semantic_model.yaml`, `config/wren_mdl.json`).
 - **Few-Shot Retrieval**: Matches relevant procurement question-to-SQL examples (`config/wren_examples.yaml`).
 - **Self-Correction Loop**: Single-retry execution recovery feedback loop correcting syntax/column errors.
 - **Decision Engine**: Coordinates deterministic optimization, risk auditing, chart generation, and multi-sheet XLSX export packs.
-
 
 ## Step 2: Vendor Quotation Intake & Extraction Architecture
 
@@ -212,9 +220,11 @@ flowchart TD
 ```
 
 ### State Machine Lifecycle
+
 `received` ➔ `preprocessing` ➔ `extracting` ➔ `resolving` ➔ `matching` ➔ `normalizing` ➔ `validating` ➔ `done` | `needs_review` | `failed`
 
 ### Read-Only SQL Views for Analysis
+
 1. `v_response_items_current`: Clean current line items with RFx item details, normalized prices in INR, flags, and crop URLs.
 2. `v_vendor_coverage`: Summary per vendor response (total items, quoted count, coverage %, min/max price, open critical flags).
 3. `v_open_flags`: Unresolved review flags with plain-language explanations for buyer intervention.
@@ -264,6 +274,7 @@ flowchart TD
 ```
 
 ### Deterministic Principles
+
 1. **LLM Understands & Narrates; Python & PostgreSQL Compute**: Every calculation, ranking, sum, and allocation comes from deterministic tools.
 2. **Comparability First**: Overall totals are never compared without checking and stating line item coverage.
 3. **Traceability Post-Check**: All figures in generated text are verified against tool outputs; ungrounded numbers automatically downgrade confidence.
@@ -307,7 +318,9 @@ flowchart TD
 ```
 
 ### Ready-Made Standard SQL Comparison Queries
+
 1. **L1 Best Price & Savings**:
+
    ```sql
    SELECT ri.item_number, ri.description, ri.quantity, ri.target_price,
           c.vendor_name as l1_vendor, MIN(c.effective_price_inr) as l1_price
@@ -316,7 +329,9 @@ flowchart TD
    WHERE c.rfx_id = :rfx_id
    GROUP BY ri.id, ri.item_number, ri.description, ri.quantity, ri.target_price, c.vendor_name;
    ```
+
 2. **Price Spread & Bidder Variance**:
+
    ```sql
    SELECT item_number, description, COUNT(DISTINCT vendor_id) as bidder_count,
           MIN(effective_price_inr) as min_price, MAX(effective_price_inr) as max_price,
@@ -372,6 +387,7 @@ flowchart TD
 ```
 
 ### Architectural Highlights
+
 1. **Normalized Intent Matching**: Strips stop words (`the`, `a`, `an`, `for`, `please`) and punctuation to ensure variations like `"Who is cheapest vendor for each item?"` match seed examples identically.
 2. **Dual-Mode Narrative Synthesis**: When LLM is active, prompt engineering synthesizes executive answers without hallucinating numbers; when offline, deterministic domain rules generate formatted markdown with exact counts and ranges.
 3. **Table Cleansing**: Prevents exposing database keys (`rfx_item_id`) to business users, humanizes column names, and formats INR currency.
@@ -387,5 +403,3 @@ PYTHONPATH=. .venv/bin/pytest tests/ backend/tests/ -v
 ```
 
 Test logs are output to [`artifacts/logs/test_full_suite.log`](file:///Users/akshaykumar/code/ktq2/artifacts/logs/test_full_suite.log).
-
-
