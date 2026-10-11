@@ -249,6 +249,32 @@
 - **Verification**:
   - Full test suite passing 100% (76 passed, 14 skipped PostgreSQL tests) with trace logs in `artifacts/logs/test_full_suite.log` and `artifacts/logs/test_vendor_duplicate_fix.log`.
 
+## Step 15: Decision Analyst Question Answering & Natural Language Synthesis Fix
+- **Root Cause Analysis**:
+  - In `backend/app/analyst/orchestrator.py`: Route C executed SQL queries via `ask_data()` and retrieved valid data rows, but output only a static placeholder template:
+    `### Analysis for: *{question}*\n\nRetrieved {len(rows)} result records based on verified database queries.\n- Top Record: {cols[0]}: {rows[0][0]} | {cols[1]}: {rows[0][1]}`.
+    It failed to synthesize any procurement answer, winner breakdown, or executive summary.
+  - Furthermore, `TableData` exposed technical primary keys (`rfx_item_id`, `vendor_id`, `response_id`), raw unformatted floats, and raw SQL column names to the buyer.
+  - In `backend/app/analyst/semantic.py`: example retrieval relied on exact string equality without normalizing stop words (`the`, `a`, `an`, `for`, `please`), causing quick questions with minor phrasing differences (e.g. "Who is cheapest vendor for each item?" vs "Who is the cheapest...") to miss exact examples, and fallback query generation was too narrow.
+- **Architectural Fixes**:
+  - **Dual-Mode Narrative Synthesis (`_generate_data_narrative`)**:
+    - Primary LLM synthesis invokes PydanticAI model using `config/prompts/analyst_system_v1.txt` to synthesize an executive summary answering the question directly with key findings, distributions, and state disclosures without hallucinating numbers.
+    - Deterministic domain fallback (`_synthesize_deterministic_narrative`) analyzes query rows to produce structured analyses for cheapest vendor (L1 wins per vendor, price ranges, CONFIDENT/REVIEW counts), savings vs target price (total INR savings, items under/over budget), quotation summary & coverage, and compliance/risk flags.
+    - Stated numbers and calculated figures are registered into `collected_numbers` ensuring the ground truth post-check awards `HIGH CONFIDENCE`.
+  - **Table Cleansing & Column Humanization**:
+    - Filtered out technical database IDs (`rfx_item_id`, `vendor_id`, `response_id`, `flag_id`, `rfx_id`) from display tables.
+    - Applied human-friendly column names (`Item #`, `Description`, `Vendor`, `Price (INR)`, `Savings (INR)`, `Coverage %`) and currency formatting (`₹`).
+    - Configured intelligent table titles matching question intent (`Lowest Quoted Price (L1) per Line Item`, `Vendor Quotation & Coverage Summary`, `Savings & Price Variance vs Target Price`).
+  - **Normalized Semantic Intent Matching**:
+    - Normalized queries before comparing against `config/wren_examples.yaml`.
+    - Added dedicated seed examples for all quick questions (`ex_01b`, `ex_02b`, `ex_02c`, `ex_10b`).
+    - Expanded fallback query builders in `SemanticDataEngine` for free-form user questions across savings, lead times, vendor spend, single bidders, and specific item numbers.
+  - **UI Table Stream Badges (`chatbot/analyst.html`)**:
+    - Rendered interactive status chips (`CONFIDENT`, `REVIEW`, `MISSING`, `CRITICAL`, `WARNING`, `PASS`, `FAIL`) and added a scrollable container for clean display of 30+ row tables.
+- **Verification**:
+  - Full test suite passing 100% (82 passed, 14 skipped live PostgreSQL tests) with trace logs in `artifacts/logs/test_analyst_questions_fix.log` and `artifacts/logs/test_full_suite.log`.
+
+
 
 
 

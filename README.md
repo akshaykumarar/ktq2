@@ -357,8 +357,25 @@ PYTHONPATH=. .venv/bin/python scripts/eval_analyst.py
 ```
 Outputs pass/fail matrix and logs trace details to `artifacts/logs/eval_analyst.log`.
 
-### Run Full Test Suite (69 Tests):
+### Run Full Test Suite:
 ```bash
 PYTHONPATH=. .venv/bin/pytest tests/ backend/tests/ -v
 ```
+
+---
+
+## Decision Analyst Natural Language Question Answering & Synthesis
+
+The Decision Analyst incorporates dual-mode natural language synthesis and table formatting for buyer questions:
+- **Intelligent Narrative Synthesis**:
+  - LLM-powered primary synthesis using `config/prompts/analyst_system_v1.txt` delivers executive summaries, win distributions, and key highlights directly answering the buyer's query.
+  - Deterministic domain fallback synthesizes structured analysis for L1 lowest bidder allocations, vendor coverage, target price savings, and open risk flags when running offline or without LLM keys.
+- **Normalized Few-Shot Intent Matching**:
+  - Tolerates phrasing differences, stop words, and punctuation in user queries against `config/wren_examples.yaml`.
+  - Comprehensive intent fallbacks for newly created free-form buyer questions across savings, lead times, spend totals, single bidders, and specific item numbers.
+- **Clean Table Formatting & Technical Key Filtering**:
+  - Automatically suppresses internal primary keys (`rfx_item_id`, `vendor_id`, `response_id`) from buyer-facing tables.
+  - Humanizes column headers (`Item #`, `Description`, `Vendor`, `Price (INR)`, `Savings (INR)`, `Coverage %`) and applies INR currency formatting (`₹`).
+  - Renders inline status chips (`CONFIDENT`, `REVIEW`, `MISSING`, `CRITICAL`, `WARNING`, `PASS`, `FAIL`) in the chat workbench table stream.
+
 

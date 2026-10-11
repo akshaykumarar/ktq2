@@ -3,9 +3,22 @@ examples:
   - id: ex_01
     question: "Who is the cheapest vendor for each item?"
     sql: >
-      SELECT rfx_item_id, item_number, rfx_description, vendor_name, effective_price_inr, state
+      SELECT item_number, rfx_description, vendor_name, effective_price_inr, state
       FROM (
-        SELECT rfx_item_id, item_number, rfx_description, vendor_name, effective_price_inr, state,
+        SELECT item_number, rfx_description, vendor_name, effective_price_inr, state,
+               ROW_NUMBER() OVER (PARTITION BY rfx_item_id ORDER BY effective_price_inr ASC) as rank
+        FROM ktq.v_rfx_comparison
+        WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED'
+      ) sub
+      WHERE rank = 1
+      ORDER BY item_number;
+
+  - id: ex_01b
+    question: "Who is cheapest vendor for each item?"
+    sql: >
+      SELECT item_number, rfx_description, vendor_name, effective_price_inr, state
+      FROM (
+        SELECT item_number, rfx_description, vendor_name, effective_price_inr, state,
                ROW_NUMBER() OVER (PARTITION BY rfx_item_id ORDER BY effective_price_inr ASC) as rank
         FROM ktq.v_rfx_comparison
         WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED'
@@ -17,6 +30,24 @@ examples:
     question: "Show total coverage percentage and quote counts for all vendors"
     sql: >
       SELECT vendor_id, vendor_name, total_rfx_items, matched_items_count, coverage_pct,
+             confident_items_count, review_items_count, missing_items_count
+      FROM ktq.v_vendor_coverage
+      WHERE rfx_id = :rfx_id
+      ORDER BY coverage_pct DESC, vendor_name ASC;
+
+  - id: ex_02b
+    question: "Show quotation summary for all vendors"
+    sql: >
+      SELECT vendor_name, total_rfx_items, matched_items_count, coverage_pct,
+             confident_items_count, review_items_count, missing_items_count, response_status
+      FROM ktq.v_vendor_coverage
+      WHERE rfx_id = :rfx_id
+      ORDER BY coverage_pct DESC, vendor_name ASC;
+
+  - id: ex_02c
+    question: "Check vendor compliance and response status"
+    sql: >
+      SELECT vendor_name, response_status, total_rfx_items, matched_items_count, coverage_pct,
              confident_items_count, review_items_count, missing_items_count
       FROM ktq.v_vendor_coverage
       WHERE rfx_id = :rfx_id
@@ -110,6 +141,21 @@ examples:
       FROM ktq.v_rfx_comparison
       WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL
       ORDER BY item_number, effective_price_inr ASC;
+
+  - id: ex_10b
+    question: "Show savings vs target price"
+    sql: >
+      SELECT item_number, rfx_description, rfx_quantity, rfx_target_price, vendor_name,
+             effective_price_inr, (rfx_target_price - effective_price_inr) as savings_per_unit_inr,
+             ((rfx_target_price - effective_price_inr) * rfx_quantity) as total_savings_inr
+      FROM (
+        SELECT item_number, rfx_description, rfx_quantity, rfx_target_price, vendor_name, effective_price_inr,
+               ROW_NUMBER() OVER (PARTITION BY rfx_item_id ORDER BY effective_price_inr ASC) as rank
+        FROM ktq.v_rfx_comparison
+        WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED'
+      ) sub
+      WHERE rank = 1 AND rfx_target_price IS NOT NULL
+      ORDER BY total_savings_inr DESC;
 
   - id: ex_11
     question: "List vendors who have 100% full item coverage"

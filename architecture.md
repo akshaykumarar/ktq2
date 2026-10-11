@@ -329,6 +329,55 @@ flowchart TD
 
 ---
 
+## Step 5: Natural Language Decision Synthesis & Table Humanization
+
+```mermaid
+flowchart TD
+    subgraph QueryIntake["1. Query Intake & Normalization"]
+        Q1["Buyer Question: askQuick or Chat Input"]
+        Q2["Stop-Word & Punctuation Normalization"]
+        Q3["Semantic Few-Shot Lookup (wren_examples.yaml)"]
+        Q4["Intent Fallback Builder (cheapest, savings, coverage, flags, lead times)"]
+    end
+
+    subgraph DeterministicExecution["2. Deterministic SQL Execution"]
+        E1["run_sql: Guarded SELECT with :rfx_id"]
+        E2["PostgreSQL Views (ktq.v_rfx_comparison, ktq.v_vendor_coverage, etc.)"]
+        E3["Exact Numbers Collection (collected_numbers)"]
+    end
+
+    subgraph SynthesisEngine["3. Dual-Mode Narrative Synthesis"]
+        S1{"LLM Available?"}
+        S2["LLM Narrative Synthesis (analyst_system_v1.txt)"]
+        S3["Deterministic Domain Fallback (L1 wins, savings, coverage, risk)"]
+        S4["Traceability Check (extract_numbers_from_text)"]
+    end
+
+    subgraph DataPresentation["4. Table Cleansing & UI Stream"]
+        T1["Filter Internal IDs (rfx_item_id, vendor_id, etc.)"]
+        T2["Humanize Columns (Item #, Vendor, Price INR, Savings INR)"]
+        T3["Format Currency & Percentages (₹, %)"]
+        T4["Interactive Vuetify Chips (CONFIDENT, REVIEW, CRITICAL, etc.)"]
+    end
+
+    Q1 --> Q2 --> Q3
+    Q3 -.->|No match| Q4
+    Q3 --> E1
+    Q4 --> E1
+    E1 --> E2 --> E3
+    E3 --> S1
+    S1 -->|Yes| S2 --> S4
+    S1 -->|No / Offline| S3 --> S4
+    E2 --> T1 --> T2 --> T3 --> T4
+```
+
+### Architectural Highlights
+1. **Normalized Intent Matching**: Strips stop words (`the`, `a`, `an`, `for`, `please`) and punctuation to ensure variations like `"Who is cheapest vendor for each item?"` match seed examples identically.
+2. **Dual-Mode Narrative Synthesis**: When LLM is active, prompt engineering synthesizes executive answers without hallucinating numbers; when offline, deterministic domain rules generate formatted markdown with exact counts and ranges.
+3. **Table Cleansing**: Prevents exposing database keys (`rfx_item_id`) to business users, humanizes column names, and formats INR currency.
+
+---
+
 ## Running Tests
 
 Run the full pytest suite:
@@ -338,4 +387,5 @@ PYTHONPATH=. .venv/bin/pytest tests/ backend/tests/ -v
 ```
 
 Test logs are output to [`artifacts/logs/test_full_suite.log`](file:///Users/akshaykumar/code/ktq2/artifacts/logs/test_full_suite.log).
+
 

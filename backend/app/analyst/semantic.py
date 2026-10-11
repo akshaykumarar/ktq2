@@ -93,9 +93,17 @@ class SemanticDataEngine:
 
         path_used = "wren" if wren_available else "fallback"
 
-        # Check for direct example exact match
+        # Normalize question for matching
+        def _normalize_q(s: str) -> str:
+            clean = re.sub(r"[^\w\s]", " ", s.lower())
+            words = [w for w in clean.split() if w not in {"the", "a", "an", "for", "please", "all", "me", "show"}]
+            return " ".join(words)
+
+        q_norm = _normalize_q(question)
+        # Check for direct example match (exact or normalized)
         for ex in self._examples:
-            if ex.get("question", "").strip().lower() == question.strip().lower():
+            ex_q = ex.get("question", "").strip()
+            if ex_q.lower() == question.strip().lower() or _normalize_q(ex_q) == q_norm:
                 raw_sql = ex.get("sql", "").strip()
                 return raw_sql, path_used
 
@@ -138,32 +146,91 @@ class SemanticDataEngine:
             logger.warning("LLM SQL generation error: %s. Using deterministic query builder fallback.", e)
             # Fallback to smart query based on intent
             q_low = question.lower()
-            if "coverage" in q_low or "quote count" in q_low:
+            item_match = re.search(r"\bitem\s+(?:number\s+|#\s*)?(\d+)\b", q_low)
+            if item_match:
+                item_num = int(item_match.group(1))
+                return (
+                    f"SELECT item_number, rfx_description, vendor_name, effective_price_inr, lead_time_days, state "
+                    f"FROM ktq.v_rfx_comparison WHERE rfx_id = :rfx_id AND item_number = {item_num} AND effective_price_inr IS NOT NULL "
+                    f"ORDER BY effective_price_inr ASC",
+                    path_used
+                )
+            elif any(w in q_low for w in ["saving", "target", "budget", "variance", "delta"]):
+                return (
+                    "SELECT item_number, rfx_description, rfx_quantity, rfx_target_price, vendor_name, "
+                    "effective_price_inr, (rfx_target_price - effective_price_inr) as savings_per_unit_inr, "
+                    "((rfx_target_price - effective_price_inr) * rfx_quantity) as total_savings_inr "
+                    "FROM (SELECT item_number, rfx_description, rfx_quantity, rfx_target_price, vendor_name, effective_price_inr, "
+                    "ROW_NUMBER() OVER (PARTITION BY rfx_item_id ORDER BY effective_price_inr ASC) as rank "
+                    "FROM ktq.v_rfx_comparison WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED') sub "
+                    "WHERE rank = 1 AND rfx_target_price IS NOT NULL ORDER BY total_savings_inr DESC",
+                    path_used
+                )
+            elif any(w in q_low for w in ["lead time", "delivery", "fastest", "turnaround", "timeline"]):
+                return (
+                    "SELECT item_number, rfx_description, vendor_name, lead_time_days, effective_price_inr "
+                    "FROM (SELECT item_number, rfx_description, vendor_name, lead_time_days, effective_price_inr, "
+                    "ROW_NUMBER() OVER (PARTITION BY rfx_item_id ORDER BY lead_time_days ASC NULLS LAST) as rank "
+                    "FROM ktq.v_rfx_comparison WHERE rfx_id = :rfx_id AND lead_time_days IS NOT NULL) ranked "
+                    "WHERE rank = 1 ORDER BY item_number",
+                    path_used
+                )
+            elif any(w in q_low for w in ["spend", "total spend", "spend per vendor"]):
+                return (
+                    "SELECT vendor_name, COUNT(rfx_item_id) as items_quoted, "
+                    "ROUND(SUM(rfx_quantity * effective_price_inr), 2) as total_spend_inr "
+                    "FROM ktq.v_rfx_comparison WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED' "
+                    "GROUP BY vendor_name ORDER BY total_spend_inr ASC",
+                    path_used
+                )
+            elif any(w in q_low for w in ["single bidder", "one bidder", "only one vendor"]):
+                return (
+                    "SELECT item_number, rfx_description, COUNT(DISTINCT vendor_id) as bidder_count "
+                    "FROM ktq.v_rfx_comparison WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED' "
+                    "GROUP BY rfx_item_id, item_number, rfx_description HAVING COUNT(DISTINCT vendor_id) = 1 ORDER BY item_number",
+                    path_used
+                )
+            elif any(w in q_low for w in ["compliance", "response status", "status", "qualification"]):
+                return (
+                    "SELECT vendor_name, response_status, total_rfx_items, matched_items_count, coverage_pct, "
+                    "confident_items_count, review_items_count, missing_items_count "
+                    "FROM ktq.v_vendor_coverage WHERE rfx_id = :rfx_id ORDER BY coverage_pct DESC, vendor_name ASC",
+                    path_used
+                )
+            elif any(w in q_low for w in ["coverage", "quote count", "quotation summary", "summary for all vendors", "overview"]):
                 return (
                     "SELECT vendor_name, total_rfx_items, matched_items_count, coverage_pct, "
                     "confident_items_count, review_items_count, missing_items_count "
-                    "FROM ktq.v_vendor_coverage WHERE rfx_id = :rfx_id ORDER BY coverage_pct DESC",
+                    "FROM ktq.v_vendor_coverage WHERE rfx_id = :rfx_id ORDER BY coverage_pct DESC, vendor_name ASC",
                     path_used
                 )
-            elif "flag" in q_low or "warning" in q_low or "risk" in q_low:
+            elif any(w in q_low for w in ["flag", "warning", "risk", "anomaly", "critical"]):
                 return (
                     "SELECT flag_id, vendor_name, code, severity, message, item_id "
-                    "FROM ktq.v_open_flags WHERE rfx_id = :rfx_id ORDER BY flag_id ASC",
+                    "FROM ktq.v_open_flags WHERE rfx_id = :rfx_id ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 ELSE 3 END, flag_id ASC",
                     path_used
                 )
-            elif "cheapest" in q_low or "l1" in q_low:
+            elif any(w in q_low for w in ["terms", "payment terms", "commercial terms", "freight"]):
+                return (
+                    "SELECT COALESCE(v.name, vr.sender_name) as vendor_name, rt.term_type, rt.value_text, rt.value_num "
+                    "FROM ktq.response_terms rt JOIN ktq.vendor_responses vr ON rt.response_id = vr.id "
+                    "LEFT JOIN ktq.vendors v ON vr.vendor_id = v.id WHERE vr.rfx_id = :rfx_id AND vr.is_current = TRUE "
+                    "ORDER BY vendor_name, rt.term_type",
+                    path_used
+                )
+            elif any(w in q_low for w in ["cheapest", "l1", "lowest price", "best price"]):
                 return (
                     "SELECT item_number, rfx_description, vendor_name, effective_price_inr, state "
                     "FROM (SELECT item_number, rfx_description, vendor_name, effective_price_inr, state, "
                     "ROW_NUMBER() OVER (PARTITION BY rfx_item_id ORDER BY effective_price_inr ASC) as rank "
-                    "FROM ktq.v_rfx_comparison WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL) sub "
+                    "FROM ktq.v_rfx_comparison WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL AND kind = 'MATCHED') sub "
                     "WHERE rank = 1 ORDER BY item_number",
                     path_used
                 )
             else:
                 return (
                     "SELECT item_number, rfx_description, vendor_name, effective_price_inr, lead_time_days, state "
-                    "FROM ktq.v_rfx_comparison WHERE rfx_id = :rfx_id ORDER BY item_number, effective_price_inr ASC",
+                    "FROM ktq.v_rfx_comparison WHERE rfx_id = :rfx_id AND effective_price_inr IS NOT NULL ORDER BY item_number, effective_price_inr ASC",
                     path_used
                 )
 
